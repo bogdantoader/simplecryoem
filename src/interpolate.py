@@ -1,53 +1,11 @@
 import numpy as np
 
-# Nearest neighbour interpolation
-# We don't really need the full X, Y, Z here, 
-# but only the actual grid points
-def interpolate_nn(i_coords, x_freq, y_freq, z_freq, vol):
+
+def interpolate(i_coords, x_freq, y_freq, z_freq, vol, method):
     """Given a volume vol sampled on meshgrid given
     by x_freq, y_freq, z_freq, return the interpolated values of vol
-    at the coordinates i_coords.
-
-    Nearest neighbour interpolation.
-
-    Parameters
-    ----------
-    i_coords: 3 x ... array
-        Interpolation points
-    x_freq, y_freq, z_freq : Nx, Ny, Nz arrays
-        The axes of the grid the volume is defined on
-    vol : Nx x Ny x Nz array
-        The volume
-
-    Returns
-    -------
-    i_slice : NxNy x 1 array
-        The interpolated values of vol.
-    """
-
-    # Obtain the nearest grid points and interpolate
-    i_slice = np.apply_along_axis(
-        lambda coords : 
-            vol[tuple(
-                find_nearest_one_grid_point_idx(coords, x_freq, y_freq, z_freq)
-            )],
-        axis = 0,
-        arr = i_coords)
-
-    # 'Interpolation' i.e. the value of the volume at those nearest grid points
-    #i_slice = np.apply_along_axis(lambda idx : vol[tuple(idx)],
-    #                           axis = 0,
-    #                           arr = nearest_points_idxs)
-    
-    return i_slice
-
-
-def interpolate_tri(i_coords, x_freq, y_freq, z_freq, vol):
-    """Given a volume vol sampled on meshgrid given
-    by x_freq, y_freq, z_freq, return the interpolated values of vol
-    at the coordinates i_coords of M points.
-
-    Trilinear interpolation.
+    at the coordinates i_coords of M points. 
+    Nearest neighbour or trilinear interpolation.
 
     Parameters
     ----------
@@ -57,24 +15,48 @@ def interpolate_tri(i_coords, x_freq, y_freq, z_freq, vol):
         The axes of the grid the volume is defined on
     vol : Nx x Ny x Nz array
         The volume
-
+    method: string
+        "nn" for nearest neighbour
+        "tri" for trilinear 
     Returns
     -------
     i_slice : NxNy x 1 array
         The interpolated values of vol.
     """
-
+    
+    if method == "nn":
+        interp_func = get_interpolate_nn_lambda(x_freq, y_freq, z_freq, vol)
+    elif method == "tri":
+        interp_func = get_interpolate_tri_lambda(x_freq, y_freq, z_freq, vol)
+   
     i_slice = np.apply_along_axis(
-        lambda coords : 
-            tri_interp_point(
-                coords, vol,
-                find_nearest_eight_grid_points_idx(coords, x_freq, y_freq, z_freq)
-            ),
+        interp_func,
         axis = 0,
         arr = i_coords
     )
 
-    return i_slice
+    return i_slice 
+
+# Nearest neighbour interpolation
+def get_interpolate_nn_lambda(x_freq, y_freq, z_freq, vol):
+
+    # Obtain the closest grid point to the point and interpolate
+    # i.e. take the value of the volume at the closest grid point.
+    thelambda = lambda coords : vol[tuple(
+        find_nearest_one_grid_point_idx(coords, x_freq, y_freq, z_freq)
+    )]
+
+    return thelambda
+
+
+def get_interpolate_tri_lambda(x_freq, y_freq, z_freq, vol):
+
+    # Obtain the eight grid points around each point and interpolate.
+    thelambda = lambda coords : tri_interp_point(coords, vol,  
+        find_nearest_eight_grid_points_idx(coords, x_freq, y_freq, z_freq)
+    )
+
+    return thelambda 
 
 def tri_interp_point(i_coords, vol, xyz_and_idx):
     """Trilinear interpolation of the volume vol at the point given by coords

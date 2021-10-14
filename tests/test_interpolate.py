@@ -51,7 +51,7 @@ class TestInterpolate(unittest.TestCase):
                     vol[5,4,1],
                     vol[0,2,3]])
 
-        i_vol = interpolate_nn(i_coords, x_freq, y_freq, z_freq, vol)
+        i_vol = interpolate(i_coords, x_freq, y_freq, z_freq, vol, "nn")
 
         self.assertEqual(sum((i_vol - i_vol_correct)**2), 0)
 
