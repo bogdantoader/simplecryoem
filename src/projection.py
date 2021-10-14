@@ -1,5 +1,5 @@
 import numpy as np
-from src.interpolate import interpolate 
+from src.interpolate import interpolate_nn, interpolate_tri 
 
 
 def project(vol, X, Y, Z, angles):
@@ -7,8 +7,12 @@ def project(vol, X, Y, Z, angles):
     X_r, Y_r, Z_r = rotate(X, Y, Z, angles)
 
     slice_coords = np.array([X_r[:,:,0].flatten(), Y_r[:,:,0].flatten(),Z_r[:,:,0].flatten()])
-    slice_interp = interpolate(slice_coords , X, Y, Z, vol)
 
+    x_freq = X[0,:,0]
+    y_freq = Y[:,0,0]
+    z_freq = Z[0,0,:]
+
+    slice_interp = interpolate_tri(slice_coords , x_freq, y_freq, z_freq, vol)
     slice_interp_2d = slice_interp.reshape(X_r.shape[0], X_r.shape[1])
 
     slice_X = slice_coords[0,:].reshape(X_r.shape[0], X_r.shape[1])

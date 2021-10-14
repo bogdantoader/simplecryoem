@@ -8,7 +8,7 @@ from src.interpolate import *
 
 class TestInterpolate(unittest.TestCase):
 
-    def test_find_nearest_grid_points_idx(self):    
+    def test_find_nearest_one_grid_point_idx(self):    
         x_freq = np.fft.fftfreq(10,2)
         y_freq = np.fft.fftfreq(5,0.1)
         z_freq = np.fft.fftfreq(6,1)
@@ -28,19 +28,17 @@ class TestInterpolate(unittest.TestCase):
 
         for p, pt_grid_idx in zip(pts, pts_grid_idxs):
             #print(p, pt_grid_idx)
-            idx_found = find_nearest_grid_points_idx(p, x_freq, y_freq, z_freq)
+            idx_found = find_nearest_one_grid_point_idx(p, x_freq, y_freq, z_freq)
             #print(idx_found)
             self.assertEqual(sum((idx_found-pt_grid_idx)**2), 0)
 
         return
            
 
-    def test_interpolate(self):
+    def test_interpolate_nn(self):
         x_freq = np.fft.fftfreq(10,2)
         y_freq = np.fft.fftfreq(5,0.1)
         z_freq = np.fft.fftfreq(6,1)
-        
-        X,Y,Z = np.meshgrid(x_freq, y_freq, z_freq, indexing = 'xy')
         
         vol = np.random.randn(len(x_freq), len(y_freq), len(z_freq))
 
@@ -53,7 +51,7 @@ class TestInterpolate(unittest.TestCase):
                     vol[5,4,1],
                     vol[0,2,3]])
 
-        i_vol = interpolate(i_coords, X, Y, Z, vol)
+        i_vol = interpolate_nn(i_coords, x_freq, y_freq, z_freq, vol)
 
         self.assertEqual(sum((i_vol - i_vol_correct)**2), 0)
 

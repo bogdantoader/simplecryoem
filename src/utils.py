@@ -1,4 +1,6 @@
 import numpy as np
+from  matplotlib import pyplot as plt
+
 
 # TODO: maybe put all the coordinates X, Y, Z in one variable 
 # if it makes more sense 
@@ -119,3 +121,10 @@ def volume_fourier(vol, dimensions, shape_f = None):
     X_f, Y_f, Z_f = np.meshgrid(x_freq, y_freq, z_freq, indexing='xy')
 
     return vol_f, X_f, Y_f, Z_f, dx, dy, dz
+
+def mip_z(img):
+    plt.imshow(np.max(img, axis = 2))
+    return
+
+
+
