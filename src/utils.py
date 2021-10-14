@@ -1,11 +1,33 @@
 import numpy as np
 
-def volume_comp(shape, dimensions):
-    return 0
+# TODO: maybe put all the coordinates X, Y, Z in one variable 
+# if it makes more sense 
+
+def volume_comp(shape, dimensions, centres, radii, intensities):
+    """Create a volume that is a sum of rand_volumes with given centres and
+    radii.
+
+    Parameters
+    ----------
+    shape : 3 x 1 array
+        Dimensions of the volume, in number of elements
+    dimensions: 3 x 1 array
+        Dimensions of the volume, in units (e.g. Angst?)
+    centres: N x 3 array
+        Centre coordinates of each of the N components
+    radii: N array 
+        Radii of each of the N components
+    """
+
+    vol = sum(map(lambda cr : 
+            rand_volume(shape, dimensions, cr[0], cr[1], cr[2]),
+        zip(centres, radii, intensities)))
+    
+    return vol
 
 # TODO: think properly about inputs-outputs.
 # In the spatial domain, the function below makes sense.
-def rand_volume(shape, dimensions, centre, radius, sigma = 0.1):
+def rand_volume(shape, dimensions, centre, radius, intensity, sigma = 0.1):
     """Generate a random smoothed spherical volume.
 
     Parameters
@@ -26,7 +48,7 @@ def rand_volume(shape, dimensions, centre, radius, sigma = 0.1):
     """
     
     Nx, Ny, Nz = shape
-    vol = np.random.randn(Nx, Ny, Nz) + 2
+    vol = np.random.randn(Nx, Ny, Nz) + intensity
     #vol = np.ones(shape) + 5
     vol[vol < 0] = 0
     
@@ -44,7 +66,7 @@ def rand_volume(shape, dimensions, centre, radius, sigma = 0.1):
     mask = create_mask(X, Y, Z, centre, radius) 
     
     #return low_pass_filter(mask*vol, X, Y, Z, sigma), X, Y, Z
-    return mask * vol, X, Y, Z
+    return mask * vol
 
 def create_mask(X, Y, Z, centre, radius):
     mask = np.ones(X.shape)

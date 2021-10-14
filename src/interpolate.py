@@ -1,6 +1,8 @@
 import numpy as np
 
 # Nearest neighbour interpolation
+# We don't really need the full X, Y, Z here, 
+# but only the actual grid points
 def interpolate(i_coords, X, Y, Z, vol):
     """Given a volume vol sampled on meshgrid given
     by X, Y, Z, return the interpolated values of vol
@@ -102,6 +104,7 @@ def find_nearest_grid_points_idx(coords, x_freq, y_freq, z_freq):
     return pts_idx[min_idx]
 
 # Can this be vectorized for many coords/points?
+# Only dx and grid length are needed, not full grid
 def find_adjacent_grid_points_idx(p, grid):
     """For a one dimensional grid of Fourier samples
     and a point p, find the indices of the grid points
