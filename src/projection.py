@@ -44,7 +44,8 @@ def rotate_z(X, Y, Z, alpha):
 
 # Euler angles
 # TODO: no need to apply the rotation to all coords if in Fourier
-# we are only interested in the plane z=0 after rotation
+# we are only interested in the new coordinates of the pre-rotation
+# plane z=0 
 def rotate(X, Y, Z, angles):
     """Rotate the coordinates given by X, Y, Z
     with Euler angles alpha, beta, gamma
