@@ -22,9 +22,13 @@ class TestInterpolate(unittest.TestCase):
                 np.array([-0.24, -2, 0.168]),
                 np.array([-0.01, 4, -0.48])]
         pts_grid_idxs = [np.array([0, 0, 0]),
-                np.array([1, 0, 0]),
-                np.array([5, 4, 1]),
-                np.array([0, 2, 3])]
+                #np.array([1, 0, 0]),
+                #np.array([5, 4, 1]),
+                #np.array([0, 2, 3])]
+                np.array([0, 1, 0]),
+                np.array([4, 5, 1]),
+                np.array([2, 0, 3])]
+            # x and y indices swapped
 
         for p, pt_grid_idx in zip(pts, pts_grid_idxs):
             #print(p, pt_grid_idx)
@@ -40,16 +44,16 @@ class TestInterpolate(unittest.TestCase):
         y_freq = np.fft.fftfreq(5,0.1)
         z_freq = np.fft.fftfreq(6,1)
         
-        vol = np.random.randn(len(x_freq), len(y_freq), len(z_freq))
+        vol = np.random.randn(len(y_freq), len(x_freq), len(z_freq))
 
         i_coords = np.array([[0, 0.04, -0.24, -0.01],
                              [0, 0, -2, 4],
                              [0, 0, 0.168, -0.48]])
             
         i_vol_correct = np.array([vol[0,0,0],
-                    vol[1,0,0],
-                    vol[5,4,1],
-                    vol[0,2,3]])
+                    vol[0,1,0],
+                    vol[4,5,1],
+                    vol[2,0,3]])
 
         i_vol = interpolate(i_coords, x_freq, y_freq, z_freq, vol, "nn")
 

@@ -20,7 +20,7 @@ def interpolate(i_coords, x_freq, y_freq, z_freq, vol, method):
         "tri" for trilinear 
     Returns
     -------
-    i_slice : NxNy x 1 array
+    i_vals : NxNy x 1 array
         The interpolated values of vol.
     """
     
@@ -29,13 +29,13 @@ def interpolate(i_coords, x_freq, y_freq, z_freq, vol, method):
     elif method == "tri":
         interp_func = get_interpolate_tri_lambda(x_freq, y_freq, z_freq, vol)
    
-    i_slice = np.apply_along_axis(
+    i_vals = np.apply_along_axis(
         interp_func,
         axis = 0,
         arr = i_coords
     )
 
-    return i_slice 
+    return i_vals
 
 # Nearest neighbour interpolation
 def get_interpolate_nn_lambda(x_freq, y_freq, z_freq, vol):
@@ -89,14 +89,16 @@ def tri_interp_point(i_coords, vol, xyz_and_idx):
     yd = (y - xyz[1,0])/(xyz[1,1] - xyz[1,0])
     zd = (z - xyz[2,0])/(xyz[2,1] - xyz[2,0])
 
-    c000 = vol[xyz_idx[0,0], xyz_idx[1,0], xyz_idx[2,0]] 
-    c001 = vol[xyz_idx[0,0], xyz_idx[1,0], xyz_idx[2,1]] 
-    c010 = vol[xyz_idx[0,0], xyz_idx[1,1], xyz_idx[2,0]] 
-    c011 = vol[xyz_idx[0,0], xyz_idx[1,1], xyz_idx[2,1]] 
-    c100 = vol[xyz_idx[0,1], xyz_idx[1,0], xyz_idx[2,0]] 
-    c101 = vol[xyz_idx[0,1], xyz_idx[1,0], xyz_idx[2,1]] 
-    c110 = vol[xyz_idx[0,1], xyz_idx[1,1], xyz_idx[2,0]] 
-    c111 = vol[xyz_idx[0,1], xyz_idx[1,1], xyz_idx[2,1]] 
+    # The value of the function at each grid point.
+    # Note that x and y indices are swapped in vol.
+    c000 = vol[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,0]] 
+    c001 = vol[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,1]] 
+    c010 = vol[xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,0]] 
+    c011 = vol[xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,1]] 
+    c100 = vol[xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,0]] 
+    c101 = vol[xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,1]] 
+    c110 = vol[xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,0]] 
+    c111 = vol[xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,1]] 
 
     c00 = c000 * (1 - xd) + c100 * xd
     c01 = c001 * (1 - xd) + c101 * xd
@@ -131,7 +133,8 @@ def find_nearest_one_grid_point_idx(coords, x_freq, y_freq, z_freq):
     -------
     index_in_volume: array of length 3
         The index in the volume (and grids) of the nearest grid point to
-        coords.
+        coords. Note that x and y indices are swapped to match the indexing of
+        the volume given by meshgrid(indices='xy')
     """
     
     xyz, xyz_idx = find_nearest_eight_grid_points_idx(coords, x_freq, y_freq, z_freq)
@@ -145,19 +148,22 @@ def find_nearest_one_grid_point_idx(coords, x_freq, y_freq, z_freq):
                     [xyz[0,1], xyz[1,1], xyz[2,0]],
                     [xyz[0,1], xyz[1,1], xyz[2,1]]])
     
-    pts_idx = np.array([[xyz_idx[0,0], xyz_idx[1,0], xyz_idx[2,0]],
-                    [xyz_idx[0,0], xyz_idx[1,0], xyz_idx[2,1]],
-                    [xyz_idx[0,0], xyz_idx[1,1], xyz_idx[2,0]],
-                    [xyz_idx[0,0], xyz_idx[1,1], xyz_idx[2,1]],
-                    [xyz_idx[0,1], xyz_idx[1,0], xyz_idx[2,0]],
-                    [xyz_idx[0,1], xyz_idx[1,0], xyz_idx[2,1]],
-                    [xyz_idx[0,1], xyz_idx[1,1], xyz_idx[2,0]],
-                    [xyz_idx[0,1], xyz_idx[1,1], xyz_idx[2,1]]])
+    # Note that x and y indices are swapped so the indexing is the same as in
+    # volume
+    pts_idx = np.array([[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,0]],
+                    [xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,1]],
+                    [xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,0]],
+                    [xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,1]],
+                    [xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,0]],
+                    [xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,1]],
+                    [xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,0]],
+                    [xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,1]]])
+
 
     sq_dist = np.sum((pts - coords.T)**2, axis=1)
     min_idx = np.argmin(sq_dist)
     index_in_volume = pts_idx[min_idx]
-    
+
     return index_in_volume
 
 def find_nearest_eight_grid_points_idx(coords, x_freq, y_freq, z_freq):
@@ -200,7 +206,8 @@ def find_nearest_eight_grid_points_idx(coords, x_freq, y_freq, z_freq):
     z1 = z_freq[z1_idx]
 
     xyz = np.array([[x0, x1], [y0, y1], [z0, z1]])
-    xyz_idx = np.array([[x0_idx, x1_idx], [y0_idx, y1_idx], [z0_idx, z1_idx]])
+    xyz_idx = np.array([ [x0_idx, x1_idx], [y0_idx, y1_idx],[z0_idx, z1_idx]])
+
     return xyz, xyz_idx  
 
 # Can this be vectorized for many coords/points?

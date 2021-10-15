@@ -22,14 +22,14 @@ def volume_comp(shape, dimensions, centres, radii, intensities):
     """
 
     vol = sum(map(lambda cr : 
-            rand_volume(shape, dimensions, cr[0], cr[1], cr[2]),
+            spherical_volume(shape, dimensions, cr[0], cr[1], cr[2], False),
         zip(centres, radii, intensities)))
     
     return vol
 
 # TODO: think properly about inputs-outputs.
 # In the spatial domain, the function below makes sense.
-def rand_volume(shape, dimensions, centre, radius, intensity, sigma = 0.1):
+def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not, sigma = 0.1):
     """Generate a random smoothed spherical volume.
 
     Parameters
@@ -42,7 +42,8 @@ def rand_volume(shape, dimensions, centre, radius, intensity, sigma = 0.1):
         Radius of spherical object
     sigma: float
         Sigma for the Gaussian window 
-
+    rand_or_not: boolean
+        If true generate the values using randn, otherwise ones.
     Returns
     -------
     vol
@@ -50,9 +51,10 @@ def rand_volume(shape, dimensions, centre, radius, intensity, sigma = 0.1):
     """
     
     Nx, Ny, Nz = shape
-    vol = np.random.randn(Nx, Ny, Nz) + intensity
-    #vol = np.ones(shape) + 5
-    vol[vol < 0] = 0
+    vol = intensity * np.ones([Nx, Ny, Nz])
+    if rand_or_not:
+        vol = vol + np.random.randn(Nx, Ny, Nz) 
+        vol[vol < 0] = 0
     
     Lx, Ly, Lz = dimensions  
     dx, dy, dz = dimensions/shape # "pixel" size
