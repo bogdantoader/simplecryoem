@@ -2,24 +2,25 @@ import numpy as np
 from src.interpolate import interpolate
 
 def project(vol, X, Y, Z, angles, interpolation_method):
-    """Projection in the Fourier domain"""
+    """Projection in the Fourier domain.
+    Assumption: the frequencies are in the 'standard' order for vol and the
+    coordinates X, Y, Z."""
+
+    # Any issue when the shape dimensions are not odd?
     X_r, Y_r, Z_r = rotate(X, Y, Z, angles)
 
-    slice_coords = np.array([X_r[:,:,0].flatten(), Y_r[:,:,0].flatten(), Z_r[:,:,0].flatten()])
+    # Select the slice at z=0, assuming shape[2] is odd. 
+
+    slice_coords = np.array([X_r[:,:,0].flatten(), Y_r[:,:,0].flatten(),
+        Z_r[:,:,0].flatten()])
 
     x_freq = X[0,:,0]
     y_freq = Y[:,0,0]
     z_freq = Z[0,0,:]
 
-    #print(np.fft.fftshift(X_r[:,:,0]))
-
     slice_interp = interpolate(slice_coords, x_freq, y_freq, z_freq, vol,
             interpolation_method)
-    slice_interp_2d = slice_interp.reshape(X_r.shape[0], X_r.shape[1])
-
-    #slice_X = slice_coords[0,:].reshape(X_r.shape[0], X_r.shape[1])
-    #slice_Y = slice_coords[1,:].reshape(X_r.shape[0], X_r.shape[1])
-    #slice_Z = slice_coords[2,:].reshape(X_r.shape[0], X_r.shape[1])
+    slice_interp_2d = slice_interp.reshape(vol.shape[0],vol.shape[1])
 
     slice_X = X_r[:,:,0]
     slice_Y = Y_r[:,:,0]
