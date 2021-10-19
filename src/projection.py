@@ -1,5 +1,20 @@
 import numpy as np
 from src.interpolate import interpolate
+from src.utils import volume_fourier 
+
+
+def project_spatial(v, angles, dimensions, method):
+    """Takes a centred object in the spatial domain and returns the centred
+    projection in the spatial domain.""" 
+    
+    # First ifftshift in the spatial domain 
+    v = np.fft.ifftshift(v)
+    V, X, Y, Z, _, _, _ = volume_fourier(v, dimensions)
+    V_slice, X_slice, Y_slice, Z_slice = project(V, X, Y, Z, angles, method)
+    v_proj = np.real(np.fft.fftshift(np.fft.ifftn(V_slice)))
+
+    return v_proj
+
 
 def project(vol, X, Y, Z, angles, interpolation_method):
     """Projection in the Fourier domain.
@@ -7,6 +22,8 @@ def project(vol, X, Y, Z, angles, interpolation_method):
     coordinates X, Y, Z."""
 
     # Any issue when the shape dimensions are not odd?
+    # In that case, need to interpolate to find the plane z=0, 
+    # rather than selecting the z-slice at index 0.
     X_r, Y_r, Z_r = rotate(X, Y, Z, angles)
 
     # Select the slice at z=0, assuming shape[2] is odd. 
