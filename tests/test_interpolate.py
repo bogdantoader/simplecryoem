@@ -5,6 +5,8 @@ import sys, site
 site.addsitedir('..')
 
 from src.interpolate import *
+from numpy.testing import assert_array_equal
+from numpy.testing import assert_equal
 
 class TestInterpolate(unittest.TestCase):
 
@@ -34,7 +36,7 @@ class TestInterpolate(unittest.TestCase):
             #print(p, pt_grid_idx)
             idx_found = find_nearest_one_grid_point_idx(p, x_freq, y_freq, z_freq)
             #print(idx_found)
-            self.assertEqual(sum((idx_found-pt_grid_idx)**2), 0)
+            assert_array_equal(idx_found, pt_grid_idx)
 
         return
            
@@ -57,7 +59,107 @@ class TestInterpolate(unittest.TestCase):
 
         i_vol = interpolate(i_coords, x_freq, y_freq, z_freq, vol, "nn")
 
-        self.assertEqual(sum((i_vol - i_vol_correct)**2), 0)
+        assert_array_equal(i_vol, i_vol_correct)
+        return
+
+
+    def test_find_nearest_eight_grid_points_idx(self):
+        x_freq = [0, 1, 2, -2, -1]
+        y_freq = x_freq
+        z_freq = x_freq
+    
+        coords = np.array([1.5, 1.5, 1.5])
+        xyz, xyz_idx = find_nearest_eight_grid_points_idx(coords, 
+            x_freq, y_freq, z_freq)
+        assert_array_equal(xyz, np.array([[1,2],[1,2],[1,2]]))
+        assert_array_equal(xyz_idx, np.array([[1,2],[1,2],[1,2]]))
+
+        coords = np.array([1.5, 1.5, 2.5])
+        xyz, xyz_idx = find_nearest_eight_grid_points_idx(coords, 
+            x_freq, y_freq, z_freq)
+        assert_array_equal(xyz, np.array([[1,2],[1,2],[2,-2]]))
+        assert_array_equal(xyz_idx, np.array([[1,2],[1,2],[2,3]]))
+
+        coords = np.array([1.5, 1.5, 3.5])
+        xyz, xyz_idx = find_nearest_eight_grid_points_idx(coords, 
+            x_freq, y_freq, z_freq)
+        assert_array_equal(xyz, np.array([[1,2],[1,2],[-2,-1]]))
+        assert_array_equal(xyz_idx, np.array([[1,2],[1,2],[3,4]]))
+
+        coords = np.array([1.5, 1.5, 4.5])
+        xyz, xyz_idx = find_nearest_eight_grid_points_idx(coords, 
+            x_freq, y_freq, z_freq)
+        assert_array_equal(xyz, np.array([[1,2],[1,2],[-1,0]]))
+        assert_array_equal(xyz_idx, np.array([[1,2],[1,2],[4,0]]))
+
+        coords = np.array([1.5, -0.9, 0.2])
+        xyz, xyz_idx = find_nearest_eight_grid_points_idx(coords, 
+            x_freq, y_freq, z_freq)
+        assert_array_equal(xyz, np.array([[1,2],[-1,0],[0,1]]))
+        assert_array_equal(xyz_idx, np.array([[1,2],[4,0],[0,1]]))
+
+        coords = np.array([1.5, -1.9, 0.2])
+        xyz, xyz_idx = find_nearest_eight_grid_points_idx(coords, 
+            x_freq, y_freq, z_freq)
+        assert_array_equal(xyz, np.array([[1,2],[-2,-1],[0,1]]))
+        assert_array_equal(xyz_idx, np.array([[1,2],[3,4],[0,1]]))
+
+        coords = np.array([1.5, -2.9, 0.2])
+        xyz, xyz_idx = find_nearest_eight_grid_points_idx(coords, 
+            x_freq, y_freq, z_freq)
+        assert_array_equal(xyz, np.array([[1,2],[2,-2],[0,1]]))
+        assert_array_equal(xyz_idx, np.array([[1,2],[2,3],[0,1]]))
+
+        coords = np.array([2, -0.6, 0.2])
+        xyz, xyz_idx = find_nearest_eight_grid_points_idx(coords, 
+            x_freq, y_freq, z_freq)
+        assert_array_equal(xyz, np.array([[2,-2],[-1,0],[0,1]]))
+        assert_array_equal(xyz_idx, np.array([[2,3],[4,0],[0,1]]))
+
+        return
+
+    def test_find_adjacent_grid_points_idx(self):
+        grid = np.array([0, 0.2, 0.4, -0.4, -0.2])
+
+        assert_equal(find_adjacent_grid_points_idx(0.02, grid),(0,1))
+        assert_equal(find_adjacent_grid_points_idx(0.25, grid),(1,2))
+        assert_equal(find_adjacent_grid_points_idx(0.48, grid),(2,3))
+        assert_equal(find_adjacent_grid_points_idx(0.62, grid),(3,4))
+        assert_equal(find_adjacent_grid_points_idx(0.79, grid),(3,4))
+        assert_equal(find_adjacent_grid_points_idx(0.89, grid),(4,0))
+        
+        assert_equal(find_adjacent_grid_points_idx(-0.1, grid),(4,0))
+        assert_equal(find_adjacent_grid_points_idx(-0.25, grid),(3,4))
+        assert_equal(find_adjacent_grid_points_idx(-0.38, grid),(3,4))
+        assert_equal(find_adjacent_grid_points_idx(-0.43, grid),(2,3))
+        assert_equal(find_adjacent_grid_points_idx(-0.57, grid),(2,3))
+        assert_equal(find_adjacent_grid_points_idx(-0.62, grid),(1,2))
+        assert_equal(find_adjacent_grid_points_idx(-0.87, grid),(0,1))
+        assert_equal(find_adjacent_grid_points_idx(-0.94, grid),(0,1))
+
+        assert_equal(find_adjacent_grid_points_idx(0, grid),(0,1))
+        assert_equal(find_adjacent_grid_points_idx(0.2, grid),(1,2))
+        assert_equal(find_adjacent_grid_points_idx(0.4, grid),(2,3))
+        assert_equal(find_adjacent_grid_points_idx(0.6, grid),(3,4))
+        assert_equal(find_adjacent_grid_points_idx(0.8, grid),(4,0))
+        assert_equal(find_adjacent_grid_points_idx(-0.2, grid),(4,0))
+        assert_equal(find_adjacent_grid_points_idx(-0.4, grid),(3,4))
+        assert_equal(find_adjacent_grid_points_idx(-0.6, grid),(2,3))
+        assert_equal(find_adjacent_grid_points_idx(-0.8, grid),(1,2))
+       
+        eps = 1e-18
+        assert_equal(find_adjacent_grid_points_idx(0-eps, grid),(0,1))
+        assert_equal(find_adjacent_grid_points_idx(0.2-eps, grid),(1,2))
+        assert_equal(find_adjacent_grid_points_idx(0.4-eps, grid),(2,3))
+        assert_equal(find_adjacent_grid_points_idx(0.6-eps, grid),(3,4))
+        assert_equal(find_adjacent_grid_points_idx(0.8-eps, grid),(4,0))
+        assert_equal(find_adjacent_grid_points_idx(1-eps, grid),(0,1))
+        assert_equal(find_adjacent_grid_points_idx(1.2-eps, grid),(1,2))
+        assert_equal(find_adjacent_grid_points_idx(-0.2-eps, grid),(4,0))
+        assert_equal(find_adjacent_grid_points_idx(-0.4-eps, grid),(3,4))
+        assert_equal(find_adjacent_grid_points_idx(-0.6-eps, grid),(2,3))
+        assert_equal(find_adjacent_grid_points_idx(-0.8-eps, grid),(1,2))
+        assert_equal(find_adjacent_grid_points_idx(-1-eps, grid),(0,1))
 
         return
 

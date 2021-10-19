@@ -221,7 +221,15 @@ def find_adjacent_grid_points_idx(p, grid):
     """
 
     dx = grid[1]
-    pt = np.floor(p / dx)
+
+    # If, due to floating point errors, p/dx = 1.9999999, 
+    # consider it to be on the grid at 2 and always make that the
+    # left point, for consistency.
+    if p/dx - np.floor(p/dx) > 1-1e-15:
+        pt = np.floor(p/dx) + 1 
+    else:
+        pt = np.floor(p/dx)
+
     n = len(grid)
     idx_left = int(np.mod(pt, n))
     idx_right = np.mod(idx_left + 1,n)
