@@ -85,6 +85,12 @@ def tri_interp_point(i_coords, vol, xyz_and_idx):
     x, y, z = i_coords
     xyz, xyz_idx = xyz_and_idx 
 
+    print(xyz)
+    print(xyz_idx)
+    print(vol[:,:,0])
+    print(vol[:,:,1])
+    print(i_coords)
+
     xd = (x - xyz[0,0])/(xyz[0,1] - xyz[0,0])
     yd = (y - xyz[1,0])/(xyz[1,1] - xyz[1,0])
     zd = (z - xyz[2,0])/(xyz[2,1] - xyz[2,0])

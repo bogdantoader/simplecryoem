@@ -63,6 +63,52 @@ class TestInterpolate(unittest.TestCase):
         return
 
 
+    def test_tri_interp_point(self):
+        xyz = np.array([[0,10],[0,100],[0,1000]])
+        xyz_idx = np.array([[0,1],[0,1],[0,1]])
+
+        vol = np.zeros([2,2,2])
+        vol[0,0,0] = 1
+        vol[1,0,0] = 2
+        vol[1,1,0] = 3
+        vol[0,1,0] = 4
+        vol[0,0,1] = 5
+        vol[1,0,1] = 6
+        vol[1,1,1] = 7
+        vol[0,1,1] = 8
+
+        print(vol[0,1,0]) 
+
+        # First the corners of the cube
+        self.assertEqual(tri_interp_point(np.array([0,0,0]),vol,(xyz,xyz_idx)),1)
+        self.assertEqual(tri_interp_point(np.array([0,0,1000]),vol,(xyz,xyz_idx)),5)
+        self.assertEqual(tri_interp_point(np.array([0,100,0]),vol,(xyz,xyz_idx)),4)
+        self.assertEqual(tri_interp_point(np.array([0,100,1000]),vol,(xyz,xyz_idx)),8)
+        self.assertEqual(tri_interp_point(np.array([10,0,0]),vol,(xyz,xyz_idx)),2)
+        self.assertEqual(tri_interp_point(np.array([10,0,1000]),vol,(xyz,xyz_idx)),6)
+        self.assertEqual(tri_interp_point(np.array([10,100,0]),vol,(xyz,xyz_idx)),3)
+        self.assertEqual(tri_interp_point(np.array([10,100,1000]),vol,(xyz,xyz_idx)),7)
+
+        # Interpolate on edges 
+        self.assertEqual(tri_interp_point(np.array([5,0,0]),vol,(xyz,xyz_idx)),0)
+        self.assertEqual(tri_interp_point(np.array([0,50,0]),vol,(xyz,xyz_idx)),0)
+        self.assertEqual(tri_interp_point(np.array([10,50,0]),vol,(xyz,xyz_idx)),0)
+        self.assertEqual(tri_interp_point(np.array([5,100,0]),vol,(xyz,xyz_idx)),0)
+        self.assertEqual(tri_interp_point(np.array([0,0,1000]),vol,(xyz,xyz_idx)),0)
+        self.assertEqual(tri_interp_point(np.array([0,0,1000]),vol,(xyz,xyz_idx)),0)
+        self.assertEqual(tri_interp_point(np.array([0,0,1000]),vol,(xyz,xyz_idx)),0)
+        self.assertEqual(tri_interp_point(np.array([0,0,1000]),vol,(xyz,xyz_idx)),0)
+        self.assertEqual(tri_interp_point(np.array([0,0,0]),vol,(xyz,xyz_idx)),0)
+        self.assertEqual(tri_interp_point(np.array([0,0,0]),vol,(xyz,xyz_idx)),0)
+        self.assertEqual(tri_interp_point(np.array([0,0,0]),vol,(xyz,xyz_idx)),0)
+        self.assertEqual(tri_interp_point(np.array([0,0,0]),vol,(xyz,xyz_idx)),0)
+
+        # Interpolate on cube faces
+
+        # Interpolate in the interior
+        
+        return
+
     def test_find_nearest_eight_grid_points_idx(self):
         x_freq = [0, 1, 2, -2, -1]
         y_freq = x_freq
