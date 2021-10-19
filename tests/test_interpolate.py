@@ -5,8 +5,7 @@ import sys, site
 site.addsitedir('..')
 
 from src.interpolate import *
-from numpy.testing import assert_array_equal
-from numpy.testing import assert_equal
+from numpy.testing import assert_array_equal, assert_equal
 
 class TestInterpolate(unittest.TestCase):
 
