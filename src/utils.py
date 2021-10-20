@@ -29,7 +29,8 @@ def volume_comp(shape, dimensions, centres, radii, intensities):
 
 # TODO: think properly about inputs-outputs.
 # In the spatial domain, the function below makes sense.
-def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not, sigma = 0.1):
+def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
+        sigma = 10):
     """Generate a random smoothed spherical volume.
 
     Parameters
@@ -69,8 +70,8 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not, 
     
     mask = create_mask(X, Y, Z, centre, radius) 
     
-    #return low_pass_filter(mask*vol, X, Y, Z, sigma), X, Y, Z
-    return mask * vol
+    return low_pass_filter(mask*vol, X, Y, Z, sigma)
+    #return mask * vol
 
 def create_mask(X, Y, Z, centre, radius):
     mask = np.ones(X.shape)
