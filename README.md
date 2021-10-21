@@ -4,4 +4,4 @@
 
 ### Run unit tests
 
-python3 -m unittest tests/test_interpolate.py
+`python3 -m unittest -v tests/test*`
