@@ -1,7 +1,8 @@
 import numpy as np
 from itertools import product
 
-
+# Looks light it might be possible to only pass the grid step sizes and lengths
+# rather than the full *_freq grids - if it has an impact on memory later.
 def interpolate(i_coords, x_freq, y_freq, z_freq, vol, method):
     """Given a volume vol sampled on meshgrid given
     by x_freq, y_freq, z_freq, return the interpolated values of vol
@@ -118,6 +119,8 @@ def tri_interp_point(i_coords, vol, xyz_and_idx):
 # Can this be vectorized? 
 # If using vmap and jax.numpy.apply_along_axis (which is implemented using jax
 # vmap, maybe no need to vectorize?
+# TODO: could be possible to only pass length and step size in each *_freq grid
+# instead of the full grids
 def find_nearest_one_grid_point_idx(coords, x_freq, y_freq, z_freq):
     """For a point given by coords and a grid defined by
     x_freq, y_freq, z_freq, return the grid indices of the nearest grid point to coords.
@@ -150,6 +153,8 @@ def find_nearest_one_grid_point_idx(coords, x_freq, y_freq, z_freq):
 
     return xyz_idx
 
+# TODO: could be possible to only pass length and step size in each *_freq grid
+# instead of the full grids
 def find_nearest_eight_grid_points_idx(coords, x_freq, y_freq, z_freq):
     """For a point given by coords and a grid defined by
     x_freq, y_freq, z_freq, return the 8 grid points nearest to coords 
@@ -195,7 +200,7 @@ def find_nearest_eight_grid_points_idx(coords, x_freq, y_freq, z_freq):
     return xyz, xyz_idx  
 
 # Can this be vectorized for many coords/points?
-# Only dx and grid length are needed, not full grid
+# TODO: Only dx and grid length are needed, not full grid
 def find_adjacent_grid_points_idx(p, grid):
     """For a one dimensional grid of Fourier samples
     and a point p, find the indices of the grid points
@@ -221,6 +226,8 @@ def find_adjacent_grid_points_idx(p, grid):
 
     return idx_left, idx_right
 
+# TODO: passing only dx and grid length should be enough instead of passing
+# full grid here
 def find_nearest_grid_point_idx(p, grid):
     """For a one dimensional grid of Fourier samples and a point p, 
     find the index of the grid point that is the closest to p."""

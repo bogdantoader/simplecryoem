@@ -21,15 +21,11 @@ def project(vol, X, Y, Z, angles, interpolation_method = "tri"):
     Assumption: the frequencies are in the 'standard' order for vol and the
     coordinates X, Y, Z."""
 
-    # Any issue when the shape dimensions are not odd?
-    # In that case, need to interpolate to find the plane z=0, 
-    # rather than selecting the z-slice at index 0.
-    X_r, Y_r, Z_r = rotate(X, Y, Z, angles)
+    #TODO!! Any issue when the shape dimensions are not odd?
 
-    # Select the slice at z=0, assuming shape[2] is odd. 
-
-    slice_coords = np.array([X_r[:,:,0].flatten(), Y_r[:,:,0].flatten(),
-        Z_r[:,:,0].flatten()])
+    # Only select the z=0 slice
+    X_r, Y_r, Z_r = rotate(X[:,:,0], Y[:,:,0], Z[:,:,0], angles)
+    slice_coords = np.array([X_r.ravel(), Y_r.ravel(),Z_r.ravel()])
 
     x_freq = X[0,:,0]
     y_freq = Y[:,0,0]
@@ -39,11 +35,7 @@ def project(vol, X, Y, Z, angles, interpolation_method = "tri"):
             interpolation_method)
     slice_interp_2d = slice_interp.reshape(vol.shape[0],vol.shape[1])
 
-    slice_X = X_r[:,:,0]
-    slice_Y = Y_r[:,:,0]
-    slice_Z = Z_r[:,:,0]
-
-    return slice_interp_2d, slice_X, slice_Y, slice_Z
+    return slice_interp_2d, X_r, Y_r, Z_r
 
 # Rotation around the z axis to begin with
 def rotate_z(X, Y, Z, alpha):
@@ -51,7 +43,7 @@ def rotate_z(X, Y, Z, alpha):
                        [np.sin(alpha), np.cos(alpha), 0],
                        [0, 0, 1]])
     
-    coords = np.array([X.flatten(), Y.flatten(), Z.flatten()])
+    coords = np.array([X.ravel(), Y.ravel(), Z.ravel()])
     coords_r = np.matmul(rot_mat, coords)
     
     X_r = coords_r[0,:].reshape(X.shape)
@@ -60,10 +52,6 @@ def rotate_z(X, Y, Z, alpha):
     
     return X_r, Y_r, Z_r
 
-# Euler angles
-# TODO: no need to apply the rotation to all coords if in Fourier
-# we are only interested in the new coordinates of the pre-rotation
-# plane z=0 
 def rotate(X, Y, Z, angles):
     """Rotate the coordinates given by X, Y, Z
     with Euler angles alpha, beta, gamma
@@ -96,7 +84,7 @@ def rotate(X, Y, Z, angles):
                     [np.sin(gamma), np.cos(gamma), 0],
                     [0, 0, 1]])
 
-    coords = np.array([X.flatten(), Y.flatten(), Z.flatten()])
+    coords = np.array([X.ravel(), Y.ravel(), Z.ravel()])
     coords_r = Rz @ Ry @ Rx @ coords
 
     X_r = coords_r[0,:].reshape(X.shape)
