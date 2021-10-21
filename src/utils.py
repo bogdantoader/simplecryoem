@@ -5,7 +5,8 @@ from  matplotlib import pyplot as plt
 # TODO: maybe put all the coordinates X, Y, Z in one variable 
 # if it makes more sense 
 
-def volume_comp(shape, dimensions, centres, radii, intensities):
+def volume_comp(shape, dimensions, centres, radii, intensities, 
+        apply_filter = False, sigma = 10.0):
     """Create a volume that is a sum of rand_volumes with given centres and
     radii.
 
@@ -20,9 +21,9 @@ def volume_comp(shape, dimensions, centres, radii, intensities):
     radii: N array 
         Radii of each of the N components
     """
-
     vol = sum(map(lambda cr : 
-            spherical_volume(shape, dimensions, cr[0], cr[1], cr[2], False),
+            spherical_volume(shape, dimensions, cr[0], cr[1], cr[2], False,
+                apply_filter, sigma),
         zip(centres, radii, intensities)))
     
     return vol
@@ -30,7 +31,7 @@ def volume_comp(shape, dimensions, centres, radii, intensities):
 # TODO: think properly about inputs-outputs.
 # In the spatial domain, the function below makes sense.
 def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not, 
-        low_pass_filter = False, sigma = 10):
+        apply_filter = False, sigma = 10):
     """Generate a random smoothed spherical volume.
 
     Parameters
@@ -45,8 +46,8 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
         Sigma for the Gaussian window 
     rand_or_not: boolean
         If true generate the values using randn, otherwise ones.
-    low_pass_filter: boolean
-        If true, apply a low pass filter to the volume.
+    apply_filter : boolean
+        If true, apply a Gaussian filter to the volume in the Fourier domain.
     sigma: float
         Sigma value for Gausian filter.
     Returns
@@ -74,7 +75,7 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
     
     mask = create_mask(X, Y, Z, centre, radius) 
    
-    if low_pass_filter:
+    if apply_filter:
         vol = low_pass_filter(mask*vol, X, Y, Z, sigma)
     else:
         vol = mask * vol
