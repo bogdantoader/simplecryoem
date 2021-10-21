@@ -114,9 +114,9 @@ class TestProjection(unittest.TestCase):
 
     def test_project_odd_dims_xy_spatial_pi2_p4(self):
         """Projections of a point mass in the spatial domain on the z=0 plane, 
-        rotated at pi/2 and pi/4, compared against explicit calculation.
-        Nearest neighbour interpolation for pi/2 and pi/4, trilinear
-        inteerpolation for pi/2 only."""
+        rotated at -pi/2 and -pi/4, compared against explicit calculation.
+        Nearest neighbour interpolation for -pi/2 and -pi/4, trilinear
+        inteerpolation for -pi/2 only."""
 
         nx = 5
         shape = np.array([nx, nx, nx])
@@ -142,11 +142,11 @@ class TestProjection(unittest.TestCase):
             centre = np.array(centre)
             v = spherical_volume(shape, dimensions, centre, radius, intensity, False)
         
-            # Calculate the pi/2 projections 
+            # Calculate the -pi/2 projections 
             v_proj2_nn = project_spatial(v, [0,0,-np.pi/2], dimensions, "nn")
             v_proj2_tri = project_spatial(v, [0,0,-np.pi/2], dimensions, "tri")
 
-            # And the pi/4 projection
+            # And the -pi/4 projection
             v_proj4_nn = project_spatial(v, [0,0,-np.pi/4], dimensions, "nn")
            
             # The analytically calculated projections - for pi/2 both nn and

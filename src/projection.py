@@ -3,7 +3,7 @@ from src.interpolate import interpolate
 from src.utils import volume_fourier 
 
 
-def project_spatial(v, angles, dimensions, method):
+def project_spatial(v, angles, dimensions, method = "tri"):
     """Takes a centred object in the spatial domain and returns the centred
     projection in the spatial domain.""" 
     
@@ -16,7 +16,7 @@ def project_spatial(v, angles, dimensions, method):
     return v_proj
 
 
-def project(vol, X, Y, Z, angles, interpolation_method):
+def project(vol, X, Y, Z, angles, interpolation_method = "tri"):
     """Projection in the Fourier domain.
     Assumption: the frequencies are in the 'standard' order for vol and the
     coordinates X, Y, Z."""
