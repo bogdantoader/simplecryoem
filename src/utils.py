@@ -29,8 +29,8 @@ def volume_comp(shape, dimensions, centres, radii, intensities):
 
 # TODO: think properly about inputs-outputs.
 # In the spatial domain, the function below makes sense.
-def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
-        sigma = 10):
+def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not, 
+        low_pass_filter = False, sigma = 10):
     """Generate a random smoothed spherical volume.
 
     Parameters
@@ -45,6 +45,10 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
         Sigma for the Gaussian window 
     rand_or_not: boolean
         If true generate the values using randn, otherwise ones.
+    low_pass_filter: boolean
+        If true, apply a low pass filter to the volume.
+    sigma: float
+        Sigma value for Gausian filter.
     Returns
     -------
     vol
@@ -69,9 +73,12 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
     X, Y, Z = np.meshgrid(coords_x, coords_y, coords_z, indexing='xy')
     
     mask = create_mask(X, Y, Z, centre, radius) 
-    
-    return low_pass_filter(mask*vol, X, Y, Z, sigma)
-    #return mask * vol
+   
+    if low_pass_filter:
+        vol = low_pass_filter(mask*vol, X, Y, Z, sigma)
+    else:
+        vol = mask * vol
+    return vol
 
 def create_mask(X, Y, Z, centre, radius):
     mask = np.ones(X.shape)
