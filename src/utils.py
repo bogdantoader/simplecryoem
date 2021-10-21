@@ -70,8 +70,8 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
     
     mask = create_mask(X, Y, Z, centre, radius) 
     
-    #return low_pass_filter(mask*vol, X, Y, Z, sigma)
-    return mask * vol
+    return low_pass_filter(mask*vol, X, Y, Z, sigma)
+    #return mask * vol
 
 def create_mask(X, Y, Z, centre, radius):
     mask = np.ones(X.shape)
