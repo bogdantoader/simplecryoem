@@ -14,21 +14,19 @@ class TestInterpolate(unittest.TestCase):
         y_freq = np.fft.fftfreq(5,0.1)
         z_freq = np.fft.fftfreq(6,1)
 
-        #print(x_freq)
-        #print(y_freq)
-        #print(z_freq)
-
         pts = [np.array([0, 0, 0]),
                 np.array([0.04, 0, 0]),
                 np.array([-0.24, -2, 0.168]),
-                np.array([-0.01, 4, -0.48])]
+                np.array([-0.01, 4, -0.48]),
+                np.array([-0.04, 0, 0])]
         pts_grid_idxs = [np.array([0, 0, 0]),
                 #np.array([1, 0, 0]),
                 #np.array([5, 4, 1]),
                 #np.array([0, 2, 3])]
                 np.array([0, 1, 0]),
                 np.array([4, 5, 1]),
-                np.array([2, 0, 3])]
+                np.array([2, 0, 3]),
+                np.array([0, 9, 0])]
             # x and y indices swapped
 
         for p, pt_grid_idx in zip(pts, pts_grid_idxs):
@@ -39,6 +37,16 @@ class TestInterpolate(unittest.TestCase):
 
         return
            
+    def test_find_nearest_one_grid_point_idx_bug(self):
+        coord = np.array([0.282842712e+00, 2.22044605e-16, 0.00000000e+00])
+        x_freq = np.array([ 0.,  0.1,  0.2, -0.2, -0.1])
+        y_freq = x_freq
+        z_freq = x_freq
+        target_idx = np.array([0, 3, 0])
+
+        found_idx = find_nearest_one_grid_point_idx(coord,x_freq,y_freq,z_freq)
+        assert_array_equal(found_idx, target_idx)
+        return
 
     def test_interpolate_nn(self):
         x_freq = np.fft.fftfreq(10,2)
@@ -214,49 +222,103 @@ class TestInterpolate(unittest.TestCase):
         return
 
     def test_find_adjacent_grid_points_idx(self):
-        grid = np.array([0, 0.2, 0.4, -0.4, -0.2])
+        grid, pts_adjacent_nearest = self.get_data_adjacent_and_nearest_grid_point_idx()
 
-        assert_equal(find_adjacent_grid_points_idx(0.02, grid),(0,1))
-        assert_equal(find_adjacent_grid_points_idx(0.25, grid),(1,2))
-        assert_equal(find_adjacent_grid_points_idx(0.48, grid),(2,3))
-        assert_equal(find_adjacent_grid_points_idx(0.62, grid),(3,4))
-        assert_equal(find_adjacent_grid_points_idx(0.79, grid),(3,4))
-        assert_equal(find_adjacent_grid_points_idx(0.89, grid),(4,0))
-        
-        assert_equal(find_adjacent_grid_points_idx(-0.1, grid),(4,0))
-        assert_equal(find_adjacent_grid_points_idx(-0.25, grid),(3,4))
-        assert_equal(find_adjacent_grid_points_idx(-0.38, grid),(3,4))
-        assert_equal(find_adjacent_grid_points_idx(-0.43, grid),(2,3))
-        assert_equal(find_adjacent_grid_points_idx(-0.57, grid),(2,3))
-        assert_equal(find_adjacent_grid_points_idx(-0.62, grid),(1,2))
-        assert_equal(find_adjacent_grid_points_idx(-0.87, grid),(0,1))
-        assert_equal(find_adjacent_grid_points_idx(-0.94, grid),(0,1))
+        for test_pt, adj_idx, _ in pts_adjacent_nearest:
+            assert_equal(find_adjacent_grid_points_idx(test_pt, grid), adj_idx)
+        return
 
-        assert_equal(find_adjacent_grid_points_idx(0, grid),(0,1))
-        assert_equal(find_adjacent_grid_points_idx(0.2, grid),(1,2))
-        assert_equal(find_adjacent_grid_points_idx(0.4, grid),(2,3))
-        assert_equal(find_adjacent_grid_points_idx(0.6, grid),(3,4))
-        assert_equal(find_adjacent_grid_points_idx(0.8, grid),(4,0))
-        assert_equal(find_adjacent_grid_points_idx(-0.2, grid),(4,0))
-        assert_equal(find_adjacent_grid_points_idx(-0.4, grid),(3,4))
-        assert_equal(find_adjacent_grid_points_idx(-0.6, grid),(2,3))
-        assert_equal(find_adjacent_grid_points_idx(-0.8, grid),(1,2))
-       
-        eps = 1e-18
-        assert_equal(find_adjacent_grid_points_idx(0-eps, grid),(0,1))
-        assert_equal(find_adjacent_grid_points_idx(0.2-eps, grid),(1,2))
-        assert_equal(find_adjacent_grid_points_idx(0.4-eps, grid),(2,3))
-        assert_equal(find_adjacent_grid_points_idx(0.6-eps, grid),(3,4))
-        assert_equal(find_adjacent_grid_points_idx(0.8-eps, grid),(4,0))
-        assert_equal(find_adjacent_grid_points_idx(1-eps, grid),(0,1))
-        assert_equal(find_adjacent_grid_points_idx(1.2-eps, grid),(1,2))
-        assert_equal(find_adjacent_grid_points_idx(-0.2-eps, grid),(4,0))
-        assert_equal(find_adjacent_grid_points_idx(-0.4-eps, grid),(3,4))
-        assert_equal(find_adjacent_grid_points_idx(-0.6-eps, grid),(2,3))
-        assert_equal(find_adjacent_grid_points_idx(-0.8-eps, grid),(1,2))
-        assert_equal(find_adjacent_grid_points_idx(-1-eps, grid),(0,1))
+    def test_find_nearest_grid_point_idx(self):
+        grid, pts_adjacent_nearest = self.get_data_adjacent_and_nearest_grid_point_idx()
+
+        for test_pt, _, nearest_idx in pts_adjacent_nearest:
+            assert_equal(find_nearest_grid_point_idx(test_pt, grid),nearest_idx)
+        return
 
         return
+
+
+    def get_data_adjacent_and_nearest_grid_point_idx(self):
+        grid = np.array([0, 0.2, 0.4, -0.4, -0.2])
+
+        eps = 1e-18
+
+        # List of tuples containing (test_pt, adjacent_point_idx, closest_idx)
+        pts_adjacent_nearest = [
+            # Well between grid points, positive
+            (0.02, (0,1), 0),
+            (0.25, (1,2), 1),
+            (0.48, (2,3), 2),
+            (0.62, (3,4), 3),
+            (0.79, (3,4), 4),
+            (0.89, (4,0), 4),
+            #  Well between grid points, negative
+            (-0.1, (4,0), 4),
+            (-0.25, (3,4), 4),
+            (-0.38, (3,4), 3),
+            (-0.43, (2,3), 3),
+            (-0.57, (2,3), 2),
+            (-0.62, (1,2), 2),
+            (-0.87, (0,1), 1),
+            (-0.94, (0,1), 0),
+            # On the grid points
+            (0, (0,1), 0),
+            (0.2, (1,2), 1),
+            (0.4, (2,3), 2),
+            (0.6, (3,4), 3),
+            (0.8, (4,0), 4),
+            (-0.2, (4,0), 4),
+            (-0.4, (3,4), 3),
+            (-0.6, (2,3), 2),
+            (-0.8, (1,2), 1),
+            # Epislon on the left of the grid points
+            # e.g. due to floating point errors - we consider these
+            # points to be on the grid and want to consistently select
+            # the grid point itself and the one to its right
+            (0-eps, (0,1), 0),
+            (0.2-eps, (1,2), 1),
+            (0.4-eps, (2,3), 2),
+            (0.6-eps, (3,4), 3),
+            (0.8-eps, (4,0), 4),
+            (1-eps, (0,1), 0),
+            (1.2-eps, (1,2), 1),
+            (-0.2-eps, (4,0), 4),
+            (-0.4-eps, (3,4), 3),
+            (-0.6-eps, (2,3), 2),
+            (-0.8-eps, (1,2), 1),
+            (-1-eps, (0,1), 0),
+            # Mid-distance between grid points, plus/minus epislon
+            # We want to consistently select the left point as the closest.
+            (0.1, (0,1), 0),
+            (0.3, (1,2), 1),
+            (0.5, (2,3), 2),
+            (0.7, (3,4), 3),
+            (0.9, (4,0), 4),
+            (1.1, (0,1), 0),
+            (1.3, (1,2), 1),
+            (-0.1, (4,0), 4),
+            (-0.3, (3,4), 3),
+            (-0.5, (2,3), 2),
+            (-0.7, (1,2), 1),
+            (-0.9, (0,1), 0),
+            (-1.1, (4,0), 4),
+            (-1.3, (3,4), 3),
+            (0.1+eps, (0,1), 0),
+            (0.3+eps, (1,2), 1),
+            (0.5+eps, (2,3), 2),
+            (0.7+eps, (3,4), 3),
+            (0.9+eps, (4,0), 4),
+            (1.1+eps, (0,1), 0),
+            (1.3+eps, (1,2), 1),
+            (-0.1+eps, (4,0), 4),
+            (-0.3+eps, (3,4), 3),
+            (-0.5+eps, (2,3), 2),
+            (-0.7+eps, (1,2), 1),
+            (-0.9+eps, (0,1), 0),
+            (-1.1+eps, (4,0), 4),
+            (-1.3+eps, (3,4), 3)
+        ]
+        return grid, pts_adjacent_nearest
 
 if __name__ == '__main__':
     unittest.main()

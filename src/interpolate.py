@@ -1,4 +1,5 @@
 import numpy as np
+from itertools import product
 
 
 def interpolate(i_coords, x_freq, y_freq, z_freq, vol, method):
@@ -137,35 +138,17 @@ def find_nearest_one_grid_point_idx(coords, x_freq, y_freq, z_freq):
         coords. Note that x and y indices are swapped to match the indexing of
         the volume given by meshgrid(indices='xy')
     """
-    
-    xyz, xyz_idx = find_nearest_eight_grid_points_idx(coords, x_freq, y_freq, z_freq)
 
-    pts = np.array([[xyz[0,0], xyz[1,0], xyz[2,0]],
-                    [xyz[0,0], xyz[1,0], xyz[2,1]],
-                    [xyz[0,0], xyz[1,1], xyz[2,0]],
-                    [xyz[0,0], xyz[1,1], xyz[2,1]],
-                    [xyz[0,1], xyz[1,0], xyz[2,0]],
-                    [xyz[0,1], xyz[1,0], xyz[2,1]],
-                    [xyz[0,1], xyz[1,1], xyz[2,0]],
-                    [xyz[0,1], xyz[1,1], xyz[2,1]]])
+    x, y, z = coords
+    xc_idx = find_nearest_grid_point_idx(x, x_freq)
+    yc_idx = find_nearest_grid_point_idx(y, y_freq)
+    zc_idx = find_nearest_grid_point_idx(z, z_freq)
     
     # Note that x and y indices are swapped so the indexing is the same as in
     # volume
-    pts_idx = np.array([[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,0]],
-                    [xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,1]],
-                    [xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,0]],
-                    [xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,1]],
-                    [xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,0]],
-                    [xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,1]],
-                    [xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,0]],
-                    [xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,1]]])
+    xyz_idx = np.array([yc_idx, xc_idx, zc_idx])
 
-
-    sq_dist = np.sum((pts - coords.T)**2, axis=1)
-    min_idx = np.argmin(sq_dist)
-    index_in_volume = pts_idx[min_idx]
-
-    return index_in_volume
+    return xyz_idx
 
 def find_nearest_eight_grid_points_idx(coords, x_freq, y_freq, z_freq):
     """For a point given by coords and a grid defined by
@@ -226,7 +209,8 @@ def find_adjacent_grid_points_idx(p, grid):
     # If, due to floating point errors, p/dx = 1.9999999, 
     # consider it to be on the grid at 2 and always make that the
     # left point, for consistency.
-    if p/dx - np.floor(p/dx) > 1-1e-15:
+    eps = 1e-15
+    if p/dx - np.floor(p/dx) > 1-eps:
         pt = np.floor(p/dx) + 1 
     else:
         pt = np.floor(p/dx)
@@ -234,8 +218,63 @@ def find_adjacent_grid_points_idx(p, grid):
     n = len(grid)
     idx_left = int(np.mod(pt, n))
     idx_right = np.mod(idx_left + 1,n)
+
     return idx_left, idx_right
 
+def find_nearest_grid_point_idx(p, grid):
+    """For a one dimensional grid of Fourier samples and a point p, 
+    find the index of the grid point that is the closest to p."""
+    
+    eps = 1e-15 
 
+    # In case we need to wrap around (maxium once on each side)
+    dx = grid[1]
+    lengrid = len(grid)
+    increment = lengrid*dx
+
+    if p > max(grid):
+        extended_grid = np.array([grid, grid+increment]).flatten()
+    elif p < min(grid):
+        extended_grid = np.array([grid-increment, grid]).flatten()
+    else:
+        extended_grid = grid
+
+    # Find the index of the closest grid point. 
+    dists = abs(extended_grid - p)
+    closest_idx1 = np.argmin(dists)
+    dist1 = dists[closest_idx1]
+
+    # We do the following to ensure that when the point is at the midpoint
+    # between two grid points (or withing epsilon away from it due to e.g.
+    # floating point error), we select the point on the left.
+    
+    # Find the index of the second closest grid point
+    dists[closest_idx1] = np.Inf
+    closest_idx2 = np.argmin(dists)
+    dist2 = dists[closest_idx2]
+   
+    # If the distances are within eps of each other (i.e. if the point is
+    # within epsilon from the midpoint between two grid point),
+    # select the index on the left, unless the index on the right is at the
+    # end, i.e. it is still the point on the left, wrapped around.
+
+    closest_idx1 = np.mod(closest_idx1, lengrid)
+    closest_idx2 = np.mod(closest_idx2, lengrid)
+    if abs(dist1 - dist2) > 2*eps:
+        # The first index found is clearly the closest one.
+        closest_idx = closest_idx1
+    elif closest_idx1 == 0 and closest_idx2 == lengrid - 1:
+        # Otherwise, if they are both close,
+        # the first index found is at zero and the second index found is at the
+        # end of the array, then the 'left' index is the second one.
+        closest_idx = closest_idx2
+    elif closest_idx2 == 0 and closest_idx1 == lengrid - 1:
+        # Same situation as above, but swapped indices.
+        closest_idx = closest_idx1
+    else:
+        # Otherwise, they are both close and we return the smaller index.
+        closest_idx = min(closest_idx1, closest_idx2)
+
+    return closest_idx 
 
 
