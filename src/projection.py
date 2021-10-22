@@ -10,7 +10,7 @@ def project_spatial(v, angles, dimensions, method = "tri"):
     projection in the spatial domain.""" 
     
     # First ifftshift in the spatial domain 
-    v = np.fft.ifftshift(v)
+    v = jnp.fft.ifftshift(v)
     V, X, Y, Z, _, _, _ = volume_fourier(v, dimensions)
     V_slice, X_slice, Y_slice, Z_slice = project(V, X, Y, Z, angles, method)
     v_proj = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(V_slice)))
