@@ -84,7 +84,7 @@ def rotate(X, Y, Z, angles):
                     [np.sin(gamma), np.cos(gamma), 0],
                     [0, 0, 1]])
 
-    coords = np.array([X.ravel(), Y.ravel(), Z.ravel()])
+    coords = [X.ravel(), Y.ravel(), Z.ravel()]
     coords_r = Rz @ Ry @ Rx @ coords
 
     X_r = coords_r[0,:].reshape(X.shape)
