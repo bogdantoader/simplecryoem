@@ -1,4 +1,5 @@
 import numpy as np
+import jax.numpy as jnp
 from  matplotlib import pyplot as plt
 
 
@@ -119,17 +120,17 @@ def volume_fourier(vol, dimensions, shape_f = None):
     if shape_f == None:
         shape_f = vol.shape
 
-    vol_f = np.fft.fftn(vol, shape_f)
+    vol_f = jnp.fft.fftn(vol, shape_f)
 
     Nx, Ny, Nz = vol.shape
     Nx_f, Ny_f, Nz_f = shape_f
     dx, dy, dz = dimensions/vol.shape # "pixel" size
 
-    x_freq = np.fft.fftfreq(Nx_f, dx)
-    y_freq = np.fft.fftfreq(Ny_f, dy)
-    z_freq = np.fft.fftfreq(Nz_f, dz)
+    x_freq = jnp.fft.fftfreq(Nx_f, dx)
+    y_freq = jnp.fft.fftfreq(Ny_f, dy)
+    z_freq = jnp.fft.fftfreq(Nz_f, dz)
 
-    X_f, Y_f, Z_f = np.meshgrid(x_freq, y_freq, z_freq, indexing='xy')
+    X_f, Y_f, Z_f = jnp.meshgrid(x_freq, y_freq, z_freq, indexing='xy')
 
     return vol_f, X_f, Y_f, Z_f, dx, dy, dz
 

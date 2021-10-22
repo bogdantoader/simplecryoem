@@ -1,6 +1,8 @@
 import numpy as np
+import jax.numpy as jnp
 from src.interpolate import interpolate
 from src.utils import volume_fourier 
+
 
 
 def project_spatial(v, angles, dimensions, method = "tri"):
@@ -11,7 +13,7 @@ def project_spatial(v, angles, dimensions, method = "tri"):
     v = np.fft.ifftshift(v)
     V, X, Y, Z, _, _, _ = volume_fourier(v, dimensions)
     V_slice, X_slice, Y_slice, Z_slice = project(V, X, Y, Z, angles, method)
-    v_proj = np.real(np.fft.fftshift(np.fft.ifftn(V_slice)))
+    v_proj = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(V_slice)))
 
     return v_proj
 
@@ -25,7 +27,7 @@ def project(vol, X, Y, Z, angles, interpolation_method = "tri"):
 
     # Only select the z=0 slice
     X_r, Y_r, Z_r = rotate(X[:,:,0], Y[:,:,0], Z[:,:,0], angles)
-    slice_coords = np.array([X_r.ravel(), Y_r.ravel(),Z_r.ravel()])
+    slice_coords = jnp.array([X_r.ravel(), Y_r.ravel(),Z_r.ravel()])
 
     x_freq = X[0,:,0]
     y_freq = Y[:,0,0]
@@ -39,12 +41,12 @@ def project(vol, X, Y, Z, angles, interpolation_method = "tri"):
 
 # Rotation around the z axis to begin with
 def rotate_z(X, Y, Z, alpha):
-    rot_mat = np.array([[np.cos(alpha), -np.sin(alpha), 0],
-                       [np.sin(alpha), np.cos(alpha), 0],
+    rot_mat = np.array([[jnp.cos(alpha), -jnp.sin(alpha), 0],
+                       [jnp.sin(alpha), jnp.cos(alpha), 0],
                        [0, 0, 1]])
     
-    coords = np.array([X.ravel(), Y.ravel(), Z.ravel()])
-    coords_r = np.matmul(rot_mat, coords)
+    coords = jnp.array([X.ravel(), Y.ravel(), Z.ravel()])
+    coords_r = jnp.matmul(rot_mat, coords)
     
     X_r = coords_r[0,:].reshape(X.shape)
     Y_r = coords_r[1,:].reshape(Y.shape)
@@ -72,19 +74,19 @@ def rotate(X, Y, Z, angles):
 
     alpha, beta, gamma = angles
 
-    Rx = np.array([[1, 0, 0],
-                   [0, np.cos(alpha), -np.sin(alpha)],
-                   [0, np.sin(alpha), np.cos(alpha)]])
+    Rx = jnp.array([[1, 0, 0],
+                   [0, jnp.cos(alpha), -jnp.sin(alpha)],
+                   [0, jnp.sin(alpha), jnp.cos(alpha)]])
 
-    Ry = np.array([[np.cos(beta), 0, np.sin(beta)],
+    Ry = jnp.array([[jnp.cos(beta), 0, jnp.sin(beta)],
                    [0, 1, 0],
-                   [-np.sin(beta), 0, np.cos(beta)]])
+                   [-jnp.sin(beta), 0, jnp.cos(beta)]])
 
-    Rz = np.array([[np.cos(gamma), -np.sin(gamma), 0],
-                    [np.sin(gamma), np.cos(gamma), 0],
+    Rz = jnp.array([[jnp.cos(gamma), -jnp.sin(gamma), 0],
+                    [jnp.sin(gamma), jnp.cos(gamma), 0],
                     [0, 0, 1]])
 
-    coords = [X.ravel(), Y.ravel(), Z.ravel()]
+    coords = jnp.array([X.ravel(), Y.ravel(), Z.ravel()])
     coords_r = Rz @ Ry @ Rx @ coords
 
     X_r = coords_r[0,:].reshape(X.shape)

@@ -1,4 +1,5 @@
 import numpy as np
+import jax.numpy as jnp
 from itertools import product
 
 # Looks light it might be possible to only pass the grid step sizes and lengths
@@ -31,7 +32,7 @@ def interpolate(i_coords, x_freq, y_freq, z_freq, vol, method):
     elif method == "tri":
         interp_func = get_interpolate_tri_lambda(x_freq, y_freq, z_freq, vol)
    
-    i_vals = np.apply_along_axis(
+    i_vals = jnp.apply_along_axis(
         interp_func,
         axis = 0,
         arr = i_coords
@@ -194,8 +195,8 @@ def find_nearest_eight_grid_points_idx(coords, x_freq, y_freq, z_freq):
     z0 = z_freq[z0_idx]
     z1 = z_freq[z1_idx]
 
-    xyz = np.array([[x0, x1], [y0, y1], [z0, z1]])
-    xyz_idx = np.array([ [x0_idx, x1_idx], [y0_idx, y1_idx],[z0_idx, z1_idx]])
+    xyz = jnp.array([[x0, x1], [y0, y1], [z0, z1]])
+    xyz_idx = jnp.array([ [x0_idx, x1_idx], [y0_idx, y1_idx],[z0_idx, z1_idx]])
 
     return xyz, xyz_idx  
 
@@ -215,14 +216,18 @@ def find_adjacent_grid_points_idx(p, grid):
     # consider it to be on the grid at 2 and always make that the
     # left point, for consistency.
     eps = 1e-15
-    if p/dx - np.floor(p/dx) > 1-eps:
-        pt = np.floor(p/dx) + 1 
-    else:
-        pt = np.floor(p/dx)
+    
+    #if p/dx - jnp.floor(p/dx) > 1-eps:
+    #    pt = jnp.floor(p/dx) + 1 
+    #else:
+    #    pt = jnp.floor(p/dx)
+    
+    # Jaxify the if-else above
+    pt = jnp.floor(p/dx) + (p/dx - jnp.floor(p/dx) > 1-eps).astype(jnp.float32)
 
     n = len(grid)
-    idx_left = int(np.mod(pt, n))
-    idx_right = np.mod(idx_left + 1,n)
+    idx_left = jnp.mod(pt, n).astype(jnp.int32)
+    idx_right = jnp.mod(idx_left + 1,n)
 
     return idx_left, idx_right
 
