@@ -1,6 +1,7 @@
 import numpy as np
 import jax.numpy as jnp
 from itertools import product
+import jax
 
 # Looks light it might be possible to only pass the grid step sizes and lengths
 # rather than the full *_freq grids - if it has an impact on memory later.
@@ -32,11 +33,16 @@ def interpolate(i_coords, x_freq, y_freq, z_freq, vol, method):
     elif method == "tri":
         interp_func = get_interpolate_tri_lambda(x_freq, y_freq, z_freq, vol)
    
+    #i_vals = jax.vmap(interp_func, in_axes = 1)(i_coords)
+
+    # apply_along_axis seems slightly faster than vmap (it is also implemented
+    # using vmap)
     i_vals = jnp.apply_along_axis(
         interp_func,
         axis = 0,
         arr = i_coords
     )
+
 
     return i_vals
 
@@ -150,7 +156,7 @@ def find_nearest_one_grid_point_idx(coords, x_freq, y_freq, z_freq):
     
     # Note that x and y indices are swapped so the indexing is the same as in
     # volume
-    xyz_idx = np.array([yc_idx, xc_idx, zc_idx])
+    xyz_idx = jnp.array([yc_idx, xc_idx, zc_idx])
 
     return xyz_idx
 
@@ -244,16 +250,20 @@ def find_nearest_grid_point_idx(p, grid):
     lengrid = len(grid)
     increment = lengrid*dx
 
-    if p > max(grid):
-        extended_grid = np.array([grid, grid+increment]).flatten()
-    elif p < min(grid):
-        extended_grid = np.array([grid-increment, grid]).flatten()
-    else:
-        extended_grid = grid
+    #if p > max(grid):
+    #    extended_grid = jnp.array([grid, grid+increment]).flatten()
+    #elif p < min(grid):
+    #    extended_grid = jnp.array([grid, grid-increment]).flatten()
+    #else:
+    #    extended_grid = grid
+
+    # Avoiding if-else above due to jax. Replacing the above with cond
+    # statements makes the code twice as slow.
+    extended_grid = jnp.array([grid-increment, grid, grid+increment]).flatten()
 
     # Find the index of the closest grid point. 
     dists = abs(extended_grid - p)
-    closest_idx1 = np.argmin(dists)
+    closest_idx1 = jnp.argmin(dists)
     dist1 = dists[closest_idx1]
 
     # We do the following to ensure that when the point is at the midpoint
@@ -261,8 +271,9 @@ def find_nearest_grid_point_idx(p, grid):
     # floating point error), we select the point on the left.
     
     # Find the index of the second closest grid point
-    dists[closest_idx1] = np.Inf
-    closest_idx2 = np.argmin(dists)
+    #dists[closest_idx1] = jnp.inf
+    dists = dists.at[closest_idx1].set(jnp.inf)
+    closest_idx2 = jnp.argmin(dists)
     dist2 = dists[closest_idx2]
    
     # If the distances are within eps of each other (i.e. if the point is
@@ -270,23 +281,50 @@ def find_nearest_grid_point_idx(p, grid):
     # select the index on the left, unless the index on the right is at the
     # end, i.e. it is still the point on the left, wrapped around.
 
-    closest_idx1 = np.mod(closest_idx1, lengrid)
-    closest_idx2 = np.mod(closest_idx2, lengrid)
-    if abs(dist1 - dist2) > 2*eps:
-        # The first index found is clearly the closest one.
-        closest_idx = closest_idx1
-    elif closest_idx1 == 0 and closest_idx2 == lengrid - 1:
-        # Otherwise, if they are both close,
-        # the first index found is at zero and the second index found is at the
-        # end of the array, then the 'left' index is the second one.
-        closest_idx = closest_idx2
-    elif closest_idx2 == 0 and closest_idx1 == lengrid - 1:
-        # Same situation as above, but swapped indices.
-        closest_idx = closest_idx1
-    else:
-        # Otherwise, they are both close and we return the smaller index.
-        closest_idx = min(closest_idx1, closest_idx2)
+#    closest_idx1 = jnp.mod(closest_idx1, lengrid)
+#    closest_idx2 = jnp.mod(closest_idx2, lengrid)
+#    if abs(dist1 - dist2) > 2*eps:
+#        # The first index found is clearly the closest one.
+#        closest_idx = closest_idx1
+#    elif closest_idx1 == 0 and closest_idx2 == lengrid - 1:
+#        # Otherwise, if they are both close,
+#        # the first index found is at zero and the second index found is at the
+#        # end of the array, then the 'left' index is the second one.
+#        closest_idx = closest_idx2
+#    elif closest_idx2 == 0 and closest_idx1 == lengrid - 1:
+#        # Same situation as above, but swapped indices.
+#        closest_idx = closest_idx1
+#    else:
+#        # Otherwise, they are both close and we return the smaller index.
+#        closest_idx = min(closest_idx1, closest_idx2)
 
-    return closest_idx 
+    # Replace the above if-else logic with a jax-friendly alternative.
+    closest_idx1 = jnp.mod(closest_idx1, lengrid)
+    closest_idx2 = jnp.mod(closest_idx2, lengrid)
+    
+    closest_idx = jax.lax.cond(abs(dist1 - dist2) > 2*eps,
+        # The first index found is clearly the closest one.
+        true_fun = lambda _ : closest_idx1,
+        false_fun = lambda _:
+            jax.lax.cond((closest_idx1==0)/2 + (closest_idx2==lengrid-1)/2 >=1,
+            # Otherwise, if they are both close,
+            # the first index found is at zero and the second index found is at the
+            # end of the array, then the 'left' index is the second one.
+                true_fun = lambda _ : closest_idx2,
+                false_fun = lambda _: 
+                    jax.lax.cond((closest_idx2==0)/2 + (closest_idx1==lengrid-1)/2 >=1,
+                    # Same situation as above, but swapped indices.
+                        true_fun = lambda _ : closest_idx1,
+                        false_fun = lambda _:
+                            # Otherwise, they are both close and we return the smaller index.
+                            jnp.min(jnp.array([closest_idx1, closest_idx2])),
+                        operand = None
+                    ),
+                operand = None 
+            ),
+        operand = None
+    )
+
+    return closest_idx
 
 

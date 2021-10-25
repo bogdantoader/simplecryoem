@@ -124,7 +124,10 @@ def volume_fourier(vol, dimensions, shape_f = None):
 
     Nx, Ny, Nz = vol.shape
     Nx_f, Ny_f, Nz_f = shape_f
-    dx, dy, dz = dimensions/vol.shape # "pixel" size
+    px_size = dimensions/np.array(vol.shape) # "pixel" size
+    dx = px_size[0]
+    dy = px_size[1]
+    dz = px_size[2]
 
     x_freq = jnp.fft.fftfreq(Nx_f, dx)
     y_freq = jnp.fft.fftfreq(Ny_f, dy)

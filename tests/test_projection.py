@@ -1,9 +1,13 @@
 import unittest
 import sys, site
+from jax.config import config
+
+config.update("jax_enable_x64", True)
 
 site.addsitedir('..')
 
 import numpy as np
+import jax.numpy as jnp
 from src.projection import *
 from src.utils import spherical_volume
 from numpy.testing import assert_array_almost_equal
@@ -23,14 +27,14 @@ class TestProjection(unittest.TestCase):
         i, j, k = (0, 2, 2)
         v, X, Y, Z = self.get_volume_and_coords_odd(i,j,k)
         
-        angles = [np.pi/2, -3*np.pi/2, -np.pi/2, 3*np.pi/2, np.pi, -np.pi,
-                2*np.pi, -2*np.pi]
+        angles = [jnp.pi/2, -3*jnp.pi/2, -jnp.pi/2, 3*jnp.pi/2, jnp.pi, -jnp.pi,
+                2*jnp.pi, -2*jnp.pi]
 
         target_points = [(2,0), (2,0), (2,4), (2,4), (4,2), (4,2), (0,2),
                 (0,2)]
 
         for (ang, target_p) in zip(angles, target_points):
-            a = np.array([0,0,ang])
+            a = jnp.array([0,0,ang])
             vp_nn, vp_tri = self.do_nn_and_tri_projection(v, X, Y, Z, a)
             self.assert_point_mass_proj_one(vp_nn, target_p)
             self.assert_point_mass_proj_one(vp_tri, target_p)
@@ -41,11 +45,11 @@ class TestProjection(unittest.TestCase):
         v, X, Y, Z = self.get_volume_and_coords_odd(i,j,k)
 
         #  For nearest neightbour it should be one
-        angles = [np.pi/4, np.pi/4+np.pi/2, np.pi/4+np.pi, -np.pi/4]
+        angles = [jnp.pi/4, jnp.pi/4+jnp.pi/2, jnp.pi/4+jnp.pi, -jnp.pi/4]
         target_points = [(1,3), (1,1), (3,1), (3,3)]
         
         for (ang, target_p) in zip(angles, target_points):
-            a = np.array([0,0,ang])
+            a = jnp.array([0,0,ang])
             vp_nn, _ = self.do_nn_and_tri_projection(v, X, Y, Z, a)
             self.assert_point_mass_proj_one(vp_nn, target_p)
 
@@ -67,6 +71,8 @@ class TestProjection(unittest.TestCase):
         target_vp_tri[3,2,3] = 1/np.sqrt(2)-1/2
         target_vp_tri[2,3,3] = 1/np.sqrt(2)-1/2
 
+        target_vp_tri = jnp.array(target_vp_tri)
+
         for i in range(len(angles)):
             _, vp_tri = self.do_nn_and_tri_projection(v, X, Y, Z, (0,0,angles[i]))
             assert_array_almost_equal(vp_tri, target_vp_tri[:,:,i],decimal=15)
@@ -80,12 +86,12 @@ class TestProjection(unittest.TestCase):
         i, j, k = (2, 2, 1)
         v, X, Y, Z = self.get_volume_and_coords_odd(i,j,k)
 
-        angles = [np.pi/2, -3*np.pi/2, -np.pi/2, 3*np.pi/2]
+        angles = [jnp.pi/2, -3*jnp.pi/2, -jnp.pi/2, 3*jnp.pi/2]
 
         target_points = [(1,2), (1,2), (3,2), (3,2)]
 
         for (ang, target_p) in zip(angles, target_points):
-            a = np.array([ang,0,0])
+            a = jnp.array([ang,0,0])
             vp_nn, vp_tri = self.do_nn_and_tri_projection(v, X, Y, Z, a)
             self.assert_point_mass_proj_one(vp_nn, target_p)
             self.assert_point_mass_proj_one(vp_tri, target_p)
@@ -100,12 +106,12 @@ class TestProjection(unittest.TestCase):
         i, j, k = (0,2,4)
         v, X, Y, Z = self.get_volume_and_coords_odd(i,j,k)
 
-        angles = [np.pi/2, -3*np.pi/2, -np.pi/2, 3*np.pi/2]
+        angles = [jnp.pi/2, -3*jnp.pi/2, -jnp.pi/2, 3*jnp.pi/2]
 
         target_points = [(0,0), (0,0), (0,4), (0,4)]
 
         for ang, target_p in zip(angles, target_points):
-            a = np.array([0,ang,0])
+            a = jnp.array([0,ang,0])
             vp_nn, vp_tri = self.do_nn_and_tri_projection(v, X, Y, Z, a)
             self.assert_point_mass_proj_one(vp_nn, target_p)
             self.assert_point_mass_proj_one(vp_tri, target_p)
@@ -119,8 +125,8 @@ class TestProjection(unittest.TestCase):
         inteerpolation for -pi/2 only."""
 
         nx = 5
-        shape = np.array([nx, nx, nx])
-        dimensions = np.array([1, 1, 1])
+        shape = jnp.array([nx, nx, nx])
+        dimensions = jnp.array([1, 1, 1])
         radius = 1/(2*nx)
         intensity = 1
 
@@ -139,19 +145,19 @@ class TestProjection(unittest.TestCase):
         Kxr4, Kyr4 = self.get_pi4_rotated_coordinates()
                    
         for centre in centres:
-            centre = np.array(centre)
+            centre = jnp.array(centre)
             v = spherical_volume(shape, dimensions, centre, radius, intensity, False)
         
             # Calculate the -pi/2 projections 
-            v_proj2_nn = project_spatial(v, [0,0,-np.pi/2], dimensions, "nn")
-            v_proj2_tri = project_spatial(v, [0,0,-np.pi/2], dimensions, "tri")
+            v_proj2_nn = project_spatial(v, jnp.array([0,0,-jnp.pi/2]), dimensions, "nn")
+            v_proj2_tri = project_spatial(v, [0,0,-jnp.pi/2], dimensions, "tri")
 
             # And the -pi/4 projection
-            v_proj4_nn = project_spatial(v, [0,0,-np.pi/4], dimensions, "nn")
+            v_proj4_nn = project_spatial(v, [0,0,-jnp.pi/4], dimensions, "nn")
            
             # The analytically calculated projections - for pi/2 both nn and
             # tri are the same, while for pi/4 we only have nn. 
-            point_idx = np.array(list(np.where(v == 1))).flatten()
+            point_idx = jnp.array(list(np.where(v == 1))).flatten()
             v_proj2_true=self.calculate_rotated_point_mass_projection(point_idx,Kxr2,Kyr2)
             v_proj4_true=self.calculate_rotated_point_mass_projection(point_idx,Kxr4,Kyr4)
 
@@ -167,14 +173,14 @@ class TestProjection(unittest.TestCase):
         (depending on Kxr and Kyr - the rotated coordinate matrices)."""
         
         # kx, ky Fourier coordinates
-        Ky = np.array([[0,0,0,0,0],[1,1,1,1,1],[2,2,2,2,2],[-2,-2,-2,-2,-2],[-1,-1,-1,-1,-1]])
+        Ky = jnp.array([[0,0,0,0,0],[1,1,1,1,1],[2,2,2,2,2],[-2,-2,-2,-2,-2],[-1,-1,-1,-1,-1]])
         Kx = Ky.T
 
         # We need the iffthifted indices in idx
         # When ifftshifted, the indices (2, 3) become (0, 1)
-        xy_freq = np.array([0, 1, 2, -2, -1])
-        new_idx1 = np.fft.fftshift(xy_freq)[idx[0]]
-        new_idx2 = np.fft.fftshift(xy_freq)[idx[1]]
+        xy_freq = jnp.array([0, 1, 2, -2, -1])
+        new_idx1 = jnp.fft.fftshift(xy_freq)[idx[0]]
+        new_idx2 = jnp.fft.fftshift(xy_freq)[idx[1]]
         
         # And calculate the actual ifftn(fftn(v))
         vr0_a = np.zeros([5,5], dtype = np.complex128)
@@ -186,18 +192,18 @@ class TestProjection(unittest.TestCase):
                     )
                 )
 
-        vr0_a = np.real(np.fft.fftshift(vr0_a))
+        vr0_a = jnp.array(np.real(np.fft.fftshift(vr0_a)))
 
         return vr0_a
 
 
     def get_pi2_rotated_coordinates(self):
-        Ky = np.array([[0,0,0,0,0],[1,1,1,1,1],[2,2,2,2,2],[-2,-2,-2,-2,-2],[-1,-1,-1,-1,-1]])
+        Ky = jnp.array([[0,0,0,0,0],[1,1,1,1,1],[2,2,2,2,2],[-2,-2,-2,-2,-2],[-1,-1,-1,-1,-1]])
         Kx = Ky.T
 
         # Get the pi/2 rotated coordinates. To rotate the object by -pi/2, we need to
         # rotate the coordinates by pi/2, so negate the angle.
-        gamma = np.pi/2
+        gamma = jnp.pi/2
         Kxr, Kyr = self.rotate_coordinates_in_xy(Kx, Ky, gamma)
 
         return Kxr, Kyr
@@ -208,13 +214,13 @@ class TestProjection(unittest.TestCase):
         # rotate the coordinates by pi/4.
         # So these coordinates will lead to an object rotated by -pi/4. 
 
-        Kxr =np.array([[0,1,1,-1,-1],
+        Kxr = jnp.array([[0,1,1,-1,-1],
                [-1,0,1,-2,-1],
                [-1,-1,0,2,-2],
                [1,2,-2,0,1],
                [1,1,2,-1,0]])
              
-        Kyr = np.array([[0,1,1,-1,-1],
+        Kyr = jnp.array([[0,1,1,-1,-1],
                [1,1,2,-1,0],
                [1,2,-2,0,1],
                [-1,-1,0,2,-2],
@@ -224,7 +230,7 @@ class TestProjection(unittest.TestCase):
 
     def rotate_coordinates_in_xy(self, X, Y, gamma):
         
-        R = np.array([[np.cos(gamma), -np.sin(gamma)],
+        R = jnp.array([[np.cos(gamma), -np.sin(gamma)],
                     [np.sin(gamma), np.cos(gamma)]])
 
         rc = []
@@ -232,7 +238,7 @@ class TestProjection(unittest.TestCase):
             xy2 = R @ np.array([x,y])
             rc.append(list(xy2))
 
-        rc = np.array(rc)  
+        rc = jnp.array(rc)  
 
         Xr = rc[:,0].reshape(X.shape)
         Yr = rc[:,1].reshape(Y.shape)
@@ -246,22 +252,22 @@ class TestProjection(unittest.TestCase):
         v = np.zeros([nx, nx, nx])
         v[i,j,k] = 1
 
-        x_freq = np.fft.fftfreq(nx, dx)
-        y_freq = np.fft.fftfreq(nx, dx)
-        z_freq = np.fft.fftfreq(nx, dx)
-        X, Y, Z = np.meshgrid(x_freq, y_freq, z_freq, indexing = 'xy')
+        x_freq = jnp.fft.fftfreq(nx, dx)
+        y_freq = jnp.fft.fftfreq(nx, dx)
+        z_freq = jnp.fft.fftfreq(nx, dx)
+        X, Y, Z = jnp.meshgrid(x_freq, y_freq, z_freq, indexing = 'xy')
 
         return v, X, Y, Z
 
     def assert_point_mass_proj_one(self, v, idx):
         self.assertAlmostEqual(v[idx], 1, places = 14)
-        self.assertAlmostEqual(np.sum(abs(v)), 1, places = 14)
+        self.assertAlmostEqual(jnp.sum(abs(v)), 1, places = 14)
 
     def do_nn_and_tri_projection(self, v, X, Y, Z, angles):
-        vp_nn, _, _, _ = project(np.fft.ifftshift(v), X, Y, Z, angles, "nn")
+        vp_nn, _, _, _ = project(jnp.fft.ifftshift(v), X, Y, Z, angles, "nn")
         vp_nn = np.fft.fftshift(vp_nn)
 
-        vp_tri, _, _, _ = project(np.fft.ifftshift(v), X, Y, Z, angles, "tri")
+        vp_tri, _, _, _ = project(jnp.fft.ifftshift(v), X, Y, Z, angles, "tri")
         vp_tri = np.fft.fftshift(vp_tri)
 
         return vp_nn, vp_tri
