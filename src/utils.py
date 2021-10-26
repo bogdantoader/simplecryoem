@@ -120,7 +120,8 @@ def volume_fourier(vol, dimensions, shape_f = None):
     if shape_f == None:
         shape_f = vol.shape
 
-    vol_f = jnp.fft.fftn(vol, shape_f)
+    #vol_f = jnp.fft.fftn(vol, shape_f)
+    vol_f = jnp.fft.fftn(vol)
 
     Nx, Ny, Nz = vol.shape
     Nx_f, Ny_f, Nz_f = shape_f
