@@ -26,6 +26,7 @@ def volume_comp(shape, dimensions, centres, radii, intensities,
             spherical_volume(shape, dimensions, cr[0], cr[1], cr[2], False,
                 apply_filter, sigma),
         zip(centres, radii, intensities)))
+    vol = vol/jnp.max(vol)
     
     return vol
 
