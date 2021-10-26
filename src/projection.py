@@ -7,7 +7,11 @@ from src.utils import volume_fourier
 
 def project_spatial(v, angles, dimensions, method = "tri"):
     """Takes a centred object in the spatial domain and returns the centred
-    projection in the spatial domain.""" 
+    projection in the spatial domain.
+    If N is the number of pixels in one dimension, then the origin is 
+    assumed to be in the pixel with index (N-1)/2 if N is odd 
+    and N/2 is N is even, similar to an fftshifted Fourier grid.
+    """ 
     
     # First ifftshift in the spatial domain 
     v = jnp.fft.ifftshift(v)
@@ -23,11 +27,9 @@ def project(vol, X, Y, Z, angles, interpolation_method = "tri"):
     Assumption: the frequencies are in the 'standard' order for vol and the
     coordinates X, Y, Z."""
 
-    #TODO!! Any issue when the shape dimensions are not odd?
-
     # Only select the z=0 slice
     X_r, Y_r, Z_r = rotate(X[:,:,0], Y[:,:,0], Z[:,:,0], angles)
-    slice_coords = jnp.array([X_r.ravel(), Y_r.ravel(),Z_r.ravel()])
+    slice_coords = jnp.array([X_r.ravel(), Y_r.ravel(), Z_r.ravel()])
 
     x_freq = X[0,:,0]
     y_freq = Y[:,0,0]

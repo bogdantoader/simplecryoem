@@ -12,7 +12,8 @@ from numpy.testing import assert_array_equal, assert_equal
 
 class TestInterpolate(unittest.TestCase):
 
-    def test_find_nearest_one_grid_point_idx(self):    
+    def test_find_nearest_one_grid_point_idx(self):   
+        # Tested here for both even and odd number of grid points.
         x_freq = jnp.fft.fftfreq(10,2)
         y_freq = jnp.fft.fftfreq(5,0.1)
         z_freq = jnp.fft.fftfreq(6,1)
@@ -81,9 +82,7 @@ class TestInterpolate(unittest.TestCase):
 
         i_coords = jnp.array(coords).T
 
-        assert_array_equal(interpolate(i_coords, x_freq, y_freq, z_freq, vol,
-            "tri"), vals)
-       
+        assert_array_equal(interpolate(i_coords, x_freq, y_freq, z_freq, vol, "tri"), vals)
 
         return
 
@@ -169,6 +168,8 @@ class TestInterpolate(unittest.TestCase):
         return vol, coords_vals, freqs
 
     def test_find_nearest_eight_grid_points_idx(self):
+        # This should also work for even number of points, as long as 
+        # find_adjacent_grid_points_idx does (tested below).
         x_freq = [0, 1, 2, -2, -1]
         y_freq = x_freq
         z_freq = x_freq
@@ -224,7 +225,15 @@ class TestInterpolate(unittest.TestCase):
         return
 
     def test_find_adjacent_grid_points_idx(self):
-        grid, pts_adjacent_nearest = self.get_data_adjacent_and_nearest_grid_point_idx()
+        # Odd number of points
+        grid, pts_adjacent_nearest = self.get_data_adjacent_and_nearest_grid_point_idx_odd()
+
+        for test_pt, adj_idx, _ in pts_adjacent_nearest:
+            assert_equal(find_adjacent_grid_points_idx(test_pt, grid),
+                    (jnp.array(adj_idx[0]), jnp.array(adj_idx[1])))
+
+        # Even number of points
+        grid, pts_adjacent_nearest = self.get_data_adjacent_and_nearest_grid_point_idx_even()
 
         for test_pt, adj_idx, _ in pts_adjacent_nearest:
             assert_equal(find_adjacent_grid_points_idx(test_pt, grid),
@@ -232,17 +241,94 @@ class TestInterpolate(unittest.TestCase):
         return
 
     def test_find_nearest_grid_point_idx(self):
-        grid, pts_adjacent_nearest = self.get_data_adjacent_and_nearest_grid_point_idx()
+        # Odd number of points
+        grid, pts_adjacent_nearest = self.get_data_adjacent_and_nearest_grid_point_idx_odd()
 
         for test_pt, _, nearest_idx in pts_adjacent_nearest:
-            assert_equal(
-            find_nearest_grid_point_idx(test_pt, grid), jnp.array(nearest_idx))
+            assert_equal(find_nearest_grid_point_idx(test_pt, grid), jnp.array(nearest_idx))
+       
+        # Even number of points
+        grid, pts_adjacent_nearest = self.get_data_adjacent_and_nearest_grid_point_idx_even()
+
+        for test_pt, _, nearest_idx in pts_adjacent_nearest:
+            assert_equal(find_nearest_grid_point_idx(test_pt, grid), jnp.array(nearest_idx))
         return
 
         return
 
+    def get_data_adjacent_and_nearest_grid_point_idx_even(self):
+        grid = jnp.array([0., 0.25, -0.5, -0.25])
 
-    def get_data_adjacent_and_nearest_grid_point_idx(self):
+        eps = 1e-18
+
+        # List of tuples containing (test_pt, adjacent_point_idx, closest_idx)
+        pts_adjacent_nearest = [
+            # Well between grid points, positive
+            (0.1, (0,1), 0),
+            (0.4, (1,2), 2),
+            (0.6, (2,3), 2),
+            (0.85, (3,0), 3),
+            (0.9, (3,0), 0),
+            (1.05, (0,1), 0),
+            #  Well between grid points, negative
+            (-0.1, (3,0), 0),
+            (-0.2, (3,0), 3),
+            (-0.3, (2,3), 3),
+            (-0.43, (2,3), 2),
+            (-0.57, (1,2), 2),
+            (-0.7, (1,2), 1),
+            (-0.87, (0,1), 1),
+            (-0.94, (0,1), 0),
+            # On the grid points
+            (0, (0,1), 0),
+            (0.25, (1,2), 1),
+            (0.5, (2,3), 2),
+            (0.75, (3,0), 3),
+            (1, (0,1), 0),
+            (-0.25, (3,0), 3),
+            (-0.5, (2,3), 2),
+            (-0.75, (1,2), 1),
+            (-1, (0,1), 0),
+            # Epislon on the left of the grid points
+            # e.g. due to floating point errors - we consider these
+            # points to be on the grid and want to consistently select
+            # the grid point itself and the one to its right.
+            (0-eps, (0,1), 0),
+            (0.25-eps, (1,2), 1),
+            (0.5-eps, (2,3), 2),
+            (0.75-eps, (3,0), 3),
+            (1-eps, (0,1), 0),
+            (-0.25-eps, (3,0), 3),
+            (-0.5-eps, (2,3), 2),
+            (-0.75-eps, (1,2), 1),
+            (-1-eps, (0,1), 0),
+            # Mid-distance between grid points, plus/minus epislon
+            # We want to consistently select the left point as the closest.
+            (0.125, (0,1), 0),
+            (0.375, (1,2), 1),
+            (0.625, (2,3), 2),
+            (0.875, (3,0), 3),
+            (1.125, (0,1), 0),
+            (-0.125, (3,0), 3),
+            (-0.375, (2,3), 2),
+            (-0.625, (1,2), 1),
+            (-0.875, (0,1), 0),
+            (-0.125, (3,0), 3),
+            (0.125+eps, (0,1), 0),
+            (0.375+eps, (1,2), 1),
+            (0.625+eps, (2,3), 2),
+            (0.875+eps, (3,0), 3),
+            (1.125+eps, (0,1), 0),
+            (-0.125+eps, (3,0), 3),
+            (-0.375+eps, (2,3), 2),
+            (-0.625+eps, (1,2), 1),
+            (-0.875+eps, (0,1), 0),
+            (-0.125+eps, (3,0), 3)
+        ]
+        return grid, pts_adjacent_nearest
+
+
+    def get_data_adjacent_and_nearest_grid_point_idx_odd(self):
         grid = jnp.array([0, 0.2, 0.4, -0.4, -0.2])
 
         eps = 1e-18
