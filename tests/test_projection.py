@@ -183,16 +183,18 @@ class TestProjection(unittest.TestCase):
         new_idx2 = jnp.fft.fftshift(xy_freq)[idx[1]]
         
         # And calculate the actual ifftn(fftn(v))
-        vr0_a = np.zeros([5,5], dtype = np.complex128)
+        vr0_a = jnp.zeros([5,5], dtype = jnp.complex128)
         for i in range(5):
             for j in range(5):
-                vr0_a[i,j] = 1/25 * np.sum(
-                    np.exp(1j * 2 * np.pi/5*
-                        (i * Kx + j * Ky - new_idx1 * Kxr - new_idx2 * Kyr)
+                vr0_a =  vr0_a.at[i,j].set(  
+                    1/25 * jnp.sum(
+                        jnp.exp(1j * 2 * jnp.pi/5*
+                            (i * Kx + j * Ky - new_idx1 * Kxr - new_idx2 * Kyr)
+                        )
                     )
                 )
 
-        vr0_a = jnp.array(np.real(np.fft.fftshift(vr0_a)))
+        vr0_a = jnp.real(jnp.fft.fftshift(vr0_a))
 
         return vr0_a
 
