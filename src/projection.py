@@ -35,7 +35,11 @@ def project(vol, X, Y, Z, angles, interpolation_method = "tri"):
     y_freq = Y[:,0,0]
     z_freq = Z[0,0,:]
 
-    slice_interp = interpolate(slice_coords, x_freq, y_freq, z_freq, vol,
+    x_grid = jnp.array([x_freq[1], len(x_freq)])
+    y_grid = jnp.array([y_freq[1], len(y_freq)])
+    z_grid = jnp.array([z_freq[1], len(z_freq)])
+
+    slice_interp = interpolate(slice_coords, x_grid, y_grid, z_grid, vol,
             interpolation_method)
     slice_interp_2d = slice_interp.reshape(vol.shape[0],vol.shape[1])
 
