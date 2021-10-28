@@ -5,6 +5,8 @@ import jax
 
 # Looks light it might be possible to only pass the grid step sizes and lengths
 # rather than the full *_freq grids - if it has an impact on memory later.
+# TODO: add a check here to ensure that vol shape is consistent with grid
+# lengths
 def interpolate(i_coords, x_grid, y_grid, z_grid, vol, method):
     """Given a volume vol sampled on meshgrid given
     by x_grid, y_grid, z_grid, return the interpolated values of vol

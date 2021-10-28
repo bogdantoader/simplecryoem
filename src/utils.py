@@ -186,13 +186,13 @@ def get_pad_width(l0, l1):
             pad_width = [w+1, w]
     return jnp.array(pad_width).astype(jnp.int64)
     
-
+# TODO: this should take a new radius probably,rather than new grid  length
 def rescale_larger_grid(v, x_grid, y_grid, z_grid, new_grid_lengths):
     """Assume the new grid lengths are larger than the current ones."""
     
-    x_grid_new = x_grid.at[1].set(new_grid_lengths[0])
-    y_grid_new = y_grid.at[1].set(new_grid_lengths[1])
-    z_grid_new = z_grid.at[1].set(new_grid_lengths[2])
+    x_grid_new = [x_grid[0], new_grid_lengths[0]]
+    y_grid_new = [y_grid[0], new_grid_lengths[1]]
+    z_grid_new = [z_grid[0], new_grid_lengths[2]]
 
     pad_width_x = get_pad_width(x_grid[1], new_grid_lengths[0])
     pad_width_y = get_pad_width(y_grid[1], new_grid_lengths[1])
