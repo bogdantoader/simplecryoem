@@ -26,6 +26,7 @@ class TestProjection(unittest.TestCase):
         # Indices of the point mass
         i, j, k = (0, 2, 2)
         v, x_grid, y_grid, z_grid = self.get_volume_and_coords_odd(i,j,k)
+       
         
         angles = [jnp.pi/2, -3*jnp.pi/2, -jnp.pi/2, 3*jnp.pi/2, jnp.pi, -jnp.pi,
                 2*jnp.pi, -2*jnp.pi]
@@ -37,9 +38,6 @@ class TestProjection(unittest.TestCase):
             a = jnp.array([0,0,ang])
             vp_nn, vp_tri = self.do_nn_and_tri_projection(v, x_grid, y_grid, z_grid, a)
 
-            print(vp_nn)
-            print(vp_tri)
-            print(target_p)
             self.assert_point_mass_proj_one(vp_nn, target_p)
             self.assert_point_mass_proj_one(vp_tri, target_p)
 
@@ -262,9 +260,9 @@ class TestProjection(unittest.TestCase):
         y_freq = jnp.fft.fftfreq(nx, dx)
         z_freq = jnp.fft.fftfreq(nx, dx)
 
-        x_grid = [x_freq[1], len(x_freq)]
-        y_grid = [y_freq[1], len(y_freq)]
-        z_grid = [z_freq[1], len(z_freq)]
+        x_grid = jnp.array([x_freq[1], len(x_freq)])
+        y_grid = jnp.array([y_freq[1], len(y_freq)])
+        z_grid = jnp.array([z_freq[1], len(z_freq)])
 
         return v, x_grid, y_grid, z_grid 
 
@@ -274,13 +272,13 @@ class TestProjection(unittest.TestCase):
 
     def do_nn_and_tri_projection(self, v, x_grid, y_grid, z_grid, angles):
         vp_nn, _ = project(jnp.fft.ifftshift(v), x_grid, y_grid, z_grid, angles, "nn")
-        vp_nn = np.fft.fftshift(vp_nn)
-
         vp_tri, _ = project(jnp.fft.ifftshift(v), x_grid, y_grid, z_grid, angles, "tri")
-        vp_tri = np.fft.fftshift(vp_tri)
 
         vp_nn = vp_nn.reshape(v.shape[0], v.shape[1])
         vp_tri = vp_tri.reshape(v.shape[0], v.shape[1])
+
+        vp_nn = np.fft.fftshift(vp_nn)
+        vp_tri = np.fft.fftshift(vp_tri)
 
         return vp_nn, vp_tri
 

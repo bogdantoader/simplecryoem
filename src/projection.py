@@ -39,7 +39,7 @@ def project_spatial(v, angles, dimensions, method = "tri"):
     
     return v_proj
 
-
+# TODO: write the doc string properly
 def project(vol, x_grid, y_grid, z_grid, angles, interpolation_method = "tri"):
     """Projection in the Fourier domain.
     Assumption: the frequencies are in the 'standard' order for vol and the
@@ -48,8 +48,7 @@ def project(vol, x_grid, y_grid, z_grid, angles, interpolation_method = "tri"):
     # Get the rotated coordinates in the z=0 plane.
     slice_coords = rotate(x_grid, y_grid, angles)
     
-    slice_interp = interpolate(slice_coords, x_grid, y_grid, z_grid, vol,
-            interpolation_method)
+    slice_interp = interpolate(slice_coords, x_grid, y_grid, z_grid, vol, interpolation_method)
     
     return slice_interp, slice_coords
 
