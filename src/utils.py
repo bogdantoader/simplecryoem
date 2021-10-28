@@ -88,7 +88,7 @@ def create_mask(X, Y, Z, centre, radius):
     cx, cy, cz = centre
     r = np.sqrt((X-cx)**2 + (Y-cy)**2 + (Z-cz)**2)
     mask[r > radius] = 0
-    return mask
+    return jnp.array(mask)
 
 def low_pass_filter(vol, X, Y, Z, sigma):
     gauss = np.exp(-(X**2 + Y**2 + Z**2)/(2*sigma))
@@ -143,5 +143,61 @@ def mip_z(img):
     plt.imshow(np.max(img, axis = 2))
     return
 
+# TODO: tests for the three functions below
+def rescale_smaller_grid(v, x_grid, y_grid, z_grid, radius):
+    x_freq = jnp.fft.fftfreq(int(x_grid[1]), 1/(x_grid[0]*x_grid[1]))
+    y_freq = jnp.fft.fftfreq(int(y_grid[1]), 1/(y_grid[0]*y_grid[1]))
+    z_freq = jnp.fft.fftfreq(int(z_grid[1]), 1/(z_grid[0]*z_grid[1]))
+    X, Y, Z = jnp.meshgrid(x_freq, y_freq, z_freq)
+    
+    idx = (jnp.sqrt(X**2 + Y**2 + Z**2) <= radius)
 
+    idx1 = idx[0,:,0]
+    idx2 = idx[:,0,0]
+    idx3 = idx[0,0,:]
+    
+    len_x = len(x_freq[idx1])
+    len_y = len(y_freq[idx2])
+    len_z = len(z_freq[idx3])
 
+    v_c = v[idx1][:,idx2][:,:,idx3]
+    
+    x_grid_c = x_grid.at[1].set(len_x)
+    y_grid_c = y_grid.at[1].set(len_y)
+    z_grid_c = z_grid.at[1].set(len_z)
+
+    return v_c, x_grid_c, y_grid_c, z_grid_c
+    
+
+def get_pad_width(l0, l1):
+    """Determine the padding width that a centred object of length l0 in the
+    Fourier domain should be padded with so that the final length is l1."""
+    
+    if jnp.mod(l1-l0, 2) == 0: 
+        w = (l1-l0)/2
+        pad_width = [w, w]
+    else:
+        w = jnp.floor((l1-l0)/2)
+
+        if jnp.mod(l0, 2) == 0:
+            pad_width = [w, w+1]
+        else:
+            pad_width = [w+1, w]
+    return jnp.array(pad_width).astype(jnp.int64)
+    
+
+def rescale_larger_grid(v, x_grid, y_grid, z_grid, new_grid_lengths):
+    """Assume the new grid lengths are larger than the current ones."""
+    
+    x_grid_new = x_grid.at[1].set(new_grid_lengths[0])
+    y_grid_new = y_grid.at[1].set(new_grid_lengths[1])
+    z_grid_new = z_grid.at[1].set(new_grid_lengths[2])
+
+    pad_width_x = get_pad_width(x_grid[1], new_grid_lengths[0])
+    pad_width_y = get_pad_width(y_grid[1], new_grid_lengths[1])
+    pad_width_z = get_pad_width(z_grid[1], new_grid_lengths[2])
+    
+    v_new = jnp.pad(jnp.fft.fftshift(v), (pad_width_x, pad_width_y, pad_width_z))
+    v_new = jnp.fft.ifftshift(v_new)
+    
+    return v_new, x_grid_new, y_grid_new, z_grid_new  
