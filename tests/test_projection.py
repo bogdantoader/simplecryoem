@@ -25,7 +25,7 @@ class TestProjection(unittest.TestCase):
 
         # Indices of the point mass
         i, j, k = (0, 2, 2)
-        v, X, Y, Z = self.get_volume_and_coords_odd(i,j,k)
+        v, x_grid, y_grid, z_grid = self.get_volume_and_coords_odd(i,j,k)
         
         angles = [jnp.pi/2, -3*jnp.pi/2, -jnp.pi/2, 3*jnp.pi/2, jnp.pi, -jnp.pi,
                 2*jnp.pi, -2*jnp.pi]
@@ -35,14 +35,18 @@ class TestProjection(unittest.TestCase):
 
         for (ang, target_p) in zip(angles, target_points):
             a = jnp.array([0,0,ang])
-            vp_nn, vp_tri = self.do_nn_and_tri_projection(v, X, Y, Z, a)
+            vp_nn, vp_tri = self.do_nn_and_tri_projection(v, x_grid, y_grid, z_grid, a)
+
+            print(vp_nn)
+            print(vp_tri)
+            print(target_p)
             self.assert_point_mass_proj_one(vp_nn, target_p)
             self.assert_point_mass_proj_one(vp_tri, target_p)
 
         # Rotations in the xy plane where the rotated coordinates fall 
         # between two grid points. Take different point for variety
         i, j, k = (2, 3, 2)
-        v, X, Y, Z = self.get_volume_and_coords_odd(i,j,k)
+        v, x_grid, y_grid, z_grid = self.get_volume_and_coords_odd(i,j,k)
 
         #  For nearest neightbour it should be one
         angles = [jnp.pi/4, jnp.pi/4+jnp.pi/2, jnp.pi/4+jnp.pi, -jnp.pi/4]
@@ -50,7 +54,7 @@ class TestProjection(unittest.TestCase):
         
         for (ang, target_p) in zip(angles, target_points):
             a = jnp.array([0,0,ang])
-            vp_nn, _ = self.do_nn_and_tri_projection(v, X, Y, Z, a)
+            vp_nn, _ = self.do_nn_and_tri_projection(v, x_grid, y_grid, z_grid, a)
             self.assert_point_mass_proj_one(vp_nn, target_p)
 
         # Check the trilinear interpolation rotation for each angle 
@@ -74,7 +78,7 @@ class TestProjection(unittest.TestCase):
         target_vp_tri = jnp.array(target_vp_tri)
 
         for i in range(len(angles)):
-            _, vp_tri = self.do_nn_and_tri_projection(v, X, Y, Z, (0,0,angles[i]))
+            _, vp_tri = self.do_nn_and_tri_projection(v, x_grid, y_grid,z_grid, (0,0,angles[i]))
             assert_array_almost_equal(vp_tri, target_vp_tri[:,:,i],decimal=15)
 
 
@@ -84,7 +88,7 @@ class TestProjection(unittest.TestCase):
 
         # Indices of the point mass
         i, j, k = (2, 2, 1)
-        v, X, Y, Z = self.get_volume_and_coords_odd(i,j,k)
+        v, x_grid, y_grid, z_grid = self.get_volume_and_coords_odd(i,j,k)
 
         angles = [jnp.pi/2, -3*jnp.pi/2, -jnp.pi/2, 3*jnp.pi/2]
 
@@ -92,7 +96,7 @@ class TestProjection(unittest.TestCase):
 
         for (ang, target_p) in zip(angles, target_points):
             a = jnp.array([ang,0,0])
-            vp_nn, vp_tri = self.do_nn_and_tri_projection(v, X, Y, Z, a)
+            vp_nn, vp_tri = self.do_nn_and_tri_projection(v, x_grid,y_grid,z_grid, a)
             self.assert_point_mass_proj_one(vp_nn, target_p)
             self.assert_point_mass_proj_one(vp_tri, target_p)
 
@@ -104,7 +108,7 @@ class TestProjection(unittest.TestCase):
 
         # Indices of the point mass
         i, j, k = (0,2,4)
-        v, X, Y, Z = self.get_volume_and_coords_odd(i,j,k)
+        v, x_grid, y_grid,z_grid = self.get_volume_and_coords_odd(i,j,k)
 
         angles = [jnp.pi/2, -3*jnp.pi/2, -jnp.pi/2, 3*jnp.pi/2]
 
@@ -112,7 +116,7 @@ class TestProjection(unittest.TestCase):
 
         for ang, target_p in zip(angles, target_points):
             a = jnp.array([0,ang,0])
-            vp_nn, vp_tri = self.do_nn_and_tri_projection(v, X, Y, Z, a)
+            vp_nn, vp_tri = self.do_nn_and_tri_projection(v, x_grid, y_grid,z_grid, a)
             self.assert_point_mass_proj_one(vp_nn, target_p)
             self.assert_point_mass_proj_one(vp_tri, target_p)
 
@@ -257,20 +261,26 @@ class TestProjection(unittest.TestCase):
         x_freq = jnp.fft.fftfreq(nx, dx)
         y_freq = jnp.fft.fftfreq(nx, dx)
         z_freq = jnp.fft.fftfreq(nx, dx)
-        X, Y, Z = jnp.meshgrid(x_freq, y_freq, z_freq, indexing = 'xy')
 
-        return v, X, Y, Z
+        x_grid = [x_freq[1], len(x_freq)]
+        y_grid = [y_freq[1], len(y_freq)]
+        z_grid = [z_freq[1], len(z_freq)]
+
+        return v, x_grid, y_grid, z_grid 
 
     def assert_point_mass_proj_one(self, v, idx):
         self.assertAlmostEqual(v[idx], 1, places = 14)
         self.assertAlmostEqual(jnp.sum(abs(v)), 1, places = 14)
 
-    def do_nn_and_tri_projection(self, v, X, Y, Z, angles):
-        vp_nn, _, _, _ = project(jnp.fft.ifftshift(v), X, Y, Z, angles, "nn")
+    def do_nn_and_tri_projection(self, v, x_grid, y_grid, z_grid, angles):
+        vp_nn, _ = project(jnp.fft.ifftshift(v), x_grid, y_grid, z_grid, angles, "nn")
         vp_nn = np.fft.fftshift(vp_nn)
 
-        vp_tri, _, _, _ = project(jnp.fft.ifftshift(v), X, Y, Z, angles, "tri")
+        vp_tri, _ = project(jnp.fft.ifftshift(v), x_grid, y_grid, z_grid, angles, "tri")
         vp_tri = np.fft.fftshift(vp_tri)
+
+        vp_nn = vp_nn.reshape(v.shape[0], v.shape[1])
+        vp_tri = vp_tri.reshape(v.shape[0], v.shape[1])
 
         return vp_nn, vp_tri
 
