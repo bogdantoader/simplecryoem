@@ -33,7 +33,7 @@ def volume_comp(shape, dimensions, centres, radii, intensities,
 # TODO: think properly about inputs-outputs.
 # In the spatial domain, the function below makes sense.
 def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not, 
-        apply_filter = False, sigma = 10):
+        apply_filter = False, sigma = 10.0):
     """Generate a random smoothed spherical volume.
 
     Parameters
@@ -80,7 +80,7 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
     if apply_filter:
         vol = low_pass_filter(mask*vol, X, Y, Z, sigma)
     else:
-        vol = mask * vol
+        vol =  mask * vol
     return vol
 
 def create_mask(X, Y, Z, centre, radius):
@@ -143,7 +143,8 @@ def mip_z(img):
     plt.imshow(np.max(img, axis = 2))
     return
 
-# TODO: tests for the three functions below
+# TODO: tests for the three functions below,
+# and change the names of these functions, they're not great
 def rescale_smaller_grid(v, x_grid, y_grid, z_grid, radius):
     x_freq = jnp.fft.fftfreq(int(x_grid[1]), 1/(x_grid[0]*x_grid[1]))
     y_freq = jnp.fft.fftfreq(int(y_grid[1]), 1/(y_grid[0]*y_grid[1]))
@@ -161,10 +162,10 @@ def rescale_smaller_grid(v, x_grid, y_grid, z_grid, radius):
     len_z = len(z_freq[idx3])
 
     v_c = v[idx1][:,idx2][:,:,idx3]
-    
-    x_grid_c = x_grid.at[1].set(len_x)
-    y_grid_c = y_grid.at[1].set(len_y)
-    z_grid_c = z_grid.at[1].set(len_z)
+   
+    x_grid_c = [x_grid[0], len_x]
+    y_grid_c = [y_grid[0], len_y]
+    z_grid_c = [z_grid[0], len_z]
 
     return v_c, x_grid_c, y_grid_c, z_grid_c
     
