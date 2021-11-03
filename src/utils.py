@@ -3,11 +3,9 @@ import jax.numpy as jnp
 from  matplotlib import pyplot as plt
 
 
-# TODO: maybe put all the coordinates X, Y, Z in one variable 
-# if it makes more sense 
 
 def volume_comp(shape, dimensions, centres, radii, intensities, 
-        apply_filter = False, sigma = 10.0):
+        apply_filter = False, sigma = 0.01):
     """Create a volume that is a sum of rand_volumes with given centres and
     radii.
 
@@ -30,10 +28,8 @@ def volume_comp(shape, dimensions, centres, radii, intensities,
     
     return vol
 
-# TODO: think properly about inputs-outputs.
-# In the spatial domain, the function below makes sense.
 def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not, 
-        apply_filter = False, sigma = 10.0):
+        apply_filter = False, sigma = 0.01):
     """Generate a random smoothed spherical volume.
 
     Parameters
