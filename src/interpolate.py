@@ -40,13 +40,14 @@ def interpolate(i_coords, x_grid, y_grid, z_grid, vol, method):
     #i_vals = jax.vmap(interp_func, in_axes = 1)(i_coords)
 
     # apply_along_axis seems slightly faster than vmap (it is also implemented
-    # using vmap)
+    # using vmap).
+    # It can be easier to debug the non-vectorized function, so use np instead
+    # of jnp.
     i_vals = jnp.apply_along_axis(
         interp_func,
         axis = 0,
         arr = i_coords
     )
-
 
     return i_vals
 
@@ -65,11 +66,33 @@ def get_interpolate_nn_lambda(x_grid, y_grid, z_grid, vol):
 def get_interpolate_tri_lambda(x_grid, y_grid, z_grid, vol):
 
     # Obtain the eight grid points around each point and interpolate.
-    thelambda = lambda coords : tri_interp_point(coords, vol,  
-        find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid)
-    )
+    #thelambda = lambda coords : tri_interp_point(coords, vol,  
+    #    find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid)
+    #)
+
+    thelambda = lambda coords : the_lambda_def(coords, x_grid,y_grid,z_grid,vol)
 
     return thelambda 
+
+# The same function as the one returned by the above, but defined properly
+# for debugging purposes
+def the_lambda_def(coords, x_grid, y_grid, z_grid, vol):
+
+    nearest_pts = find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid)
+    interp_pts = tri_interp_point(coords, vol, nearest_pts) 
+    
+    #print(x_grid, y_grid, z_grid)
+    #print("Coords = ", coords)
+
+    #print("Nearest_pts = ", nearest_pts[0])
+    #print("Nearest_pts_idx = ", nearest_pts[1])
+
+    #print("Interp values = ", interp_pts)
+
+    #print("Volx0 = ", vol[1,0:2,0:2])
+    #print("Volx1 = ", vol[2,0:2,0:2])
+
+    return interp_pts 
 
 def tri_interp_point(i_coords, vol, xyz_and_idx):
     """Trilinear interpolation of the volume vol at the point given by coords
@@ -172,6 +195,10 @@ def find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid):
     It assumes the grid is a Fourier DFT sampling grid in
     'standard' order (e.g. [0, 1, ..., n/2-1, -n/2, ..., -2, -1]).
 
+    Note: If the coords 'overflow', in either direction', we add/subtract
+    the length of the grid to the grid point, so that the coord is between 
+    them (note - the indices stay the same).
+
     Parameters
     ----------
     coords: array of length 3
@@ -199,15 +226,19 @@ def find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid):
 
     x0 = get_fourier_grid_point(x0_idx, x_grid[0], x_grid[1])
     x1 = get_fourier_grid_point(x1_idx, x_grid[0], x_grid[1])
+    x0x1 = adjust_grid_points(x, x0, x1, x_grid[1])
 
     y0 = get_fourier_grid_point(y0_idx, y_grid[0], y_grid[1])
     y1 = get_fourier_grid_point(y1_idx, y_grid[0], y_grid[1])
+    y0y1 = adjust_grid_points(y, y0, y1, y_grid[1])
 
     z0 = get_fourier_grid_point(z0_idx, z_grid[0], z_grid[1])
     z1 = get_fourier_grid_point(z1_idx, z_grid[0], z_grid[1])
+    z0z1 = adjust_grid_points(z, z0, z1, z_grid[1])
 
-    xyz = jnp.array([[x0, x1], [y0, y1], [z0, z1]])
-    xyz_idx = jnp.array([ [x0_idx, x1_idx], [y0_idx, y1_idx],[z0_idx, z1_idx]])
+    #xyz = jnp.array([[x0, x1], [y0, y1], [z0, z1]])
+    xyz = jnp.array([x0x1, y0y1, z0z1])
+    xyz_idx = jnp.array([[x0_idx, x1_idx], [y0_idx, y1_idx],[z0_idx, z1_idx]])
 
     return xyz, xyz_idx.astype(jnp.int64)  
 
@@ -223,8 +254,35 @@ def get_fourier_grid_point(idx, dx, N):
             false_fun = lambda _ : dx * (idx - N), operand = None)
 
 
+# TODO: write tests for this function and also add tests to the tri interpolate
+# functions with overflowing coords and the eps stuff.
+def adjust_grid_points(p, x0, x1, grid_length):
+    """ Since x0, x1 are grid points on a Fourier grid and the point p
+    can overflow once on either side of the grid, we have to ensure that
+    x0 <= p <= x1 so that the interpolation gives sensible results.
+    We fix this by adding or subtracting the grid length from the grid points.
+    Note this doesn't affect the indices (since they are circular)."""
+
+    x0x1 = jnp.array([x0, x1])
+    eps = 1e-15
+
+    # Behaviour consistent with the other functions: if p is epsilon
+    # to the left of the grid point, we consider on the grid point 
+
+    #x0x1 = jax.lax.cond(p > x1, 
+    x0x1 = jax.lax.cond(p - x1 > -eps, 
+            true_fun = lambda _ : jnp.mod(x0x1 + grid_length, grid_length),
+            false_fun = lambda _ : x0x1, operand = None)
+
+    #x0x1 = jax.lax.cond(p < x0,
+    x0x1 = jax.lax.cond(p - x0 < -eps,
+            true_fun = lambda _ : jnp.mod(x0x1, grid_length) - grid_length,
+            false_fun = lambda _ : x0x1, operand = None)
+        
+    return x0x1
+
 # Can this be vectorized for many coords/points?
-# Would that be needed if we use jax.vmap anyway?
+# Would that be needed if we use jax.vmap anyway? 
 def find_adjacent_grid_points_idx(p, grid_spacing, grid_length):
     """For a one dimensional grid of Fourier samples
     and a point p, find the indices of the grid points
@@ -250,9 +308,8 @@ def find_adjacent_grid_points_idx(p, grid_spacing, grid_length):
     # Jaxify the if-else above
     pt = jnp.floor(p/grid_spacing) + (p/grid_spacing- jnp.floor(p/grid_spacing) > 1-eps).astype(jnp.float32)
 
-    n = grid_length
-    idx_left = jnp.mod(pt, n).astype(jnp.int32)
-    idx_right = jnp.mod(idx_left + 1,n)
+    idx_left = jnp.mod(pt, grid_length).astype(jnp.int32)
+    idx_right = jnp.mod(idx_left + 1, grid_length)
 
     return idx_left, idx_right
 
