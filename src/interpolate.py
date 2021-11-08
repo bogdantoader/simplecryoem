@@ -78,7 +78,7 @@ def get_interpolate_tri_lambda(x_grid, y_grid, z_grid, vol):
 # for debugging purposes
 def the_lambda_def(coords, x_grid, y_grid, z_grid, vol):
 
-    nearest_pts = find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid)
+    coords, nearest_pts = find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid)
     interp_pts = tri_interp_point(coords, vol, nearest_pts) 
     
     #print(x_grid, y_grid, z_grid)
@@ -219,28 +219,32 @@ def find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid):
         Array containing the indices of the points in xyz in the grid given by
         x_freq, y_freq, z_freq.
     """
-    x, y, z = coords
-    x0_idx, x1_idx = find_adjacent_grid_points_idx(x, x_grid[0], x_grid[1])
-    y0_idx, y1_idx = find_adjacent_grid_points_idx(y, y_grid[0], y_grid[1])
-    z0_idx, z1_idx = find_adjacent_grid_points_idx(z, z_grid[0], y_grid[1])
+    cx, cy, cz = coords
+    x0_idx, x1_idx = find_adjacent_grid_points_idx(cx, x_grid[0], x_grid[1])
+    y0_idx, y1_idx = find_adjacent_grid_points_idx(cy, y_grid[0], y_grid[1])
+    z0_idx, z1_idx = find_adjacent_grid_points_idx(cz, z_grid[0], y_grid[1])
 
     x0 = get_fourier_grid_point(x0_idx, x_grid[0], x_grid[1])
     x1 = get_fourier_grid_point(x1_idx, x_grid[0], x_grid[1])
-    x0x1 = adjust_grid_points(x, x0, x1, x_grid[1])
+    x0x1 = jnp.array([x0, x1])
+    cx, x0x1 = adjust_grid_points(cx, x0x1, x_grid)
 
     y0 = get_fourier_grid_point(y0_idx, y_grid[0], y_grid[1])
     y1 = get_fourier_grid_point(y1_idx, y_grid[0], y_grid[1])
-    y0y1 = adjust_grid_points(y, y0, y1, y_grid[1])
+    y0y1 = jnp.array([y0, y1])
+
+    cy, y0y1 = adjust_grid_points(cy, y0y1, y_grid)
 
     z0 = get_fourier_grid_point(z0_idx, z_grid[0], z_grid[1])
     z1 = get_fourier_grid_point(z1_idx, z_grid[0], z_grid[1])
-    z0z1 = adjust_grid_points(z, z0, z1, z_grid[1])
+    z0z1 = jnp.array([z0, z1])
+    cz, z0z1 = adjust_grid_points(cz, z0z1, z_grid)
 
-    #xyz = jnp.array([[x0, x1], [y0, y1], [z0, z1]])
+    coords = jnp.array([cx,cy,cz])
     xyz = jnp.array([x0x1, y0y1, z0z1])
     xyz_idx = jnp.array([[x0_idx, x1_idx], [y0_idx, y1_idx],[z0_idx, z1_idx]])
 
-    return xyz, xyz_idx.astype(jnp.int64)  
+    return coords, (xyz, xyz_idx.astype(jnp.int64))
 
 def get_fourier_grid_point(idx, dx, N):
     """ Return the grid point at index idx from a grid of frequencies of 
@@ -256,30 +260,34 @@ def get_fourier_grid_point(idx, dx, N):
 
 # TODO: write tests for this function and also add tests to the tri interpolate
 # functions with overflowing coords and the eps stuff.
-def adjust_grid_points(p, x0, x1, grid_length):
+def adjust_grid_points(p, x0x1, x_grid):
     """ Since x0, x1 are grid points on a Fourier grid and the point p
     can overflow once on either side of the grid, we have to ensure that
     x0 <= p <= x1 so that the interpolation gives sensible results.
-    We fix this by adding or subtracting the grid length from the grid points.
-    Note this doesn't affect the indices (since they are circular)."""
+    We fix p by taking mod and the grid points by adding the grid length.
+    Note this doesn't affect the indices (since they are the indices 
+    in the volume).
 
-    x0x1 = jnp.array([x0, x1])
-    eps = 1e-15
+    x_grid = [grid_spacing, grid_length]
+    """
 
-    # Behaviour consistent with the other functions: if p is epsilon
-    # to the left of the grid point, we consider on the grid point 
+    px = jnp.prod(x_grid)
 
-    #x0x1 = jax.lax.cond(p > x1, 
-    x0x1 = jax.lax.cond(p - x1 > -eps, 
-            true_fun = lambda _ : jnp.mod(x0x1 + grid_length, grid_length),
+    # First, bring the point p to the range [0, grid_length*grid_spacing)
+    # Taking the mod twice to avoid mod(-1e-16, 7) = 7
+    p = jnp.mod(jnp.mod(p, px), px) 
+
+    # And then also bring the grid points to the same range)
+    x0x1 = jnp.mod(x0x1 + px, px)
+
+    # Now, the only issue can be when the 'right' grid point is 0.
+    # We fix that by making it grid_length*grid_spacing.
+
+    x0x1 = jax.lax.cond(x0x1[1] == 0, 
+            true_fun = lambda _ : x0x1.at[1].set(px), 
             false_fun = lambda _ : x0x1, operand = None)
 
-    #x0x1 = jax.lax.cond(p < x0,
-    x0x1 = jax.lax.cond(p - x0 < -eps,
-            true_fun = lambda _ : jnp.mod(x0x1, grid_length) - grid_length,
-            false_fun = lambda _ : x0x1, operand = None)
-        
-    return x0x1
+    return p, x0x1
 
 # Can this be vectorized for many coords/points?
 # Would that be needed if we use jax.vmap anyway? 
