@@ -4,7 +4,9 @@ import itertools
 from src.interpolate import interpolate
 from src.utils import volume_fourier 
 import jax
+from jax.config import config
 
+config.update("jax_enable_x64", True)
 
 
 def project_spatial(v, angles, dimensions, method = "tri"):
@@ -25,9 +27,10 @@ def project_spatial(v, angles, dimensions, method = "tri"):
     y_freq = Y[:,0,0]
     z_freq = Z[0,0,:]
 
-    x_grid = [x_freq[1], len(x_freq)]
-    y_grid = [y_freq[1], len(y_freq)]
-    z_grid = [z_freq[1], len(z_freq)]
+    # IMPORTANT: do not make this a Jax array
+    x_grid = np.array([x_freq[1], len(x_freq)])
+    y_grid = np.array([y_freq[1], len(y_freq)])
+    z_grid = np.array([z_freq[1], len(z_freq)])
 
     V_slice, coords_slice = project(V, x_grid, y_grid, z_grid, angles, method)
    

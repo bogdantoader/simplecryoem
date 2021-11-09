@@ -2,6 +2,9 @@ import numpy as np
 import jax.numpy as jnp
 from itertools import product
 import jax
+from jax.config import config
+
+config.update("jax_enable_x64", True)
 
 # Looks light it might be possible to only pass the grid step sizes and lengths
 # rather than the full *_freq grids - if it has an impact on memory later.
@@ -80,7 +83,8 @@ def the_lambda_def(coords, x_grid, y_grid, z_grid, vol):
 
     coords, nearest_pts = find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid)
     interp_pts = tri_interp_point(coords, vol, nearest_pts) 
-    
+   
+    #print(" ")
     #print(x_grid, y_grid, z_grid)
     #print("Coords = ", coords)
 
@@ -89,8 +93,8 @@ def the_lambda_def(coords, x_grid, y_grid, z_grid, vol):
 
     #print("Interp values = ", interp_pts)
 
-    #print("Volx0 = ", vol[1,0:2,0:2])
-    #print("Volx1 = ", vol[2,0:2,0:2])
+    #print("Volx0 = ", vol[3,0:2,0:2])
+    #print("Volx1 = ", vol[4,0:2,0:2])
 
     return interp_pts 
 
@@ -188,7 +192,7 @@ def find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid):
     return xyz_idx.astype(jnp.int64)
 
 
-def find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid):
+def find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid, eps = 1e-13):
     """For a point given by coords and a grid defined by
     x_grid, y_grid, z_grid, return the 8 grid points nearest to coords 
     and their indices on the grid.
@@ -219,26 +223,30 @@ def find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid):
         Array containing the indices of the points in xyz in the grid given by
         x_freq, y_freq, z_freq.
     """
+
+    # For smaller eps, we start to see artefacts, so be careful.
+    eps = 1e-13
+
     cx, cy, cz = coords
-    x0_idx, x1_idx = find_adjacent_grid_points_idx(cx, x_grid[0], x_grid[1])
-    y0_idx, y1_idx = find_adjacent_grid_points_idx(cy, y_grid[0], y_grid[1])
-    z0_idx, z1_idx = find_adjacent_grid_points_idx(cz, z_grid[0], y_grid[1])
+    x0_idx, x1_idx = find_adjacent_grid_points_idx(cx, x_grid[0], x_grid[1], eps)
+    y0_idx, y1_idx = find_adjacent_grid_points_idx(cy, y_grid[0], y_grid[1], eps)
+    z0_idx, z1_idx = find_adjacent_grid_points_idx(cz, z_grid[0], y_grid[1], eps)
 
     x0 = get_fourier_grid_point(x0_idx, x_grid[0], x_grid[1])
     x1 = get_fourier_grid_point(x1_idx, x_grid[0], x_grid[1])
     x0x1 = jnp.array([x0, x1])
-    cx, x0x1 = adjust_grid_points(cx, x0x1, x_grid)
+    cx, x0x1 = adjust_grid_points(cx, x0x1, x_grid, eps)
 
     y0 = get_fourier_grid_point(y0_idx, y_grid[0], y_grid[1])
     y1 = get_fourier_grid_point(y1_idx, y_grid[0], y_grid[1])
     y0y1 = jnp.array([y0, y1])
 
-    cy, y0y1 = adjust_grid_points(cy, y0y1, y_grid)
+    cy, y0y1 = adjust_grid_points(cy, y0y1, y_grid, eps)
 
     z0 = get_fourier_grid_point(z0_idx, z_grid[0], z_grid[1])
     z1 = get_fourier_grid_point(z1_idx, z_grid[0], z_grid[1])
     z0z1 = jnp.array([z0, z1])
-    cz, z0z1 = adjust_grid_points(cz, z0z1, z_grid)
+    cz, z0z1 = adjust_grid_points(cz, z0z1, z_grid, eps)
 
     coords = jnp.array([cx,cy,cz])
     xyz = jnp.array([x0x1, y0y1, z0z1])
@@ -260,7 +268,7 @@ def get_fourier_grid_point(idx, dx, N):
 
 # TODO: write tests for this function and also add tests to the tri interpolate
 # functions with overflowing coords and the eps stuff.
-def adjust_grid_points(p, x0x1, x_grid):
+def adjust_grid_points(p, x0x1, x_grid, eps = 1e-13):
     """ Since x0, x1 are grid points on a Fourier grid and the point p
     can overflow once on either side of the grid, we have to ensure that
     x0 <= p <= x1 so that the interpolation gives sensible results.
@@ -270,12 +278,15 @@ def adjust_grid_points(p, x0x1, x_grid):
 
     x_grid = [grid_spacing, grid_length]
     """
-
     px = jnp.prod(x_grid)
 
     # First, bring the point p to the range [0, grid_length*grid_spacing)
-    # Taking the mod twice to avoid mod(-1e-16, 7) = 7
-    p = jnp.mod(jnp.mod(p, px), px) 
+    p = jnp.mod(p, px)
+
+    # We use eps to avoid mod(-1e-16, 7) = 7
+    p = jax.lax.cond(jnp.abs(p-px) < eps,
+            true_fun = lambda _ : jnp.float64(0),
+            false_fun = lambda _ : jnp.float64(p), operand = None)
 
     # And then also bring the grid points to the same range)
     x0x1 = jnp.mod(x0x1 + px, px)
@@ -291,7 +302,7 @@ def adjust_grid_points(p, x0x1, x_grid):
 
 # Can this be vectorized for many coords/points?
 # Would that be needed if we use jax.vmap anyway? 
-def find_adjacent_grid_points_idx(p, grid_spacing, grid_length):
+def find_adjacent_grid_points_idx(p, grid_spacing, grid_length, eps = 1e-13):
     """For a one dimensional grid of Fourier samples
     and a point p, find the indices of the grid points
     on its left and its right.
@@ -306,7 +317,6 @@ def find_adjacent_grid_points_idx(p, grid_spacing, grid_length):
     # If, due to floating point errors, p/dx = 1.9999999, 
     # consider it to be on the grid at 2 and always make that the
     # left point, for consistency.
-    eps = 1e-15
     
     #if p/dx - jnp.floor(p/dx) > 1-eps:
     #    pt = jnp.floor(p/dx) + 1 
@@ -314,7 +324,7 @@ def find_adjacent_grid_points_idx(p, grid_spacing, grid_length):
     #    pt = jnp.floor(p/dx)
     
     # Jaxify the if-else above
-    pt = jnp.floor(p/grid_spacing) + (p/grid_spacing- jnp.floor(p/grid_spacing) > 1-eps).astype(jnp.float32)
+    pt = jnp.floor(p/grid_spacing) + (p/grid_spacing- jnp.floor(p/grid_spacing) > 1-eps).astype(jnp.float64)
 
     idx_left = jnp.mod(pt, grid_length).astype(jnp.int32)
     idx_right = jnp.mod(idx_left + 1, grid_length)

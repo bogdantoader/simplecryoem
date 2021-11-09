@@ -255,14 +255,15 @@ class TestProjection(unittest.TestCase):
         dx = 0.2 # to have exactly 1 between grid points
         v = np.zeros([nx, nx, nx])
         v[i,j,k] = 1
+        v = jnp.array(v)
 
         x_freq = jnp.fft.fftfreq(nx, dx)
         y_freq = jnp.fft.fftfreq(nx, dx)
         z_freq = jnp.fft.fftfreq(nx, dx)
 
-        x_grid = jnp.array([x_freq[1], len(x_freq)])
-        y_grid = jnp.array([y_freq[1], len(y_freq)])
-        z_grid = jnp.array([z_freq[1], len(z_freq)])
+        x_grid = np.array([x_freq[1], len(x_freq)])
+        y_grid = np.array([y_freq[1], len(y_freq)])
+        z_grid = np.array([z_freq[1], len(z_freq)])
 
         return v, x_grid, y_grid, z_grid 
 
