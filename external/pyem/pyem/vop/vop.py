@@ -125,10 +125,13 @@ def vol_ft(vol, pfac=2, threads=1, normfft=1):
     :param threads: Number of threads for pyFFTW.
     :param normfft: Normalization constant for Fourier transform.
     """
-    vol = grid_correct(vol, pfac=pfac, order=1)
+
+    # Bogdan
+    #vol = grid_correct(vol, pfac=pfac, order=1)
     padvol = np.pad(vol, int((vol.shape[0] * pfac - vol.shape[0]) // 2), "constant")
     ft = rfftn(np.fft.ifftshift(padvol), padvol.shape, threads=threads)
     ftc = np.zeros((ft.shape[0] + 3, ft.shape[1] + 3, ft.shape[2]), dtype=ft.dtype)
+    #ftc = np.zeros(ft.shape, dtype=ft.dtype)
     fill_ft(ft, ftc, vol.shape[0], normfft=normfft)
     return ftc
 

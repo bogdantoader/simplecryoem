@@ -30,6 +30,9 @@ from external.pyem.pyem import vop
 from numpy.fft import fftshift
 from pyfftw.builders import irfft2
 
+from  matplotlib import pyplot as plt
+
+
 
 def main(args):
     log = logging.getLogger('root')
@@ -127,7 +130,12 @@ def project(f3d, p, s, sx, sy, a, pfac=2, apply_ctf=False, size=None, flip_phase
                             np.deg2rad(p[star.Relion.ANGLEPSI]))
     pshift = np.exp(-2 * np.pi * 1j * (-p[star.Relion.ORIGINX] * sx +
                                        -p[star.Relion.ORIGINY] * sy))
+    #Bogdan
     f2d = vop.interpolate_slice_numba(f3d, orient, pfac=pfac, size=size)
+    #print(orient)
+    #f2d = f3d[33,2:66,:]
+
+    plt.imshow(np.imag(f2d)); plt.colorbar()
 
     f2d = f2d.astype(np.complex128) * pshift
     if apply_ctf or flip_phase:

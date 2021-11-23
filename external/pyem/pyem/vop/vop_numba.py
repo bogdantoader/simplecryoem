@@ -37,6 +37,7 @@ def fill_ft(ft, ftc, rmax, normfft=1):
 @numba.jit(cache=False, nopython=True, nogil=True)
 def interpolate_slice_numba(f3d, rot, pfac=2, size=None):
     """Modified to use the dtype of f3d."""
+    print("Bogdan2")
     linterp = lambda a, l, h: l + (h - l) * a
     ori = f3d.shape[0] // 2 - 1
     n = (f3d.shape[0] - 3) // pfac
@@ -45,6 +46,8 @@ def interpolate_slice_numba(f3d, rot, pfac=2, size=None):
         size = n
     phalf = size // 2
     rmax = min(nhalf, (phalf+1) - 1)
+    #rmax = np.Inf
+
     rmax2 = rmax**2
     qot = rot.T * pfac  # Scaling!
     f2d = np.zeros((np.int64(size), np.int64(phalf + 1)), dtype=f3d.dtype)
@@ -63,8 +66,9 @@ def interpolate_slice_numba(f3d, rot, pfac=2, size=None):
         for j in range(rmax + 1):
             xp = j
 
-            if xp**2 + yp2 > rmax2:
-                continue
+            # Bogdan
+            #if xp**2 + yp2 > rmax2:
+            #    continue
 
             x = qot[0,0] * xp + qot[0,1] * yp  # Implicit z = 0.
             y = qot[1,0] * xp + qot[1,1] * yp
