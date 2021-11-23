@@ -139,6 +139,10 @@ def mip_z(img):
     plt.imshow(np.max(img, axis = 2))
     return
 
+def mip_x(img):
+    plt.imshow(np.max(img, axis = 0))
+    return
+
 # TODO: tests for the three functions below,
 # and change the names of these functions, they're not great
 def rescale_smaller_grid(v, x_grid, y_grid, z_grid, radius):
