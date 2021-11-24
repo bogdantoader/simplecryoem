@@ -2,9 +2,10 @@ import numpy as np
 import jax.numpy as jnp
 import itertools
 from src.interpolate import interpolate
-from src.utils import volume_fourier 
+from src.utils import volume_fourier, create_mask 
 import jax
 from jax.config import config
+
 
 config.update("jax_enable_x64", True)
 
@@ -20,6 +21,9 @@ def project_spatial(v, angles, dimensions, method = "tri"):
     # First ifftshift in the spatial domain 
     v = jnp.fft.ifftshift(v)
     V, X, Y, Z, _, _, _ = volume_fourier(v, dimensions)
+
+    # Added mask to compare with pyem - needs more fiddling
+    V = V * create_mask(X,Y,Z, (0,0,0), np.max(X))
 
     # Not bothered about using the full X, Y, Z here since for the big 
     # experiments we do it all in Fourier anyway.
