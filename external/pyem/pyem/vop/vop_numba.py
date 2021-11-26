@@ -22,6 +22,7 @@ import numpy as np
 
 @numba.jit(cache=False, nopython=True, nogil=True)
 def fill_ft(ft, ftc, rmax, normfft=1):
+    print('rrmax = ', rmax)
     rmax2 = rmax ** 2
     for k in range(ft.shape[0]):
         kp = k if k < ft.shape[2] else k - ft.shape[0]
@@ -47,6 +48,7 @@ def interpolate_slice_numba(f3d, rot, pfac=2, size=None):
     phalf = size // 2
     rmax = min(nhalf, (phalf+1) - 1)
 
+    print("rmax =", rmax)
     rmax2 = rmax**2
     qot = rot.T * pfac  # Scaling!
     f2d = np.zeros((np.int64(size), np.int64(phalf + 1)), dtype=f3d.dtype)

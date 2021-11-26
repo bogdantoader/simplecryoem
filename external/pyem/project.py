@@ -131,14 +131,14 @@ def project(f3d, p, s, sx, sy, a, pfac=2, apply_ctf=False, size=None, flip_phase
     pshift = np.exp(-2 * np.pi * 1j * (-p[star.Relion.ORIGINX] * sx +
                                        -p[star.Relion.ORIGINY] * sy))
     #Bogdan
-    print(pfac)
-    print(f3d.shape)
+    #print(pfac)
+    #print(f3d.shape)
     f2d = vop.interpolate_slice_numba(f3d, orient, pfac=pfac, size=size)
     #print(orient)
     #f2d = f3d[33,2:66,:]
-    print(f2d.shape)
+    #print(f2d.shape)
 
-    plt.imshow(np.real(f2d)); plt.colorbar()
+    #plt.imshow(np.real(f2d)); plt.colorbar()
 
     f2d = f2d.astype(np.complex128) * pshift
     if apply_ctf or flip_phase:

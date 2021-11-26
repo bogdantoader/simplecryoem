@@ -23,7 +23,7 @@ def project_spatial(v, angles, dimensions, method = "tri"):
     V, X, Y, Z, _, _, _ = volume_fourier(v, dimensions)
 
     # Added mask to compare with pyem - needs more fiddling
-    V = V * create_mask(X,Y,Z, (0,0,0), np.max(X))
+    #V = V * create_mask(X,Y,Z, (0,0,0), np.max(X))
 
     # Not bothered about using the full X, Y, Z here since for the big 
     # experiments we do it all in Fourier anyway.

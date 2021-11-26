@@ -87,7 +87,7 @@ def grid_correct(vol, pfac=2, order=1):
     x, y, z = np.meshgrid(*[np.arange(-nhalf, nhalf)] * 3, indexing="xy")
     r = np.sqrt(x**2 + y**2 + z**2, dtype=vol.dtype) / (n * pfac)
     with np.errstate(divide="ignore", invalid="ignore"):
-        inc = np.sin(np.pi * r) / (np.pi * r)  # Results in 1 NaN in the center.
+        sinc = np.sin(np.pi * r) / (np.pi * r)  # Results in 1 NaN in the center.
     sinc[nhalf, nhalf, nhalf] = 1.
     if order == 0:
        cordata = vol / sinc
@@ -126,12 +126,10 @@ def vol_ft(vol, pfac=2, threads=1, normfft=1):
     :param normfft: Normalization constant for Fourier transform.
     """
 
-    # Bogdan
     #vol = grid_correct(vol, pfac=pfac, order=1)
     padvol = np.pad(vol, int((vol.shape[0] * pfac - vol.shape[0]) // 2), "constant")
     ft = rfftn(np.fft.ifftshift(padvol), padvol.shape, threads=threads)
     ftc = np.zeros((ft.shape[0] + 3, ft.shape[1] + 3, ft.shape[2]), dtype=ft.dtype)
-    #ftc = np.zeros(ft.shape, dtype=ft.dtype)
     fill_ft(ft, ftc, vol.shape[0], normfft=normfft)
     return ftc
 
