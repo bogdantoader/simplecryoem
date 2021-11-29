@@ -3,14 +3,17 @@ import jax.numpy as jnp
 import itertools
 from src.interpolate import interpolate
 from src.utils import volume_fourier, create_mask, get_rotation_matrix 
+from src.ctf import eval_ctf
 import jax
 from jax.config import config
+from matplotlib import pyplot as plt
+
 
 
 config.update("jax_enable_x64", True)
 
 
-def project_spatial(v, angles, dimensions, method = "tri"):
+def project_spatial(v, angles, dimensions, shifts = [0,0], method = "tri", ctf_params = None):
     """Takes a centred object in the spatial domain and returns the centred
     projection in the spatial domain.
     If N is the number of pixels in one dimension, then the origin is 
@@ -36,7 +39,7 @@ def project_spatial(v, angles, dimensions, method = "tri"):
     y_grid = np.array([y_freq[1], len(y_freq)])
     z_grid = np.array([z_freq[1], len(z_freq)])
 
-    V_slice, coords_slice = project(V, x_grid, y_grid, z_grid, angles, method)
+    V_slice, coords_slice = project(V, x_grid, y_grid, z_grid, angles, shifts, method, ctf_params)
    
     # Make it 2D
     V_slice = V_slice.reshape(V.shape[0], V.shape[1])
@@ -47,17 +50,39 @@ def project_spatial(v, angles, dimensions, method = "tri"):
     return v_proj
 
 # TODO: write the doc string properly
-def project(vol, x_grid, y_grid, z_grid, angles, interpolation_method = "tri"):
+def project(vol, x_grid, y_grid, z_grid, angles = [0,0,0], shifts = [0,0], interpolation_method = "tri", ctf_params=None):
     """Projection in the Fourier domain.
     Assumption: the frequencies are in the 'standard' order for vol and the
     coordinates X, Y, Z."""
    
     # Get the rotated coordinates in the z=0 plane.
-    slice_coords = rotate(x_grid, y_grid, angles)
+    proj_coords = rotate(x_grid, y_grid, angles)
     
-    slice_interp = interpolate(slice_coords, x_grid, y_grid, z_grid, vol, interpolation_method)
+    proj = interpolate(proj_coords, x_grid, y_grid, z_grid, vol, interpolation_method)
+
+    shift = get_shift_term(x_grid, y_grid, shifts)
+    proj *= shift
+
+    if ctf_params is not None:
+        x_freq = jnp.fft.fftfreq(int(x_grid[1]), 1/(x_grid[0]*x_grid[1]))
+        y_freq = jnp.fft.fftfreq(int(y_grid[1]), 1/(y_grid[0]*y_grid[1]))
+
+        X,Y = jnp.meshgrid(x_freq,y_freq)
+        r = jnp.sqrt(X**2 + Y**2)
+        theta  = np.arctan2(Y, X)
+
+        #apix = np.max(r)/0.2 #3.4327272727272726
+        apix = x_grid[0]
+        print(np.max(r))
+        print(x_grid[0])
+
+        ctf = eval_ctf(r/apix, theta, **ctf_params)
+
+        plt.imshow(r/apix); plt.colorbar()
+
+        proj *= ctf.ravel()
     
-    return slice_interp, slice_coords
+    return proj, proj_coords
 
 def rotate(x_grid, y_grid, angles):
     """Rotate the coordinates given by X, Y, Z=0
@@ -96,3 +121,15 @@ def rotate(x_grid, y_grid, angles):
 
     return rotated_coords
 
+# TODO: shifts in Angstrom rather than pixels
+def get_shift_term(x_grid, y_grid, shifts):
+    """Generate the phase term corresponding to the shifts in pixels."""
+    
+    # Generate the x and y grids.
+    x_freq = jnp.fft.fftfreq(int(x_grid[1]), 1/(x_grid[0]*x_grid[1]))
+    y_freq = jnp.fft.fftfreq(int(y_grid[1]), 1/(y_grid[0]*y_grid[1]))
+
+    X,Y = jnp.meshgrid(x_freq,y_freq)
+    shift = jnp.exp(2*jnp.pi*1j/x_grid[1] * (X * shifts[0] + Y * shifts[1])) 
+
+    return shift.ravel()

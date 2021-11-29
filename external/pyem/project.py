@@ -143,12 +143,17 @@ def project(f3d, p, s, sx, sy, a, pfac=2, apply_ctf=False, size=None, flip_phase
     f2d = f2d.astype(np.complex128) * pshift
     if apply_ctf or flip_phase:
         apix = star.calculate_apix(p) * np.double(size) / (f3d.shape[0] // pfac - 1)
+
+        print(apix)
         c = ctf.eval_ctf(s / apix, a,
                          p[star.Relion.DEFOCUSU], p[star.Relion.DEFOCUSV],
                          p[star.Relion.DEFOCUSANGLE],
                          p[star.Relion.PHASESHIFT], p[star.Relion.VOLTAGE],
-                         p[star.Relion.AC], p[star.Relion.CS], bf=0,
-                         lp=2 * apix)
+                         p[star.Relion.AC], p[star.Relion.CS], bf=0)
+                         #lp=2 * apix)
+       
+        plt.imshow(s/apix) ;plt.colorbar()
+
         if flip_phase:
             c = np.sign(c)
         f2d *= c
