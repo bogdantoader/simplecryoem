@@ -2,7 +2,7 @@ import numpy as np
 import jax.numpy as jnp
 import itertools
 from src.interpolate import interpolate
-from src.utils import volume_fourier, create_mask 
+from src.utils import volume_fourier, create_mask, get_rotation_matrix 
 import jax
 from jax.config import config
 
@@ -88,28 +88,11 @@ def rotate(x_grid, y_grid, angles):
 
     X,Y = jnp.meshgrid(x_freq,y_freq)
     coords = jnp.array([X.ravel(), Y.ravel(), jnp.zeros(len(x_freq)*len(y_freq))])
+    
+    angles = -jnp.array(angles)
 
     # And finally rotate
-    rotated_coords = get_rotation_matrix(angles) @ coords
+    rotated_coords = get_rotation_matrix(*angles) @ coords
 
     return rotated_coords
 
-def get_rotation_matrix(angles):
-    """Given the Euler angles alpha, beta, gamma, return 
-    the rotation matrix."""
-
-    alpha, beta, gamma = angles
-
-    Rx = jnp.array([[1, 0, 0],
-                   [0, jnp.cos(alpha), -jnp.sin(alpha)],
-                   [0, jnp.sin(alpha), jnp.cos(alpha)]])
-
-    Ry = jnp.array([[jnp.cos(beta), 0, jnp.sin(beta)],
-                   [0, 1, 0],
-                   [-jnp.sin(beta), 0, jnp.cos(beta)]])
-
-    Rz = jnp.array([[jnp.cos(gamma), -jnp.sin(gamma), 0],
-                    [jnp.sin(gamma), jnp.cos(gamma), 0],
-                    [0, 0, 1]])
-
-    return Rz @ Ry @ Rx

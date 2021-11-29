@@ -202,3 +202,24 @@ def rescale_larger_grid(v, x_grid, y_grid, z_grid, new_grid_lengths):
     v_new = jnp.fft.ifftshift(v_new)
     
     return v_new, x_grid_new, y_grid_new, z_grid_new  
+
+
+def get_rotation_matrix(alpha, beta, gamma):
+    """Given the Euler angles alpha, beta, gamma, return 
+    the rotation matrix. As seen in the pyEM implementation."""
+
+    ca = np.cos(alpha)
+    cb = np.cos(beta)
+    cg = np.cos(gamma)
+    sa = np.sin(alpha)
+    sb = np.sin(beta)
+    sg = np.sin(gamma)
+    cc = cb * ca
+    cs = cb * sa
+    sc = sb * ca
+    ss = sb * sa
+    r = np.array([[cg * cc - sg * sa, cg * cs + sg * ca, -cg * sb],
+                  [-sg * cc - cg * sa, -sg * cs + cg * ca, sg * sb],
+                  [sc, ss, cb]])
+    return r
+
