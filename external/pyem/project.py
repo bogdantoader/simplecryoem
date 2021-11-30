@@ -130,30 +130,18 @@ def project(f3d, p, s, sx, sy, a, pfac=2, apply_ctf=False, size=None, flip_phase
                             np.deg2rad(p[star.Relion.ANGLEPSI]))
     pshift = np.exp(-2 * np.pi * 1j * (-p[star.Relion.ORIGINX] * sx +
                                        -p[star.Relion.ORIGINY] * sy))
-    #Bogdan
-    #print(pfac)
-    #print(f3d.shape)
     f2d = vop.interpolate_slice_numba(f3d, orient, pfac=pfac, size=size)
-    #print(orient)
-    #f2d = f3d[33,2:66,:]
-    #print(f2d.shape)
-
-    #plt.imshow(np.real(f2d)); plt.colorbar()
-
     f2d = f2d.astype(np.complex128) * pshift
     if apply_ctf or flip_phase:
         apix = star.calculate_apix(p) * np.double(size) / (f3d.shape[0] // pfac - 1)
 
-        print(apix)
         c = ctf.eval_ctf(s / apix, a,
                          p[star.Relion.DEFOCUSU], p[star.Relion.DEFOCUSV],
                          p[star.Relion.DEFOCUSANGLE],
                          p[star.Relion.PHASESHIFT], p[star.Relion.VOLTAGE],
-                         p[star.Relion.AC], p[star.Relion.CS], bf=0)
-                         #lp=2 * apix)
+                         p[star.Relion.AC], p[star.Relion.CS], bf=0,
+                         lp=2 * apix)
        
-        plt.imshow(s/apix) ;plt.colorbar()
-
         if flip_phase:
             c = np.sign(c)
         f2d *= c

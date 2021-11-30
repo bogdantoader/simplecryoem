@@ -94,15 +94,15 @@ def low_pass_filter(vol, X, Y, Z, sigma):
     low_pass_vol = np.fft.ifftn(np.fft.fftn(vol) * gauss)
     return np.real(low_pass_vol)
 
-def volume_fourier(vol, dimensions, shape_f = None):
+def volume_fourier(vol, pixel_size, shape_f = None):
     """Calculate the FFT of the volume and return the frequency coordinates.
 
     Parameters
     ----------
     vol :
         Volume in spatial domain
-    dimensions: 3 x 1 array
-        Spatial dimensions of the volume, in units (e.g. Angst?)
+    pixel_size: double 
+        Pixel size, in units (e.g. Angst)
     shape_f: 3 x 1 array
         Shape of the Fourier volume
 
@@ -122,18 +122,14 @@ def volume_fourier(vol, dimensions, shape_f = None):
 
     Nx, Ny, Nz = vol.shape
     Nx_f, Ny_f, Nz_f = shape_f
-    px_size = dimensions/np.array(vol.shape) # "pixel" size
-    dx = px_size[0]
-    dy = px_size[1]
-    dz = px_size[2]
 
-    x_freq = jnp.fft.fftfreq(Nx_f, dx)
-    y_freq = jnp.fft.fftfreq(Ny_f, dy)
-    z_freq = jnp.fft.fftfreq(Nz_f, dz)
+    x_freq = jnp.fft.fftfreq(Nx_f, pixel_size)
+    y_freq = jnp.fft.fftfreq(Ny_f, pixel_size)
+    z_freq = jnp.fft.fftfreq(Nz_f, pixel_size)
 
     X_f, Y_f, Z_f = jnp.meshgrid(x_freq, y_freq, z_freq, indexing='xy')
 
-    return vol_f, X_f, Y_f, Z_f, dx, dy, dz
+    return vol_f, X_f, Y_f, Z_f
 
 def mip_z(img):
     plt.imshow(np.max(img, axis = 2))

@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt
 config.update("jax_enable_x64", True)
 
 
-def project_spatial(v, angles, dimensions, shifts = [0,0], method = "tri", ctf_params = None):
+def project_spatial(v, angles, pixel_size, shifts = [0,0], method = "tri", ctf_params = None):
     """Takes a centred object in the spatial domain and returns the centred
     projection in the spatial domain.
     If N is the number of pixels in one dimension, then the origin is 
@@ -23,7 +23,7 @@ def project_spatial(v, angles, dimensions, shifts = [0,0], method = "tri", ctf_p
     
     # First ifftshift in the spatial domain 
     v = jnp.fft.ifftshift(v)
-    V, X, Y, Z, _, _, _ = volume_fourier(v, dimensions)
+    V, X, Y, Z, _, _, _ = volume_fourier(v, pixel_size)
 
     # Added mask to compare with pyem - needs more fiddling
     #V = V * create_mask(X,Y,Z, (0,0,0), np.max(X))
@@ -61,6 +61,7 @@ def project(vol, x_grid, y_grid, z_grid, angles = [0,0,0], shifts = [0,0], inter
     proj = interpolate(proj_coords, x_grid, y_grid, z_grid, vol, interpolation_method)
 
     shift = get_shift_term(x_grid, y_grid, shifts)
+    print(np.sum(shift))
     proj *= shift
 
     if ctf_params is not None:
@@ -71,14 +72,9 @@ def project(vol, x_grid, y_grid, z_grid, angles = [0,0,0], shifts = [0,0], inter
         r = jnp.sqrt(X**2 + Y**2)
         theta  = np.arctan2(Y, X)
 
-        #apix = np.max(r)/0.2 #3.4327272727272726
-        apix = x_grid[0]
-        print(np.max(r))
-        print(x_grid[0])
+        ctf = eval_ctf(r, theta, **ctf_params)
 
-        ctf = eval_ctf(r/apix, theta, **ctf_params)
-
-        plt.imshow(r/apix); plt.colorbar()
+        #plt.imshow(r); plt.colorbar()
 
         proj *= ctf.ravel()
     
@@ -121,15 +117,15 @@ def rotate(x_grid, y_grid, angles):
 
     return rotated_coords
 
-# TODO: shifts in Angstrom rather than pixels
 def get_shift_term(x_grid, y_grid, shifts):
-    """Generate the phase term corresponding to the shifts in pixels."""
+    """Generate the phase term corresponding to the shifts in 
+    units (e.g. Angstroms)."""
     
     # Generate the x and y grids.
     x_freq = jnp.fft.fftfreq(int(x_grid[1]), 1/(x_grid[0]*x_grid[1]))
     y_freq = jnp.fft.fftfreq(int(y_grid[1]), 1/(y_grid[0]*y_grid[1]))
 
     X,Y = jnp.meshgrid(x_freq,y_freq)
-    shift = jnp.exp(2*jnp.pi*1j/x_grid[1] * (X * shifts[0] + Y * shifts[1])) 
+    shift = jnp.exp(2 * jnp.pi * 1j * (X * shifts[0] + Y * shifts[1])) 
 
     return shift.ravel()
