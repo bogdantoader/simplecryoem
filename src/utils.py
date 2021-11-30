@@ -204,17 +204,17 @@ def get_rotation_matrix(alpha, beta, gamma):
     """Given the Euler angles alpha, beta, gamma, return 
     the rotation matrix. As seen in the pyEM implementation."""
 
-    ca = np.cos(alpha)
-    cb = np.cos(beta)
-    cg = np.cos(gamma)
-    sa = np.sin(alpha)
-    sb = np.sin(beta)
-    sg = np.sin(gamma)
+    ca = jnp.cos(alpha)
+    cb = jnp.cos(beta)
+    cg = jnp.cos(gamma)
+    sa = jnp.sin(alpha)
+    sb = jnp.sin(beta)
+    sg = jnp.sin(gamma)
     cc = cb * ca
     cs = cb * sa
     sc = sb * ca
     ss = sb * sa
-    r = np.array([[cg * cc - sg * sa, cg * cs + sg * ca, -cg * sb],
+    r = jnp.array([[cg * cc - sg * sa, cg * cs + sg * ca, -cg * sb],
                   [-sg * cc - cg * sa, -sg * cs + cg * ca, sg * sb],
                   [sc, ss, cb]])
     return r
