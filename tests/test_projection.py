@@ -88,12 +88,17 @@ class TestProjection(unittest.TestCase):
         i, j, k = (2, 2, 1)
         v, x_grid, y_grid, z_grid = self.get_volume_and_coords_odd(i,j,k)
 
-        angles = [jnp.pi/2, -3*jnp.pi/2, -jnp.pi/2, 3*jnp.pi/2]
+        # Euler angles corresponding to rotation arond the x axis 
+        # by pi/2, -3pi/2, -pi/2, 3pi/2 respectively.
+        angles = [[jnp.pi/2, jnp.pi/2, jnp.pi/2],
+            [-3*jnp.pi/2, -3*jnp.pi/2, -3*jnp.pi/2],
+            [-jnp.pi/2, jnp.pi/2, -jnp.pi/2],
+            [3*jnp.pi/2, -3*jnp.pi/2, 3*jnp.pi/2]]
 
-        target_points = [(1,2), (1,2), (3,2), (3,2)]
+        target_points = [(1,2) , (1,2), (3,2), (3,2)]
 
         for (ang, target_p) in zip(angles, target_points):
-            a = jnp.array([ang,0,0])
+            a = jnp.array(ang)
             vp_nn, vp_tri = self.do_nn_and_tri_projection(v, x_grid,y_grid,z_grid, a)
             self.assert_point_mass_proj_one(vp_nn, target_p)
             self.assert_point_mass_proj_one(vp_tri, target_p)
@@ -129,6 +134,7 @@ class TestProjection(unittest.TestCase):
         nx = 5
         shape = jnp.array([nx, nx, nx])
         dimensions = jnp.array([1, 1, 1])
+        pixel_size = dimensions[0]/shape[0]
         radius = 1/(2*nx)
         intensity = 1
 
@@ -151,11 +157,11 @@ class TestProjection(unittest.TestCase):
             v = spherical_volume(shape, dimensions, centre, radius, intensity, False)
         
             # Calculate the -pi/2 projections 
-            v_proj2_nn = project_spatial(v, jnp.array([0,0,-jnp.pi/2]), dimensions, "nn")
-            v_proj2_tri = project_spatial(v, [0,0,-jnp.pi/2], dimensions, "tri")
+            v_proj2_nn = project_spatial(v, jnp.array([0,0,-jnp.pi/2]), pixel_size, method = "nn")
+            v_proj2_tri = project_spatial(v, [0,0,-jnp.pi/2], pixel_size, method = "tri")
 
             # And the -pi/4 projection
-            v_proj4_nn = project_spatial(v, [0,0,-jnp.pi/4], dimensions, "nn")
+            v_proj4_nn = project_spatial(v, [0,0,-jnp.pi/4], pixel_size, method = "nn")
            
             # The analytically calculated projections - for pi/2 both nn and
             # tri are the same, while for pi/4 we only have nn. 
@@ -272,8 +278,8 @@ class TestProjection(unittest.TestCase):
         self.assertAlmostEqual(jnp.sum(abs(v)), 1, places = 14)
 
     def do_nn_and_tri_projection(self, v, x_grid, y_grid, z_grid, angles):
-        vp_nn, _ = project(jnp.fft.ifftshift(v), x_grid, y_grid, z_grid, angles, "nn")
-        vp_tri, _ = project(jnp.fft.ifftshift(v), x_grid, y_grid, z_grid, angles, "tri")
+        vp_nn, _ = project(jnp.fft.ifftshift(v), x_grid, y_grid, z_grid, angles, [0,0], "nn")
+        vp_tri, _ = project(jnp.fft.ifftshift(v), x_grid, y_grid, z_grid, angles, [0,0], "tri")
 
         vp_nn = vp_nn.reshape(v.shape[0], v.shape[1])
         vp_tri = vp_tri.reshape(v.shape[0], v.shape[1])

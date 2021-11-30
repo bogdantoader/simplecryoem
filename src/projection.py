@@ -23,7 +23,7 @@ def project_spatial(v, angles, pixel_size, shifts = [0,0], method = "tri", ctf_p
     
     # First ifftshift in the spatial domain 
     v = jnp.fft.ifftshift(v)
-    V, X, Y, Z, _, _, _ = volume_fourier(v, pixel_size)
+    V, X, Y, Z = volume_fourier(v, pixel_size)
 
     # Added mask to compare with pyem - needs more fiddling
     #V = V * create_mask(X,Y,Z, (0,0,0), np.max(X))
@@ -61,7 +61,6 @@ def project(vol, x_grid, y_grid, z_grid, angles = [0,0,0], shifts = [0,0], inter
     proj = interpolate(proj_coords, x_grid, y_grid, z_grid, vol, interpolation_method)
 
     shift = get_shift_term(x_grid, y_grid, shifts)
-    print(np.sum(shift))
     proj *= shift
 
     if ctf_params is not None:
