@@ -30,8 +30,8 @@ def fill_ft(ft, ftc, rmax, normfft=1):
             for j in range(ft.shape[2]):
                 jp = j
                 r2 = ip**2 + jp**2 + kp**2
-                if r2 <= rmax2:
-                    ftc[kp + ftc.shape[0]//2, ip + ftc.shape[1]//2, jp] = ft[k, i, j] * normfft
+                #if r2 <= rmax2:
+                ftc[kp + ftc.shape[0]//2, ip + ftc.shape[1]//2, jp] = ft[k, i, j] * normfft
 
 
 @numba.jit(cache=False, nopython=True, nogil=True)
@@ -65,8 +65,8 @@ def interpolate_slice_numba(f3d, rot, pfac=2, size=None):
             xp = j
 
             # Bogdan
-            if xp**2 + yp2 > rmax2:
-                continue
+            #if xp**2 + yp2 > rmax2:
+            #    continue
 
             x = qot[0,0] * xp + qot[0,1] * yp  # Implicit z = 0.
             y = qot[1,0] * xp + qot[1,1] * yp
@@ -94,6 +94,9 @@ def interpolate_slice_numba(f3d, rot, pfac=2, size=None):
             x1 = x0 + 1
             y1 = y0 + 1
             z1 = z0 + 1
+
+
+            print(x0, ", ", y0)
 
             f2d[i, j] = linterp(az,
                     linterp(ay,

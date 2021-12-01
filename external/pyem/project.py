@@ -131,7 +131,9 @@ def project(f3d, p, s, sx, sy, a, pfac=2, apply_ctf=False, size=None, flip_phase
     pshift = np.exp(-2 * np.pi * 1j * (-p[star.Relion.ORIGINX] * sx +
                                        -p[star.Relion.ORIGINY] * sy))
     f2d = vop.interpolate_slice_numba(f3d, orient, pfac=pfac, size=size)
-    f2d = f2d.astype(np.complex128) * pshift
+
+    # Commented due to issue with dimensions
+    #f2d = f2d.astype(np.complex128) * pshift
     if apply_ctf or flip_phase:
         apix = star.calculate_apix(p) * np.double(size) / (f3d.shape[0] // pfac - 1)
 
