@@ -69,7 +69,7 @@ def project(vol, x_grid, y_grid, z_grid, angles = [0,0,0], shifts = [0,0], inter
 
         X,Y = jnp.meshgrid(x_freq,y_freq)
         r = jnp.sqrt(X**2 + Y**2)
-        theta  = np.arctan2(Y, X)
+        theta  = jnp.arctan2(Y, X)
 
         ctf = eval_ctf(r, theta, **ctf_params)
 
