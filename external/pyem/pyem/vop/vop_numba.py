@@ -95,9 +95,6 @@ def interpolate_slice_numba(f3d, rot, pfac=2, size=None):
             y1 = y0 + 1
             z1 = z0 + 1
 
-
-            print(x0, ", ", y0)
-
             f2d[i, j] = linterp(az,
                     linterp(ay,
                             linterp(ax, f3d[z0,y0,x0], f3d[z0,y0,x1]),
