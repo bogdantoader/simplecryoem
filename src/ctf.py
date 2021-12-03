@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+import numpy as np
 from external.pyem.pyem import star
 
 def eval_ctf(s, a, def1, def2, angast=0, phase=0, kv=300, ac=0.1, cs=2.0, bf=0, lp=0):
@@ -38,20 +39,19 @@ def eval_ctf(s, a, def1, def2, angast=0, phase=0, kv=300, ac=0.1, cs=2.0, bf=0, 
     return ctf
 
 
-def get_ctf_params_from_df(df, pixel_size):
+def get_ctf_params_from_df_row(p, pixel_size):
     """Extract the CTF parameters from a dataframe, as arrays 
     with elements in the same order as the arguments of eval_ctf."""
 
-    n = len(df)
-    ctf_params = jnp.array([df[star.Relion.DEFOCUSU], 
-        df[star.Relion.DEFOCUSV],
-        df[star.Relion.DEFOCUSANGLE], 
-        df[star.Relion.PHASESHIFT],
-        df[star.Relion.VOLTAGE],
-        df[star.Relion.AC],
-        df[star.Relion.CS],
-        jnp.zeros(n),
-        2 * pixel_size]).transpose()
+    ctf_params = np.array([p[star.Relion.DEFOCUSU], 
+        p[star.Relion.DEFOCUSV],
+        p[star.Relion.DEFOCUSANGLE], 
+        p[star.Relion.PHASESHIFT],
+        p[star.Relion.VOLTAGE],
+        p[star.Relion.AC],
+        p[star.Relion.CS],
+        0,
+        2 * pixel_size])
 
     return ctf_params
 
