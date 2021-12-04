@@ -71,7 +71,7 @@ def project(vol, x_grid, y_grid, z_grid, angles = [0,0,0], shifts = [0,0], inter
         r = jnp.sqrt(X**2 + Y**2)
         theta  = jnp.arctan2(Y, X)
 
-        ctf = eval_ctf(r, theta, **ctf_params)
+        ctf = eval_ctf(r, theta, ctf_params)
 
         #plt.imshow(r); plt.colorbar()
 

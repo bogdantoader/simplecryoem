@@ -5,6 +5,8 @@ import mrcfile
 
 # TODO: need to check if I should use IMAGE_PATH and IMAGE_INDEX instead of
 # IMAGE_ORIGINAL_PATH and IMAGE_ORIGINAL_INDEX
+# And make sure this is correct anyway
+
 def get_data_from_df(df, data_dir):
     """Given a data frame as returned by star.parse_star, extract the useful
     information."""
@@ -18,6 +20,7 @@ def get_data_from_df(df, data_dir):
     ctf_params = []
 
     particle_paths = df[star.UCSF.IMAGE_ORIGINAL_PATH].unique()
+    #for path in particle_paths[:10]:
     for path in particle_paths:
         with mrcfile.open(data_dir + path) as mrc:
             group_data = mrc.data
@@ -56,11 +59,4 @@ def get_data_from_df(df, data_dir):
     ctf_params = np.array(ctf_params)
     imgs = np.array(imgs)
     
-
-    #imgs = jnp.concatenate(imgs, axis = 0)
-    #pixel_size = jnp.concatenate(pixel_size, axis = 0)
-    #angles = jnp.concatenate(angles, axis = 0)    
-    #shifts = jnp.concatenate(shifts, axis = 0)
-    #ctf_params = jnp.concatenate(ctf_params, axis = 0)
-
     return imgs, pixel_size, angles, shifts, ctf_params
