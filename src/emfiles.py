@@ -31,6 +31,7 @@ def get_data_from_df(df, data_dir):
 
         for index, p in group.iterrows():
 
+
             angrot = p[star.Relion.ANGLEROT]
             angtilt = p[star.Relion.ANGLETILT]
             angpsi = p[star.Relion.ANGLEPSI]
