@@ -44,7 +44,7 @@ def get_data_from_df(df, data_dir):
             sh = np.array([shx, shy])
             ctf_p = get_ctf_params_from_df_row(p, px)
 
-            img_index = p[star.UCSF.IMAGE_ORIGINAL_INDEX]]
+            img_index = p[star.UCSF.IMAGE_ORIGINAL_INDEX]
             img = group_data[img_index]
 
             pixel_size.append(px)
