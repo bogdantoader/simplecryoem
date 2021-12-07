@@ -57,7 +57,8 @@ def project(vol, x_grid, y_grid, z_grid, angles = [0,0,0], shifts = [0,0], inter
    
     # Get the rotated coordinates in the z=0 plane.
     proj_coords = rotate(x_grid, y_grid, angles)
-    
+  
+
     proj = interpolate(proj_coords, x_grid, y_grid, z_grid, vol, interpolation_method)
 
     shift = get_shift_term(x_grid, y_grid, shifts)
@@ -132,7 +133,7 @@ def get_shift_term(x_grid, y_grid, shifts):
 
 def project_star_params(vol, p, pfac = 1):
     """Spatial domain projection of vol with parameters from one row of
-    a star file by dictionary p. Useful to compare against Relion/pyem."""
+    a star file given by dictionary p. Useful to compare against Relion/pyem."""
 
     vol = grid_correct(vol, pfac = pfac, order = 1)
 
@@ -170,6 +171,8 @@ def project_star_params(vol, p, pfac = 1):
 #                  'bf'    : 0,
 #                  'lp'    : 2 * pixel_size}
 
+    # The project function requires the CTF parameters to be a list with
+    # the elements ordered like the keys in the dict above.
     ctf_params = [p[star.Relion.DEFOCUSU], 
                   p[star.Relion.DEFOCUSV],
                   p[star.Relion.DEFOCUSANGLE], 
@@ -180,12 +183,23 @@ def project_star_params(vol, p, pfac = 1):
                   0,
                   2 * pixel_size]
 
-
-
-
     f2d, coords_slice = project(f3d, x_grid, y_grid, z_grid, angles, shifts, 'tri',
             ctf_params)
     f2d = f2d.reshape(f3d.shape[0], f3d.shape[1]) * mymask[:,:,0]
     proj = np.real(np.fft.fftshift(np.fft.ifftn(f2d)))
 
     return proj
+
+
+def create_grid(nx, px):
+    """Create the (one dimensional) Fourier grid used for projections.
+    
+    <<<IMPORTANT!!!>>> 
+    The grids must not be Tracer (aka Jax)  objects."""
+
+    x_freq = np.fft.fftfreq(nx, px)
+    x_grid = np.array([x_freq[1], len(x_freq)])
+    
+    return x_grid 
+
+

@@ -39,11 +39,31 @@ def load_data(data_dir, star_file):
     return imgs_f, params
 
 # TODO: write tests for this function and make with work with odd dimensions too.
-def crop_fourier_images(imgs, nx):
+def crop_fourier_images(imgs, x_grid, nx):
     """Given an N x nx0 x nx0 array of N images of dimension nx0 x nx0 in the 
     frequency space with the standard ordering, crop the high-frequency entries 
     to reduce the image to the dimensions nx x nx. 
-    The cropped images are returned vectorized."""
+    Also adjust the grid arrays accordingly. 
+
+    Parameters:
+    ----------
+    imgs : N x nx0 x nx0 array
+        N stacked images of dimensions nx0 x nx0 in the Fourier domain 
+        and standard ordering.
+    x_grid: 2 x 1 array 
+        Spacing and length of the Fourier grid in each dimension (we assume
+        they are the same in all dimensions), in the format:
+        [grid_spacing, grid_length].
+    nx : integer
+        The target length each dimension of the images after cropping.
+
+    Returns:
+    -------
+        imgs_cropped: N x nx x nx)
+            N stacked cropped images. 
+        x_grid_cropped: 2 x 1 array
+            The new Fourier grid corresponding to the cropped images.
+    """
     
     N = imgs.shape[0]
     mid = imgs.shape[-1]/2
@@ -53,10 +73,13 @@ def crop_fourier_images(imgs, nx):
         img = np.fft.fftshift(f)
         imgs_cropped[i] = np.fft.ifftshift(
                 img[int(mid-nx/2):int(mid+nx/2), int(mid-nx/2):int(mid+nx/2)])
+    
+    # <<< IMPORTANT!!!>>> 
+    # The grid must not be a Jax object.
+    x_grid_cropped = np.array([x_grid[0], nx])
 
-    imgs_cropped = imgs_cropped.reshape(N, -1)
+    return imgs_cropped, x_grid_cropped
 
-    return imgs_cropped
 
 def get_data_from_df(df, data_dir):
     """Given a data frame as returned by star.parse_star, extract the useful
