@@ -157,17 +157,31 @@ def project_star_params(vol, p, pfac = 1):
              p[star.Relion.ANGLEROT]]) / 180* jnp.pi # third angle is
                                         # rotation around the first z axis
 
+
     shifts = jnp.array([p[star.Relion.ORIGINX], p[star.Relion.ORIGINY]]) * pixel_size
 
-    ctf_params = {'def1'  : p[star.Relion.DEFOCUSU], 
-                  'def2'  : p[star.Relion.DEFOCUSV],
-                  'angast': p[star.Relion.DEFOCUSANGLE], 
-                  'phase' : p[star.Relion.PHASESHIFT],
-                  'kv'    : p[star.Relion.VOLTAGE],
-                  'ac'    : p[star.Relion.AC],
-                  'cs'    : p[star.Relion.CS],
-                  'bf'    : 0,
-                  'lp'    : 2 * pixel_size}
+#    ctf_params = {'def1'  : p[star.Relion.DEFOCUSU], 
+#                  'def2'  : p[star.Relion.DEFOCUSV],
+#                  'angast': p[star.Relion.DEFOCUSANGLE], 
+#                  'phase' : p[star.Relion.PHASESHIFT],
+#                  'kv'    : p[star.Relion.VOLTAGE],
+#                  'ac'    : p[star.Relion.AC],
+#                  'cs'    : p[star.Relion.CS],
+#                  'bf'    : 0,
+#                  'lp'    : 2 * pixel_size}
+
+    ctf_params = [p[star.Relion.DEFOCUSU], 
+                  p[star.Relion.DEFOCUSV],
+                  p[star.Relion.DEFOCUSANGLE], 
+                  p[star.Relion.PHASESHIFT],
+                  p[star.Relion.VOLTAGE],
+                  p[star.Relion.AC],
+                  p[star.Relion.CS],
+                  0,
+                  2 * pixel_size]
+
+
+
 
     f2d, coords_slice = project(f3d, x_grid, y_grid, z_grid, angles, shifts, 'tri',
             ctf_params)

@@ -31,7 +31,6 @@ def get_data_from_df(df, data_dir):
 
         for index, p in group.iterrows():
 
-
             angrot = p[star.Relion.ANGLEROT]
             angtilt = p[star.Relion.ANGLETILT]
             angpsi = p[star.Relion.ANGLEPSI]
@@ -41,11 +40,11 @@ def get_data_from_df(df, data_dir):
             shx = p[star.Relion.ORIGINX] * px
             shy = p[star.Relion.ORIGINY] * px
 
-            angs = np.deg2rad(np.array([angpsi,angtilt, angrot]))
+            angs = np.deg2rad(np.array([angpsi, angtilt, angrot]))
             sh = np.array([shx, shy])
             ctf_p = get_ctf_params_from_df_row(p, px)
 
-            img_index = group[star.UCSF.IMAGE_ORIGINAL_INDEX][index]
+            img_index = p[star.UCSF.IMAGE_ORIGINAL_INDEX]]
             img = group_data[img_index]
 
             pixel_size.append(px)
