@@ -20,7 +20,7 @@ def get_data_from_df(df, data_dir):
     ctf_params = []
 
     particle_paths = df[star.UCSF.IMAGE_ORIGINAL_PATH].unique()
-    #for path in particle_paths[:10]:
+    #for path in particle_paths[:100]:
     for path in particle_paths:
         with mrcfile.open(data_dir + path) as mrc:
             group_data = mrc.data
