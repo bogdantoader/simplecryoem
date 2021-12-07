@@ -79,12 +79,20 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
         vol =  mask * vol
     return vol
 
-def create_mask(X, Y, Z, centre, radius):
+def create_mask(x_grid, centre, radius):
+    x_freq = np.fft.fftfreq(x_grid[1], 1/(x_grid[1] * x_grid[0]))
+    y_freq = x_freq
+    z_freq = x_freq
+
+    X, Y, Z = np.meshgrid(x_freq, z_freq, y_freq)
+
     mask = np.ones(X.shape)
     cx, cy, cz = centre
     r = np.sqrt((X-cx)**2 + (Y-cy)**2 + (Z-cz)**2)
     mask[r > radius] = 0
-    return jnp.array(mask)
+
+    return np.array(mask)
+
 
 def low_pass_filter(vol, X, Y, Z, sigma):
     gauss = np.exp(-(X**2 + Y**2 + Z**2)/(2*sigma))
