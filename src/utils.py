@@ -80,7 +80,7 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
     return vol
 
 def create_mask(x_grid, centre, radius):
-    x_freq = np.fft.fftfreq(x_grid[1], 1/(x_grid[1] * x_grid[0]))
+    x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1/(x_grid[1] * x_grid[0]))
     y_freq = x_freq
     z_freq = x_freq
 
