@@ -39,7 +39,7 @@ def project_spatial(v, angles, pixel_size, shifts = [0,0], method = "tri", ctf_p
     y_grid = np.array([y_freq[1], len(y_freq)])
     z_grid = np.array([z_freq[1], len(z_freq)])
 
-    V_slice, coords_slice = project(V, angles, shifts, ctf_params, x_grid, y_grid, z_grid, method)
+    V_slice = project(V, angles, shifts, ctf_params, x_grid, y_grid, z_grid, method)
    
     # Make it 2D
     V_slice = V_slice.reshape(V.shape[0], V.shape[1])
@@ -100,7 +100,8 @@ def project(vol, angles, shifts, ctf_params, x_grid, y_grid, z_grid, interpolati
 
         proj *= ctf.ravel()
     
-    return proj, proj_coords
+    #return proj, proj_coords
+    return proj
 
 def rotate(x_grid, y_grid, angles):
     """Rotate the coordinates given by X, Y, Z=0

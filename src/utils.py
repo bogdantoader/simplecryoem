@@ -1,4 +1,5 @@
 import numpy as np
+import jax
 import jax.numpy as jnp
 from  matplotlib import pyplot as plt
 
@@ -227,3 +228,6 @@ def get_rotation_matrix(alpha, beta, gamma):
                   [sc, ss, cb]])
     return r
 
+@jax.jit
+def l2sq(x, y = 0):
+    return jnp.real(jnp.sum(jnp.conj(x-y)*(x-y)))

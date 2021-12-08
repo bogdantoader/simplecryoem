@@ -1,17 +1,16 @@
 import jax
 import jax.numpy as jnp
+from src.utils import l2sq
 
-# Forward operator
 
 #TODO: maybe not all the functions in this file need to be jit-ed
-#TODO 2: do I need to have all these functions? maybe one function returning whats necessary would be better?
-#TODO 3: as part of 2, make the get_loss_func, slice_func, l2sq play together more nicely, see in Roy's code - should take a generic project function and loss function, then return all the good stuff I need (slice, loss, grad)
+
+# Slice functions
 def get_slice_funcs(project, x_grid, y_grid, z_grid, interp_method = "tri"):
 
     @jax.jit
     def slice_func(v, angles, shifts, ctf_params):
-        projection, _ = project(v, angles, shifts, ctf_params, x_grid, y_grid, z_grid, interp_method)
-        return projection
+        return project(v, angles, shifts, ctf_params, x_grid, y_grid, z_grid, interp_method)
 
     @jax.jit
     def slice_func_array(v, angles, shifts, ctf_params):    
@@ -20,18 +19,14 @@ def get_slice_funcs(project, x_grid, y_grid, z_grid, interp_method = "tri"):
     return slice_func, slice_func_array
    
 # Loss functions
-
-def get_loss_funcs(slice_func, alpha):
-    """L2 squared error with L2 regularization, where alpha is the
-    regularization parameter."""
+def get_loss_funcs(slice_func, err_func = l2sq, alpha = 0):
 
     @jax.jit
     def loss_func(v, angles, shifts, ctf_params, img):
-        nx = v.shape[-1]
-
-        #return 1/(2* nx*nx) * l2sq(slice_func(v, angles) - img)
-        # With l2 regularization
-        return 1/(2* nx*nx) * (alpha * l2sq(v) + l2sq(slice_func(v, angles, shifts, ctf_params) - img))
+        """L2 squared error with L2 regularization, where alpha is the
+        regularization parameter."""
+        
+        return 1/(2* v.shape[-1]**2) * (alpha * l2sq(v) + err_func(slice_func(v, angles, shifts, ctf_params), img))
 
     @jax.jit 
     def loss_func_batched(v, angles, shifts, ctf_params, imgs):
@@ -41,9 +36,23 @@ def get_loss_funcs(slice_func, alpha):
     def loss_func_sum(v, angles, shifts, ctf_params, imgs):
         return jnp.mean(loss_func_batched(v, angles, shifts, ctf_params, imgs))
 
-    return jax.jit(loss_func), jax.jit(loss_func_sum)
+    return loss_func, loss_func_batched, loss_func_sum
+
+# Grads
+def get_grad_v_funcs(loss_func, loss_func_sum):
+
+    @jax.jit
+    def grad_loss_volume(v, angles, shifts, ctf_params, img):
+        return jax.grad(loss_func)(v, angles, shifts, ctf_params, img)
+
+    @jax.jit
+    def grad_loss_volume_batched(v, angles, shifts, ctf_params, imgs):
+        return 1/imgs.shape[0] * jnp.sum(jax.vmap(grad_loss_volume, in_axes = (None, 0, 0, 0, 0))(v, angles, shifts, ctf_params, imgs), axis=0)
+
+    @jax.jit
+    def grad_loss_volume_sum(v, angles, shifts, ctf_params, imgs):
+        return jax.grad(loss_func_sum)(v, angles, shifts, ctf_params, imgs)
+
+    return grad_loss_volume, grad_loss_volume_batched, grad_loss_volume_sum
 
 
-@jax.jit
-def l2sq(x):
-    return jnp.real(jnp.sum(jnp.conj(x)*x))
