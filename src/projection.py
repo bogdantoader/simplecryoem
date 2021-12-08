@@ -39,7 +39,7 @@ def project_spatial(v, angles, pixel_size, shifts = [0,0], method = "tri", ctf_p
     y_grid = np.array([y_freq[1], len(y_freq)])
     z_grid = np.array([z_freq[1], len(z_freq)])
 
-    V_slice, coords_slice = project(V, x_grid, y_grid, z_grid, angles, shifts, method, ctf_params)
+    V_slice, coords_slice = project(V, angles, shifts, ctf_params, x_grid, y_grid, z_grid, method)
    
     # Make it 2D
     V_slice = V_slice.reshape(V.shape[0], V.shape[1])
@@ -50,10 +50,32 @@ def project_spatial(v, angles, pixel_size, shifts = [0,0], method = "tri", ctf_p
     return v_proj
 
 # TODO: write the doc string properly
-def project(vol, x_grid, y_grid, z_grid, angles = [0,0,0], shifts = [0,0], interpolation_method = "tri", ctf_params=None):
+def project(vol, angles, shifts, ctf_params, x_grid, y_grid, z_grid, interpolation_method = "tri"):
     """Projection in the Fourier domain.
     Assumption: the frequencies are in the 'standard' order for vol and the
-    coordinates X, Y, Z."""
+    coordinates X, Y, Z.
+
+    Parameters:G
+    -----------
+    vol: 
+        Volume in Fourier domain, in standard order. 
+
+    angles: [psi, tilt, rot]
+        Proper Euler angles.
+
+    shifts : [originx, originy]
+
+    ctf_params : 9 x 1 array or None
+        As in the ctf file.
+
+    x_grid, y_grid, z_grid : [grid_spacing, grid_length]
+
+    interp_method : "tri" or "nn"
+
+    Returns:
+    --------
+
+    """
    
     # Get the rotated coordinates in the z=0 plane.
     proj_coords = rotate(x_grid, y_grid, angles)
