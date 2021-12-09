@@ -4,7 +4,6 @@ import jax.numpy as jnp
 from  matplotlib import pyplot as plt
 
 
-
 def volume_comp(shape, dimensions, centres, radii, intensities, 
         apply_filter = False, sigma = 0.01):
     """Create a volume that is a sum of rand_volumes with given centres and
@@ -70,17 +69,19 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
     coords_x = np.linspace(-Lx/2 + dx/2, Lx/2 - dx/2, Nx)
     coords_y = np.linspace(-Ly/2 + dy/2, Ly/2 - dy/2, Ny)
     coords_z = np.linspace(-Lz/2 + dz/2, Lz/2 - dz/2, Nz) 
-    X, Y, Z = np.meshgrid(coords_x, coords_y, coords_z, indexing='xy')
-    
-    mask = create_mask(X, Y, Z, centre, radius) 
+    x_grid = np.array([coords_x[1] - coords_x[0], len(coords_x)] )
+
+    vol = vol * create_mask(x_grid, centre, radius) 
    
     if apply_filter:
-        vol = low_pass_filter(mask*vol, X, Y, Z, sigma)
-    else:
-        vol =  mask * vol
+        vol = low_pass_filter(vol, X, Y, Z, sigma)
+    
     return vol
 
 def create_mask(x_grid, centre, radius):
+    """Works in the Fourier domain with the standard ordering, but obviously
+    it can be applied in the spatial domain."""
+
     x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1/(x_grid[1] * x_grid[0]))
     y_freq = x_freq
     z_freq = x_freq
@@ -103,42 +104,29 @@ def low_pass_filter(vol, X, Y, Z, sigma):
     low_pass_vol = np.fft.ifftn(np.fft.fftn(vol) * gauss)
     return np.real(low_pass_vol)
 
-def volume_fourier(vol, pixel_size, shape_f = None):
-    """Calculate the FFT of the volume and return the frequency coordinates.
+def volume_fourier(vol, pixel_size):
+    """Calculate the FFT of the volume and return the frequency coordinates
+    Assume the volume has equal dimensions.
 
     Parameters
     ----------
-    vol :
-        Volume in spatial domain
+    vol : n x n x n array
+        Volume in spatial domain.
     pixel_size: double 
         Pixel size, in units (e.g. Angst)
-    shape_f: 3 x 1 array
-        Shape of the Fourier volume
 
     Returns
     -------
-    vol_f
-        the Fourier volume
-    X_f, Y_f, Z_f
-        Fourier points
+    vol_f: n x n x n array
+        The FFT of the volume vol.
+    x_grid: 2 x 1 array     
+        Fourier grid in the form [grid_spacing, grid_length].
     """
 
-    if shape_f == None:
-        shape_f = vol.shape
-
-    #vol_f = jnp.fft.fftn(vol, shape_f)
     vol_f = jnp.fft.fftn(vol)
+    x_grid = create_grid(vol.shape[0], pixel_size) 
 
-    Nx, Ny, Nz = vol.shape
-    Nx_f, Ny_f, Nz_f = shape_f
-
-    x_freq = jnp.fft.fftfreq(Nx_f, pixel_size)
-    y_freq = jnp.fft.fftfreq(Ny_f, pixel_size)
-    z_freq = jnp.fft.fftfreq(Nz_f, pixel_size)
-
-    X_f, Y_f, Z_f = jnp.meshgrid(x_freq, y_freq, z_freq, indexing='xy')
-
-    return vol_f, X_f, Y_f, Z_f
+    return vol_f, x_grid 
 
 def mip_z(img):
     plt.imshow(np.max(img, axis = 2))
@@ -231,3 +219,15 @@ def get_rotation_matrix(alpha, beta, gamma):
 @jax.jit
 def l2sq(x, y = 0):
     return jnp.real(jnp.sum(jnp.conj(x-y)*(x-y)))
+
+
+def create_grid(nx, px):
+    """Create the (one dimensional) Fourier grid used for projections.
+    
+    <<<IMPORTANT!!!>>> 
+    The grids must not be Tracer (aka Jax)  objects."""
+
+    x_freq = np.fft.fftfreq(nx, px)
+    x_grid = np.array([x_freq[1], len(x_freq)])
+    
+    return x_grid 

@@ -38,7 +38,8 @@ def load_data(data_dir, star_file):
 
     return imgs_f, params
 
-# TODO: write tests for this function and make with work with odd dimensions too.
+# TODO: Move this to utils
+# TODO 2: write tests for this function and make with work with odd dimensions too.
 def crop_fourier_images(imgs, x_grid, nx):
     """Given an N x nx0 x nx0 array of N images of dimension nx0 x nx0 in the 
     frequency space with the standard ordering, crop the high-frequency entries 
@@ -79,6 +80,22 @@ def crop_fourier_images(imgs, x_grid, nx):
     x_grid_cropped = np.array([x_grid[0], nx])
 
     return imgs_cropped, x_grid_cropped
+
+def crop_fourier_volume(vol, x_grid, nx):
+    """Same as above, but a volume."""
+
+    vol = np.fft.fftshift(vol)
+    mid = vol.shape[-1]/2
+
+    vol_cropped = np.fft.ifftshift(
+            vol[int(mid-nx/2):int(mid+nx/2), int(mid-nx/2):int(mid+nx/2), int(mid-nx/2):int(mid+nx/2)]
+            )
+
+    # <<< IMPORTANT!!!>>> 
+    # The grid must not be a Jax object.
+    x_grid_cropped = np.array([x_grid[0], nx])
+
+    return vol_cropped, x_grid_cropped
 
 
 def get_data_from_df(df, data_dir):

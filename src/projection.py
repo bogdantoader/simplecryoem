@@ -214,15 +214,5 @@ def project_star_params(vol, p, pfac = 1):
     return proj
 
 
-def create_grid(nx, px):
-    """Create the (one dimensional) Fourier grid used for projections.
-    
-    <<<IMPORTANT!!!>>> 
-    The grids must not be Tracer (aka Jax)  objects."""
-
-    x_freq = np.fft.fftfreq(nx, px)
-    x_grid = np.array([x_freq[1], len(x_freq)])
-    
-    return x_grid 
 
 

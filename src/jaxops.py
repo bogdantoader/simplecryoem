@@ -6,15 +6,15 @@ from src.utils import l2sq
 #TODO: maybe not all the functions in this file need to be jit-ed
 
 # Slice functions
-def get_slice_funcs(project, x_grid, y_grid, z_grid, interp_method = "tri"):
+def get_slice_funcs(project, x_grid, y_grid, z_grid, mask, interp_method = "tri"):
 
     @jax.jit
     def slice_func(v, angles, shifts, ctf_params):
-        return project(v, angles, shifts, ctf_params, x_grid, y_grid, z_grid, interp_method)
+        return project(v * mask, angles, shifts, ctf_params, x_grid, y_grid, z_grid, interp_method)
 
     @jax.jit
     def slice_func_array(v, angles, shifts, ctf_params):    
-        return jax.vmap(slice_func, in_axes = (None, 0, 0, 0))(v, angles)
+        return jax.vmap(slice_func, in_axes = (None, 0, 0, 0))(v, angles, shifts, ctf_params)
 
     return slice_func, slice_func_array
    
