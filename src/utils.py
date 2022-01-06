@@ -75,7 +75,9 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
    
     if apply_filter:
         vol = low_pass_filter(vol, X, Y, Z, sigma)
-    
+   
+    vol = np.fft.fftshift(vol)
+
     return vol
 
 def create_mask(x_grid, centre, radius):

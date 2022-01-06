@@ -148,19 +148,13 @@ def project_star_params(vol, p, pfac = 1):
 
     pixel_size = star.calculate_apix(p) #* 64.0/66.0
 
-    f3d, X, Y, Z = volume_fourier(np.fft.ifftshift(vol), pixel_size)
+    f3d, x_grid = volume_fourier(np.fft.ifftshift(vol), pixel_size)
 
-    mymask = create_mask(X,Y,Z, (0,0,0), np.max(X)+X[1,1,0])
+    #mask_radius = np.max(X)+X[1,1,0]
+    mask_radius = jnp.prod(x_grid)/2
+    mymask = create_mask(x_grid, (0,0,0), mask_radius)
     f3d = f3d * mymask
 
-    x_freq = X[0,:,0]
-    y_freq = Y[:,0,0]
-    z_freq = Z[0,0,:]
-
-    # IMPORTANT: do not make this a Jax array
-    x_grid = np.array([x_freq[1], len(x_freq)])
-    y_grid = np.array([y_freq[1], len(y_freq)])
-    z_grid = np.array([z_freq[1], len(z_freq)])
 
     angles = jnp.array([p[star.Relion.ANGLEPSI],
              p[star.Relion.ANGLETILT],
@@ -192,8 +186,7 @@ def project_star_params(vol, p, pfac = 1):
                   0,
                   2 * pixel_size]
 
-    f2d, coords_slice = project(f3d, x_grid, y_grid, z_grid, angles, shifts, 'tri',
-            ctf_params)
+    f2d = project(f3d, angles, shifts, ctf_params, x_grid, x_grid, x_grid, 'tri')
     f2d = f2d.reshape(f3d.shape[0], f3d.shape[1]) * mymask[:,:,0]
     proj = np.real(np.fft.fftshift(np.fft.ifftn(f2d)))
 
