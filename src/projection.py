@@ -23,23 +23,9 @@ def project_spatial(v, angles, pixel_size, shifts = [0,0], method = "tri", ctf_p
     
     # First ifftshift in the spatial domain 
     v = jnp.fft.ifftshift(v)
-    V, X, Y, Z = volume_fourier(v, pixel_size)
+    V, x_grid = volume_fourier(v, pixel_size)
 
-    # Added mask to compare with pyem - needs more fiddling
-    #V = V * create_mask(X,Y,Z, (0,0,0), np.max(X))
-
-    # Not bothered about using the full X, Y, Z here since for the big 
-    # experiments we do it all in Fourier anyway.
-    x_freq = X[0,:,0]
-    y_freq = Y[:,0,0]
-    z_freq = Z[0,0,:]
-
-    # IMPORTANT: do not make this a Jax array
-    x_grid = np.array([x_freq[1], len(x_freq)])
-    y_grid = np.array([y_freq[1], len(y_freq)])
-    z_grid = np.array([z_freq[1], len(z_freq)])
-
-    V_slice = project(V, angles, shifts, ctf_params, x_grid, y_grid, z_grid, method)
+    V_slice = project(V, angles, shifts, ctf_params, x_grid, x_grid, x_grid, method)
    
     # Make it 2D
     V_slice = V_slice.reshape(V.shape[0], V.shape[1])
