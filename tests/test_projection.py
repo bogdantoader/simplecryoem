@@ -278,8 +278,8 @@ class TestProjection(unittest.TestCase):
         self.assertAlmostEqual(jnp.sum(abs(v)), 1, places = 14)
 
     def do_nn_and_tri_projection(self, v, x_grid, y_grid, z_grid, angles):
-        vp_nn, _ = project(jnp.fft.ifftshift(v), x_grid, y_grid, z_grid, angles, [0,0], "nn")
-        vp_tri, _ = project(jnp.fft.ifftshift(v), x_grid, y_grid, z_grid, angles, [0,0], "tri")
+        vp_nn = project(jnp.fft.ifftshift(v), angles, [0,0], None, x_grid, y_grid, z_grid, "nn")
+        vp_tri = project(jnp.fft.ifftshift(v), angles, [0,0], None, x_grid, y_grid, z_grid, "tri")
 
         vp_nn = vp_nn.reshape(v.shape[0], v.shape[1])
         vp_tri = vp_tri.reshape(v.shape[0], v.shape[1])
