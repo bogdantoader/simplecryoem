@@ -1,0 +1,103 @@
+import numpy as np
+import jax
+import jax.numpy as jnp
+from  matplotlib import pyplot as plt
+from src.utils import get_rotation_matrix
+from src.projection import rotate
+from src.interpolate import find_nearest_eight_grid_points_idx
+
+def calc_fsc(v1, v2, grid, dr = 0.05):
+    """Calculate the fourier shell correlation between v1 and v2
+    on the Fourier grid given by grid and shell width given by dr.
+    Return the resolution and the FSC at that resolution."""
+
+    # Calculate the radius in the Fourier domain.
+    x_freq = jnp.fft.fftfreq(int(grid[1]), 1/(grid[0]*grid[1]))
+    X, Y, Z = jnp.meshgrid(x_freq, x_freq, x_freq)
+    r = np.sqrt(X**2 + Y**2 + Z**2)
+
+    # Max radius so that the shells are not outside the
+    # rectangular domain.
+    max_rad = jnp.max(r[:,0,0])
+
+    # Calculate the shells.
+    s1 = []
+    s2 = []
+    res = []
+    R = 0
+    while R + dr <= max_rad:
+        cond = jnp.where((r >= R) & (r < R + dr))
+        s1.append(v1[cond])
+        s2.append(v2[cond])
+        res.append(R)
+        R += dr
+
+    # The correlations between corresponding shells.
+    fsc = []
+    for i in range(len(s1)):
+        f = jnp.sum(s1[i] * jnp.conj(s2[i])) / (jnp.linalg.norm(s1[i],2) * jnp.linalg.norm(s2[i],2))
+        fsc.append(f)
+
+    fsc = jnp.array(fsc)
+    res = jnp.array(res)
+
+    #TODO: what do we actually need? abs squared? real part?
+    return res, jnp.abs(fsc)**2
+
+
+def plot_angles(angs):
+    """Display a list of Euler angles as points on a sphere."""
+
+    # A sphere
+    phi = jnp.linspace(0, jnp.pi)
+    theta = jnp.linspace(0, 2*jnp.pi)
+    Phi, Theta = jnp.meshgrid(phi, theta)
+    x = jnp.cos(Phi) * jnp.sin(Theta)
+    y = jnp.sin(Phi) * jnp.sin(Theta)
+    z = jnp.cos(Theta)
+
+    # Get point coordinates
+    coords = jnp.array([get_rotation_matrix(a[0],a[1],a[2])@jnp.array([1.1,0,0]) for a in angs])
+    xx, yy, zz = jnp.hsplit(coords, 3)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection = '3d')
+    ax.plot_surface(x,y,z, rstride=1, cstride = 1, alpha=0.6, linewidth=0)
+    ax.scatter(xx,yy,zz, color="k", s=20)
+    return
+
+def rotate_list(x_grid, y_grid, angles):
+    """Apply the rotate function to a list of angles."""
+
+    rc = jax.vmap(rotate, in_axes = (None, None, 0))(x_grid, y_grid, angles)
+    return jnp.swapaxes(rc, 1, 2).reshape(-1,3).T
+
+#TODO: make it work for the nearest neighbour interpolation.
+def points_orientations(angles, x_grid, y_grid, z_grid, vol):
+    """Given a list of orientations as angles, return a volume that
+    contains, at each entry, the number of times that volume entry is 
+    used by the interpolation function for the given orientations.
+
+    Currently only working for the trilinear interpolation."""
+
+    rc = rotate_list(x_grid, y_grid, angles)
+    _,(_,xyz_idxs) = jax.vmap(find_nearest_eight_grid_points_idx, in_axes = (1,None, None, None))(rc, x_grid, y_grid, z_grid)
+
+    # Note that x and y indices are swapped in vol, 
+    # similar to the tri_interp_point funtion.
+    # i.e. to obtain vol(x, y, z), call vol[y_idx, x_idx, z_idx]
+
+    points_v = np.zeros(vol.shape)
+    for xyz_idx in xyz_idxs:
+        points_v[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,0]] += 1
+        points_v[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,1]] += 1 
+        points_v[xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,0]] += 1
+        points_v[xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,1]] += 1
+        points_v[xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,0]] += 1
+        points_v[xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,1]] += 1
+        points_v[xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,0]] += 1
+        points_v[xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,1]] += 1
+
+    return jnp.array(points_v)
+
+
