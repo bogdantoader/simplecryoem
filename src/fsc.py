@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from  matplotlib import pyplot as plt
 from src.utils import get_rotation_matrix
 from src.projection import rotate
-from src.interpolate import find_nearest_eight_grid_points_idx
+from src.interpolate import find_nearest_eight_grid_points_idx, find_nearest_one_grid_point_idx
 
 def calc_fsc(v1, v2, grid, dr = 0.05):
     """Calculate the fourier shell correlation between v1 and v2
@@ -72,8 +72,7 @@ def rotate_list(x_grid, y_grid, angles):
     rc = jax.vmap(rotate, in_axes = (None, None, 0))(x_grid, y_grid, angles)
     return jnp.swapaxes(rc, 1, 2).reshape(-1,3).T
 
-#TODO: make it work for the nearest neighbour interpolation.
-def points_orientations(angles, x_grid, y_grid, z_grid, vol):
+def points_orientations_tri(angles, x_grid, y_grid, z_grid, vol):
     """Given a list of orientations as angles, return a volume that
     contains, at each entry, the number of times that volume entry is 
     used by the interpolation function for the given orientations.
@@ -87,6 +86,7 @@ def points_orientations(angles, x_grid, y_grid, z_grid, vol):
     # similar to the tri_interp_point funtion.
     # i.e. to obtain vol(x, y, z), call vol[y_idx, x_idx, z_idx]
 
+    # TODO: no need to pass volume, can infer the shape from the grids
     points_v = np.zeros(vol.shape)
     for xyz_idx in xyz_idxs:
         points_v[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,0]] += 1
@@ -100,4 +100,19 @@ def points_orientations(angles, x_grid, y_grid, z_grid, vol):
 
     return jnp.array(points_v)
 
+
+def points_orientations_nn(angles, x_grid, y_grid, z_grid, vol):
+    """Same as points_orientations_tri but for nearest neighbour
+    interpolation."""
+
+    rc = rotate_list(x_grid, y_grid, angles)
+
+    xyz_idxs = jax.vmap(find_nearest_one_grid_point_idx, in_axes = (1,None, None, None))(rc, x_grid, y_grid, z_grid)
+
+    # TODO: no need to pass volume, can infer the shape from the grids
+    points_v = np.zeros(vol.shape)
+    for xyz_idx in xyz_idxs:
+        points_v[tuple(xyz_idx)] += 1
+
+    return jnp.array(points_v)
 
