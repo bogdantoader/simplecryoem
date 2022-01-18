@@ -7,8 +7,28 @@ from src.projection import rotate
 from src.interpolate import find_nearest_eight_grid_points_idx, find_nearest_one_grid_point_idx
 
 def calc_fsc(v1, v2, grid, dr = 0.05):
-    """Calculate the fourier shell correlation between v1 and v2
-    on the Fourier grid given by grid and shell width given by dr.
+    """Calculate the fourier shell correlation between the Fourier 
+    volumes v1 and v2 on the Fourier grid given by grid and shell
+    width given by dr.
+
+    Parameters:
+    ----------
+    v1, v2: (N x N x N) arrays
+        Fourier volumes to compute the FSC between.
+    grid: [dx, N] 
+        The Fourier grid the volumes are defined on.
+        dx is the spacing and N is the number of points of the grid.
+    dr: double 
+        The width of each Fourier shell. 
+    Returns:
+    -------
+    res: double array
+        The resolutions defining each shell, the first being 0.
+    fsc: double array
+        The cross-correlation between the volumes at each shell.
+    shell_points: int array    
+        The number of points in each shell.
+    
     Return the resolution and the FSC at that resolution."""
 
     # Calculate the radius in the Fourier domain.
@@ -38,11 +58,11 @@ def calc_fsc(v1, v2, grid, dr = 0.05):
         f = jnp.sum(s1[i] * jnp.conj(s2[i])) / (jnp.linalg.norm(s1[i],2) * jnp.linalg.norm(s2[i],2))
         fsc.append(f)
 
-    fsc = jnp.array(fsc)
     res = jnp.array(res)
+    fsc = jnp.real(jnp.array(fsc))
+    shell_points = jnp.array([len(s) for s in s1])
 
-    #TODO: what do we actually need? abs squared? real part?
-    return res, jnp.abs(fsc)**2
+    return res, fsc, shell_points 
 
 
 def plot_angles(angs):
@@ -117,4 +137,47 @@ def points_orientations_nn(angles, x_grid, y_grid, z_grid):
         points_v[tuple(xyz_idx)] += 1
 
     return jnp.array(points_v)
+
+
+def shell_points_used(points, grid, dr = 0.05):
+    """Given a volume containing the number of orientations that uses each 
+    point (as output by the points_orientations_tri and points_orientations_nn 
+    functions), using the standard Fourier ordering, 
+    calculate the total number of used points 
+    in each spherical Fourier shell, normalised by the total number of points
+    in each shell respectively."""
+
+    # Calculate the radius in the Fourier domain.
+    x_freq = jnp.fft.fftfreq(int(grid[1]), 1/(grid[0]*grid[1]))
+    X, Y, Z = jnp.meshgrid(x_freq, x_freq, x_freq)
+    r = np.sqrt(X**2 + Y**2 + Z**2)
+
+    # Max radius so that the shells are not outside the
+    # rectangular domain.
+    max_rad = jnp.max(r[:,0,0])
+
+    # Calculate the shells.
+    shells = []
+    res = []
+    R = 0
+    while R + dr <= max_rad:
+        cond = jnp.where((r >= R) & (r < R + dr))
+        shells.append(points[cond])
+        res.append(R)
+        R += dr
+
+    res = jnp.array(res)
+    shell_points_used = jnp.array([len(s[s > 0]) for s in shells])
+    shell_points_total = jnp.array([len(s) for s in shells])
+
+    return res, jnp.divide(shell_points_used, shell_points_total) 
+
+
+
+
+
+
+
+
+
 
