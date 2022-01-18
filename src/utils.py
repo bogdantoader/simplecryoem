@@ -130,13 +130,18 @@ def volume_fourier(vol, pixel_size):
 
     return vol_f, x_grid 
 
+def mip_x(img):
+    plt.imshow(np.max(img, axis = 0))
+    return
+
+def mip_y(img):
+    plt.imshow(np.max(img, axis = 1))
+    return
+
 def mip_z(img):
     plt.imshow(np.max(img, axis = 2))
     return
 
-def mip_x(img):
-    plt.imshow(np.max(img, axis = 0))
-    return
 
 # TODO: tests for the three functions below,
 # and change the names of these functions, they're not great
