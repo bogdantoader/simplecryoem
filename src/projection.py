@@ -21,18 +21,21 @@ def project_spatial(v, angles, pixel_size, shifts = [0,0], method = "tri", ctf_p
     and N/2 is N is even, similar to an fftshifted Fourier grid.
     """ 
     
-    # First ifftshift in the spatial domain 
-    v = jnp.fft.ifftshift(v)
     V, grid_vol, grid_proj = volume_fourier(v, pixel_size, pfac)
+
+    #plt.imshow(jnp.abs(jnp.fft.fftshift(V[:,:,0])))
+    #print(V.shape)
 
     V_slice = project(V, angles, shifts, ctf_params, grid_vol, grid_proj, method)
 
     # Make it 2D
     V_slice = V_slice.reshape(int(grid_proj[1]), int(grid_proj[1]))
+    
+    #plt.imshow(jnp.abs(jnp.fft.fftshift(V_slice)))
 
     # Back to spatial domain
     v_proj = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(V_slice)))
-    
+   
     return v_proj
 
 # TODO: write the doc string properly
@@ -150,14 +153,15 @@ def get_shift_term(x_grid, y_grid, shifts):
 def project_star_params(vol, p, pfac = 1):
     """Spatial domain projection of vol with parameters from one row of
     a star file given by dictionary p. Useful to compare against Relion/pyem.
-    We assume vol as the same size in all dimensions."""
+    We assume vol is the same size in all dimensions."""
 
     vol = grid_correct(vol, pfac = pfac, order = 1)
 
     #TODO: uncomment the 64/66 and check comparison with Pyem
     pixel_size = star.calculate_apix(p) #* 64.0/66.0 
 
-    f3d, grid_vol, grid_proj = volume_fourier(np.fft.ifftshift(vol), pixel_size, pfac)
+    f3d, grid_vol, grid_proj = volume_fourier(vol, pixel_size, pfac)
+    #f3d, grid_vol, grid_proj = volume_fourier(vol, pixel_size, pfac)
 
     mask_radius = jnp.prod(grid_vol)/2
     mask_vol = create_3d_mask(grid_vol, (0,0,0), mask_radius)
@@ -167,7 +171,6 @@ def project_star_params(vol, p, pfac = 1):
              p[star.Relion.ANGLETILT],
              p[star.Relion.ANGLEROT]]) / 180* jnp.pi # third angle is
                                         # rotation around the first z axis
-
 
     shifts = jnp.array([p[star.Relion.ORIGINX], p[star.Relion.ORIGINY]]) * pixel_size
 

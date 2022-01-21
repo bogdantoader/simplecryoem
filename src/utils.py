@@ -124,8 +124,9 @@ def low_pass_filter(vol, X, Y, Z, sigma):
 
 def volume_fourier(vol, pixel_size, pfac = 1):
     """Calculate the FFT of the volume and return the frequency coordinates
-    Assume the volume has equal dimensions. If pfac > 1, the input is 
-    zero padded before taking the FFT.
+    Assume the volume has equal dimensions and is centred. 
+    If pfac > 1, the input is zero padded before taking the FFT.
+    The resulting Fourier volume is in the standard Fourier ordering.
 
     Parameters
     ----------
@@ -145,9 +146,24 @@ def volume_fourier(vol, pixel_size, pfac = 1):
         Fourier grid vol_f was defined on if pfac = 1.
     """
 
-    vol_f = jnp.fft.fftn(vol, jnp.array(vol.shape) * pfac)
+    n = vol.shape[0]
+   
+    # We do the padding explicitly as opposed to calling fft with larger size
+    # because funky things happen when padding a non-centred image.
+    pad = n*(pfac-1)/2
+    if jnp.mod(pad,2) == 0:
+        # In this case, add the same number of zeros to each side.
+        vol = jnp.pad(vol, int(pad))
+    else:
+        # If the number of total zeros to add in each dimension is odd,
+        # add the zeros so that when ifftshifted, the center of the image
+        # is at the zero index.
+        pad = int(jnp.floor(pad))
+        vol = jnp.pad(vol, (pad+1, pad))
+
+    vol_f = jnp.fft.fftn(jnp.fft.ifftshift(vol))
     grid_vol = create_grid(vol_f.shape[0], pixel_size) 
-    grid_vol_nopad = create_grid(vol.shape[0], pixel_size) 
+    grid_vol_nopad = create_grid(n, pixel_size) 
 
     return vol_f, grid_vol, grid_vol_nopad 
 
