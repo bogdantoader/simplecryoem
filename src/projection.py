@@ -2,7 +2,7 @@ import numpy as np
 import jax.numpy as jnp
 import itertools
 from src.interpolate import interpolate
-from src.utils import volume_fourier, create_mask, get_rotation_matrix 
+from src.utils import volume_fourier, create_2d_mask, create_3d_mask, get_rotation_matrix 
 from src.ctf import eval_ctf
 import jax
 from jax.config import config
@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt
 config.update("jax_enable_x64", True)
 
 
-def project_spatial(v, angles, pixel_size, shifts = [0,0], method = "tri", ctf_params = None):
+def project_spatial(v, angles, pixel_size, shifts = [0,0], method = "tri", ctf_params = None, pfac = 1):
     """Takes a centred object in the spatial domain and returns the centred
     projection in the spatial domain.
     If N is the number of pixels in one dimension, then the origin is 
@@ -23,12 +23,12 @@ def project_spatial(v, angles, pixel_size, shifts = [0,0], method = "tri", ctf_p
     
     # First ifftshift in the spatial domain 
     v = jnp.fft.ifftshift(v)
-    V, x_grid = volume_fourier(v, pixel_size)
+    V, grid_vol, grid_proj = volume_fourier(v, pixel_size, pfac)
 
-    V_slice = project(V, angles, shifts, ctf_params, x_grid, x_grid, x_grid, method)
-   
+    V_slice = project(V, angles, shifts, ctf_params, grid_vol, grid_proj, method)
+
     # Make it 2D
-    V_slice = V_slice.reshape(V.shape[0], V.shape[1])
+    V_slice = V_slice.reshape(int(grid_proj[1]), int(grid_proj[1]))
 
     # Back to spatial domain
     v_proj = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(V_slice)))
@@ -36,12 +36,17 @@ def project_spatial(v, angles, pixel_size, shifts = [0,0], method = "tri", ctf_p
     return v_proj
 
 # TODO: write the doc string properly
-def project(vol, angles, shifts, ctf_params, x_grid, y_grid, z_grid, interpolation_method = "tri"):
-    """Projection in the Fourier domain.
-    Assumption: the frequencies are in the 'standard' order for vol and the
-    coordinates X, Y, Z.
+def project(vol, angles, shifts, ctf_params, grid_vol, grid_proj, interpolation_method = "tri"):
+    """Projection in the Fourier domain. Defining separate grid_vol (the grid
+    on which the given 3D volume is defined) and grid_proj (the grid on which
+    the 2D projection is defined) allows us to implement Relion-style padding
+    (i.e. Oversample the Fourier transform to interpolate on, but the dimension
+    of the projection is equal to that of the initial volume).
 
-    Parameters:G
+    Assumption 1: the volume has equal size in all dimensions.
+    Assumption 2: the frequencies are in the 'standard' order for vol. 
+
+    Parameters:
     -----------
     vol: 
         Volume in Fourier domain, in standard order. 
@@ -54,7 +59,12 @@ def project(vol, angles, shifts, ctf_params, x_grid, y_grid, z_grid, interpolati
     ctf_params : 9 x 1 array or None
         As in the ctf file.
 
-    x_grid, y_grid, z_grid : [grid_spacing, grid_length]
+    grid_vol : [grid_spacing, grid_length]
+        Fourier grid that vol is defined on.
+
+    grid_proj: [grid_spacing, grid_length]
+        Fourier grid that the projection is defined on.
+        It is distinct from grid_vol when pfac > 1.
 
     interp_method : "tri" or "nn"
 
@@ -63,20 +73,17 @@ def project(vol, angles, shifts, ctf_params, x_grid, y_grid, z_grid, interpolati
 
     """
    
-    # Get the rotated coordinates in the z=0 plane.
-    proj_coords = rotate(x_grid, y_grid, angles)
-  
+    # Get the rotated coordinates of the projection in the z=0 plane.
+    proj_coords = rotate_z0(grid_proj, angles) 
 
-    proj = interpolate(proj_coords, x_grid, y_grid, z_grid, vol, interpolation_method)
+    proj = interpolate(proj_coords, grid_vol, vol, interpolation_method)
 
-    shift = get_shift_term(x_grid, y_grid, shifts)
+    shift = get_shift_term(grid_proj, grid_proj, shifts)
     proj *= shift
 
     if ctf_params is not None:
-        x_freq = jnp.fft.fftfreq(int(x_grid[1]), 1/(x_grid[0]*x_grid[1]))
-        y_freq = jnp.fft.fftfreq(int(y_grid[1]), 1/(y_grid[0]*y_grid[1]))
-
-        X,Y = jnp.meshgrid(x_freq,y_freq)
+        x_freq = jnp.fft.fftfreq(int(grid_proj[1]), 1/(grid_proj[0]*grid_proj[1]))
+        X,Y = jnp.meshgrid(x_freq,x_freq)
         r = jnp.sqrt(X**2 + Y**2)
         theta  = jnp.arctan2(Y, X)
 
@@ -89,35 +96,35 @@ def project(vol, angles, shifts, ctf_params, x_grid, y_grid, z_grid, interpolati
     #return proj, proj_coords
     return proj
 
-def rotate(x_grid, y_grid, angles):
-    """Rotate the coordinates given by X, Y, Z=0
+def rotate_z0(grid_proj, angles):
+    """Rotate the coordinates X, Y, Z=0
+    obtained using grid_proj
     with Euler angles alpha, beta, gamma
     around axes x, y, z respectively.
 
     Parameters
     ----------
-    x_grid, y_grid: [grid_spacing, grid_length]
-        The grid spacing and grid size of the Fourier grids on which 
-        the volume is defined. The full grids can be obtained by running
+    grid_proj : [grid_spacing, grid_length]
+        The grid spacing and grid size of the Fourier 1D grids on which 
+        the we project. The full grids can be obtained by running
         x_freq = np.fft.fftfreq(grid_length, 1/(grid_length*grid_spacing)).
     angles:  3 x 1 array
         [alpha, beta, gamma] Euler angles
 
     Returns
     -------
-    X_r, Y_r, Z_r : Nx x Ny x Nz arrays
-        The coordinates after rotaion.
+    rotated_coords : N x 2
+        Array of the rotated coorinates.    
     """
 
     # Change later if too inefficient. Do not use itertools, it triggers
     # an XLA 'too slow' bug when calling with jit.
 
     # Generate the x and y grids.
-    x_freq = jnp.fft.fftfreq(int(x_grid[1]), 1/(x_grid[0]*x_grid[1]))
-    y_freq = jnp.fft.fftfreq(int(y_grid[1]), 1/(y_grid[0]*y_grid[1]))
+    x_freq = jnp.fft.fftfreq(int(grid_proj[1]), 1/(grid_proj[0]*grid_proj[1]))
 
-    X,Y = jnp.meshgrid(x_freq,y_freq)
-    coords = jnp.array([X.ravel(), Y.ravel(), jnp.zeros(len(x_freq)*len(y_freq))])
+    X,Y = jnp.meshgrid(x_freq,x_freq)
+    coords = jnp.array([X.ravel(), Y.ravel(), jnp.zeros(len(x_freq)*len(x_freq))])
     
     angles = -jnp.array(angles)
 
@@ -142,19 +149,19 @@ def get_shift_term(x_grid, y_grid, shifts):
 
 def project_star_params(vol, p, pfac = 1):
     """Spatial domain projection of vol with parameters from one row of
-    a star file given by dictionary p. Useful to compare against Relion/pyem."""
+    a star file given by dictionary p. Useful to compare against Relion/pyem.
+    We assume vol as the same size in all dimensions."""
 
     vol = grid_correct(vol, pfac = pfac, order = 1)
 
-    pixel_size = star.calculate_apix(p) #* 64.0/66.0
+    #TODO: uncomment the 64/66 and check comparison with Pyem
+    pixel_size = star.calculate_apix(p) #* 64.0/66.0 
 
-    f3d, x_grid = volume_fourier(np.fft.ifftshift(vol), pixel_size)
+    f3d, grid_vol, grid_proj = volume_fourier(np.fft.ifftshift(vol), pixel_size, pfac)
 
-    #mask_radius = np.max(X)+X[1,1,0]
-    mask_radius = jnp.prod(x_grid)/2
-    mymask = create_mask(x_grid, (0,0,0), mask_radius)
-    f3d = f3d * mymask
-
+    mask_radius = jnp.prod(grid_vol)/2
+    mask_vol = create_3d_mask(grid_vol, (0,0,0), mask_radius)
+    f3d = f3d * mask_vol
 
     angles = jnp.array([p[star.Relion.ANGLEPSI],
              p[star.Relion.ANGLETILT],
@@ -186,8 +193,12 @@ def project_star_params(vol, p, pfac = 1):
                   0,
                   2 * pixel_size]
 
-    f2d = project(f3d, angles, shifts, ctf_params, x_grid, x_grid, x_grid, 'tri')
-    f2d = f2d.reshape(f3d.shape[0], f3d.shape[1]) * mymask[:,:,0]
+    f2d = project(f3d, angles, shifts, ctf_params, grid_vol, grid_proj, 'tri')
+
+    mask_radius = jnp.prod(grid_proj)/2
+    mask_proj = create_2d_mask(grid_proj, (0,0), mask_radius)
+
+    f2d = f2d.reshape(int(grid_proj[1]), int(grid_proj[1])) * mask_proj
     proj = np.real(np.fft.fftshift(np.fft.ifftn(f2d)))
 
     return proj

@@ -71,7 +71,7 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
     coords_z = np.linspace(-Lz/2 + dz/2, Lz/2 - dz/2, Nz) 
     x_grid = np.array([coords_x[1] - coords_x[0], len(coords_x)] )
 
-    vol = vol * create_mask(x_grid, centre, radius) 
+    vol = vol * create_3d_mask(x_grid, centre, radius) 
    
     if apply_filter:
         vol = low_pass_filter(vol, X, Y, Z, sigma)
@@ -80,9 +80,9 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
 
     return vol
 
-def create_mask(x_grid, centre, radius):
+def create_3d_mask(x_grid, centre, radius):
     """Works in the Fourier domain with the standard ordering, but obviously
-    it can be applied in the spatial domain."""
+    it can be applied in the spatial domain too."""
 
     x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1/(x_grid[1] * x_grid[0]))
     y_freq = x_freq
@@ -97,6 +97,22 @@ def create_mask(x_grid, centre, radius):
 
     return np.array(mask)
 
+def create_2d_mask(x_grid, centre, radius):
+    """Works in the Fourier domain with the standard ordering, but obviously
+    it can be applied in the spatial domain too.
+    Always centered at zero."""
+
+    x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1/(x_grid[1] * x_grid[0]))
+    y_freq = x_freq
+
+    X, Y = np.meshgrid(x_freq, y_freq)
+
+    mask = np.ones(X.shape)
+    cx, cy = centre
+    r = np.sqrt((X-cx)**2 + (Y-cy)**2)
+    mask[r > radius] = 0
+
+    return np.array(mask)
 
 def low_pass_filter(vol, X, Y, Z, sigma):
     gauss = np.exp(-(X**2 + Y**2 + Z**2)/(2*sigma))
@@ -106,9 +122,10 @@ def low_pass_filter(vol, X, Y, Z, sigma):
     low_pass_vol = np.fft.ifftn(np.fft.fftn(vol) * gauss)
     return np.real(low_pass_vol)
 
-def volume_fourier(vol, pixel_size):
+def volume_fourier(vol, pixel_size, pfac = 1):
     """Calculate the FFT of the volume and return the frequency coordinates
-    Assume the volume has equal dimensions.
+    Assume the volume has equal dimensions. If pfac > 1, the input is 
+    zero padded before taking the FFT.
 
     Parameters
     ----------
@@ -116,19 +133,23 @@ def volume_fourier(vol, pixel_size):
         Volume in spatial domain.
     pixel_size: double 
         Pixel size, in units (e.g. Angst)
-
+    pfac : int
+        Padding factor.
     Returns
     -------
     vol_f: n x n x n array
         The FFT of the volume vol.
-    x_grid: 2 x 1 array     
-        Fourier grid in the form [grid_spacing, grid_length].
+    grid_vol: [grid_spacing, grid_length]   2 x 1 array     
+        Fourier grid that vol_f is defined on.
+    grid_vol_nopad: [grid_spacing, grid_length]   2 x 1 array     
+        Fourier grid vol_f was defined on if pfac = 1.
     """
 
-    vol_f = jnp.fft.fftn(vol)
-    x_grid = create_grid(vol.shape[0], pixel_size) 
+    vol_f = jnp.fft.fftn(vol, jnp.array(vol.shape) * pfac)
+    grid_vol = create_grid(vol_f.shape[0], pixel_size) 
+    grid_vol_nopad = create_grid(vol.shape[0], pixel_size) 
 
-    return vol_f, x_grid 
+    return vol_f, grid_vol, grid_vol_nopad 
 
 def mip_x(img):
     plt.imshow(np.max(img, axis = 0))

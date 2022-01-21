@@ -10,9 +10,12 @@ config.update("jax_enable_x64", True)
 # rather than the full *_freq grids - if it has an impact on memory later.
 # TODO: add a check here to ensure that vol shape is consistent with grid
 # lengths
-def interpolate(i_coords, x_grid, y_grid, z_grid, vol, method):
+
+# TODO: remove the separate x_grid, y_grid, z_grid in all the functions.
+# Should only have grid_vol in all dimensions.
+def interpolate(i_coords, grid_vol, vol, method):
     """Given a volume vol sampled on meshgrid given
-    by x_grid, y_grid, z_grid, return the interpolated values of vol
+    by grid_vol, return the interpolated values of vol
     at the coordinates i_coords of M points. 
     Nearest neighbour or trilinear interpolation.
 
@@ -36,9 +39,9 @@ def interpolate(i_coords, x_grid, y_grid, z_grid, vol, method):
     """
     
     if method == "nn":
-        interp_func = get_interpolate_nn_lambda(x_grid, y_grid, z_grid, vol)
+        interp_func = get_interpolate_nn_lambda(grid_vol, grid_vol, grid_vol, vol)
     elif method == "tri":
-        interp_func = get_interpolate_tri_lambda(x_grid, y_grid, z_grid, vol)
+        interp_func = get_interpolate_tri_lambda(grid_vol, grid_vol, grid_vol, vol)
    
     #i_vals = jax.vmap(interp_func, in_axes = 1)(i_coords)
 
