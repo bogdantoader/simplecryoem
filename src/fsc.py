@@ -3,7 +3,7 @@ import jax
 import jax.numpy as jnp
 from  matplotlib import pyplot as plt
 from src.utils import get_rotation_matrix
-from src.projection import rotate
+from src.projection import rotate_z0
 from src.interpolate import find_nearest_eight_grid_points_idx, find_nearest_one_grid_point_idx
 
 def calc_fsc(v1, v2, grid, dr = 0.05):
@@ -86,10 +86,10 @@ def plot_angles(angs):
     ax.scatter(xx,yy,zz, color="k", s=20)
     return
 
-def rotate_list(x_grid, y_grid, angles):
+def rotate_list(x_grid, angles):
     """Apply the rotate function to a list of angles."""
 
-    rc = jax.vmap(rotate, in_axes = (None, None, 0))(x_grid, y_grid, angles)
+    rc = jax.vmap(rotate_z0, in_axes = (None, 0))(x_grid, angles)
     return jnp.swapaxes(rc, 1, 2).reshape(-1,3).T
 
 def points_orientations_tri(angles, x_grid, y_grid, z_grid):
@@ -99,7 +99,7 @@ def points_orientations_tri(angles, x_grid, y_grid, z_grid):
 
     Currently only working for the trilinear interpolation."""
 
-    rc = rotate_list(x_grid, y_grid, angles)
+    rc = rotate_list(x_grid, angles)
     _,(_,xyz_idxs) = jax.vmap(find_nearest_eight_grid_points_idx, 
             in_axes = (1,None, None, None))(rc, x_grid, y_grid, z_grid)
 
@@ -126,7 +126,7 @@ def points_orientations_nn(angles, x_grid, y_grid, z_grid):
     """Same as points_orientations_tri but for nearest neighbour
     interpolation."""
 
-    rc = rotate_list(x_grid, y_grid, angles)
+    rc = rotate_list(x_grid, angles)
     xyz_idxs = jax.vmap(find_nearest_one_grid_point_idx, 
             in_axes = (1,None, None, None))(rc, x_grid, y_grid, z_grid)
 

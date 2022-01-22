@@ -23,16 +23,11 @@ def project_spatial(v, angles, pixel_size, shifts = [0,0], method = "tri", ctf_p
     
     V, grid_vol, grid_proj = volume_fourier(v, pixel_size, pfac)
 
-    #plt.imshow(jnp.abs(jnp.fft.fftshift(V[:,:,0])))
-    #print(V.shape)
-
     V_slice = project(V, angles, shifts, ctf_params, grid_vol, grid_proj, method)
 
     # Make it 2D
     V_slice = V_slice.reshape(int(grid_proj[1]), int(grid_proj[1]))
     
-    #plt.imshow(jnp.abs(jnp.fft.fftshift(V_slice)))
-
     # Back to spatial domain
     v_proj = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(V_slice)))
    
@@ -161,7 +156,6 @@ def project_star_params(vol, p, pfac = 1):
     pixel_size = star.calculate_apix(p) #* 64.0/66.0 
 
     f3d, grid_vol, grid_proj = volume_fourier(vol, pixel_size, pfac)
-    #f3d, grid_vol, grid_proj = volume_fourier(vol, pixel_size, pfac)
 
     mask_radius = jnp.prod(grid_vol)/2
     mask_vol = create_3d_mask(grid_vol, (0,0,0), mask_radius)

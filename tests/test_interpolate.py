@@ -7,7 +7,7 @@ from jax.config import config
 config.update("jax_enable_x64", True)
 site.addsitedir('..')
 
-from src.interpolate import *
+from src.interpolate import * 
 from numpy.testing import assert_array_equal, assert_equal
 
 class TestInterpolate(unittest.TestCase):
@@ -81,7 +81,7 @@ class TestInterpolate(unittest.TestCase):
                     vol[4,5,1],
                     vol[2,0,3]])
 
-        i_vol = interpolate(i_coords, x_grid, y_grid, z_grid, vol, "nn")
+        i_vol = interpolate_diff_grids(i_coords, x_grid, y_grid, z_grid, vol, "nn")
 
         assert_array_equal(i_vol, i_vol_correct)
         return
@@ -97,7 +97,7 @@ class TestInterpolate(unittest.TestCase):
 
         i_coords = jnp.array(coords).T
 
-        assert_array_equal(interpolate(i_coords, x_grid, y_grid, z_grid, vol, "tri"), vals)
+        assert_array_equal(interpolate_diff_grids(i_coords, x_grid, y_grid, z_grid, vol, "tri"), vals)
 
         return
 

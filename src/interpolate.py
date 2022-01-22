@@ -6,14 +6,14 @@ from jax.config import config
 
 config.update("jax_enable_x64", True)
 
-# Looks light it might be possible to only pass the grid step sizes and lengths
-# rather than the full *_freq grids - if it has an impact on memory later.
+
+def interpolate(i_coords, grid_vol, vol, method):
+    return interpolate_diff_grids(i_coords, grid_vol, grid_vol, grid_vol, vol, method)
+
+# Keeping this function as more general to make sure interpolation works correctly.
 # TODO: add a check here to ensure that vol shape is consistent with grid
 # lengths
-
-# TODO: remove the separate x_grid, y_grid, z_grid in all the functions.
-# Should only have grid_vol in all dimensions.
-def interpolate(i_coords, grid_vol, vol, method):
+def interpolate_diff_grids(i_coords, x_grid, y_grid, z_grid, vol, method):
     """Given a volume vol sampled on meshgrid given
     by grid_vol, return the interpolated values of vol
     at the coordinates i_coords of M points. 
@@ -39,9 +39,9 @@ def interpolate(i_coords, grid_vol, vol, method):
     """
     
     if method == "nn":
-        interp_func = get_interpolate_nn_lambda(grid_vol, grid_vol, grid_vol, vol)
+        interp_func = get_interpolate_nn_lambda(x_grid, y_grid, z_grid, vol)
     elif method == "tri":
-        interp_func = get_interpolate_tri_lambda(grid_vol, grid_vol, grid_vol, vol)
+        interp_func = get_interpolate_tri_lambda(x_grid, y_grid, z_grid, vol)
    
     #i_vals = jax.vmap(interp_func, in_axes = 1)(i_coords)
 
