@@ -5,6 +5,8 @@ from  matplotlib import pyplot as plt
 from src.utils import get_rotation_matrix
 from src.projection import rotate_z0
 from src.interpolate import find_nearest_eight_grid_points_idx, find_nearest_one_grid_point_idx
+from src.emfiles import load_data
+import mrcfile
 
 def calc_fsc(v1, v2, grid, dr = 0.05):
     """Calculate the fourier shell correlation between the Fourier 
@@ -92,22 +94,27 @@ def rotate_list(x_grid, angles):
     rc = jax.vmap(rotate_z0, in_axes = (None, 0))(x_grid, angles)
     return jnp.swapaxes(rc, 1, 2).reshape(-1,3).T
 
-def points_orientations_tri(angles, x_grid, y_grid, z_grid):
+def points_orientations_tri(angles, nx):
     """Given a list of orientations as angles, return a volume that
     contains, at each entry, the number of times that volume entry is 
     used by the interpolation function for the given orientations.
 
-    Currently only working for the trilinear interpolation."""
+    We assume the volume has equal size and grid spacing in all dimensions.
+    """
+
+    # We set the grid spacing to one as the exact number (determined by
+    # pixel size) is irrelevant.
+    x_grid = jnp.array([1, nx])
 
     rc = rotate_list(x_grid, angles)
     _,(_,xyz_idxs) = jax.vmap(find_nearest_eight_grid_points_idx, 
-            in_axes = (1,None, None, None))(rc, x_grid, y_grid, z_grid)
+            in_axes = (1,None, None, None))(rc, x_grid, x_grid, x_grid)
 
     # Note that x and y indices are swapped in vol, 
     # similar to the tri_interp_point funtion.
     # i.e. to obtain vol(x, y, z), call vol[y_idx, x_idx, z_idx]
 
-    shape = np.array([x_grid[1], y_grid[1], z_grid[1]]).astype(np.int64)
+    shape = np.array([nx, nx, nx]).astype(np.int64)
     points_v = np.zeros(shape)
 
     for xyz_idx in xyz_idxs:
@@ -122,21 +129,47 @@ def points_orientations_tri(angles, x_grid, y_grid, z_grid):
 
     return jnp.array(points_v)
 
-def points_orientations_nn(angles, x_grid, y_grid, z_grid):
+def points_orientations_nn(angles, nx):
     """Same as points_orientations_tri but for nearest neighbour
     interpolation."""
 
+    x_grid = jnp.array([1, nx])
+    
     rc = rotate_list(x_grid, angles)
     xyz_idxs = jax.vmap(find_nearest_one_grid_point_idx, 
-            in_axes = (1,None, None, None))(rc, x_grid, y_grid, z_grid)
+            in_axes = (1,None, None, None))(rc, x_grid, x_grid, x_grid)
 
-    shape = np.array([x_grid[1], y_grid[1], z_grid[1]]).astype(np.int64)
+    shape = np.array([nx, nx, nx]).astype(np.int64)
     points_v = np.zeros(shape)
 
     for xyz_idx in xyz_idxs:
         points_v[tuple(xyz_idx)] += 1
 
     return jnp.array(points_v)
+
+
+def points_orientations_star(data_dir, star_file, method = "tri", out_file = None):
+    """Call points_orientations_* with the orientations taken 
+    from a starfile.""" 
+
+    imgs_f, params = load_data(data_dir, star_file)
+    angles = params["angles"]
+    nx = imgs_f.shape[1]
+
+    # It works with 1000 angles for 256 x 256 imgs, it crashes at more
+    # angles, at least on pi_lederman.
+    how_many = 100
+    if method == "tri":
+        pts = points_orientations_tri(angles[:how_many], nx)
+    elif method == "nn":
+        pts = points_orientations_nn(angles[:how_many], nx)
+
+    if out_file is not None:
+        with mrcfile.new('out_file', overwrite=True) as mrc:
+            mrc.set_data(pts.astype(np.float32))
+
+    return pts 
+
 
 
 def shell_points_used(points, grid, dr = 0.05):
