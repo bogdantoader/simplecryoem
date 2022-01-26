@@ -148,21 +148,25 @@ def points_orientations_nn(angles, nx):
     return jnp.array(points_v)
 
 
-def points_orientations_star(data_dir, star_file, method = "tri", out_file = None):
+def points_orientations_star(data_dir, star_file, nx = -1, method = "tri", out_file = None):
     """Call points_orientations_* with the orientations taken 
-    from a starfile.""" 
+    from a starfile. If nx is not given, it loads the images form the mrcs file
+    to obtain nx.""" 
 
-    imgs_f, params = load_data(data_dir, star_file)
+    if nx == -1:
+        params, imgs_f = load_data(data_dir, star_file, load_imgs = True)
+        nx = imgs_f.shape[1]
+    else:
+        params, _ = load_data(data_dir, star_file, load_imgs = False)
+
     angles = params["angles"]
-    nx = imgs_f.shape[1]
 
     # It works with 1000 angles for 256 x 256 imgs, it crashes at more
     # angles, at least on pi_lederman.
-    how_many = 100
     if method == "tri":
-        pts = points_orientations_tri(angles[:how_many], nx)
+        pts = points_orientations_tri(angles, nx)
     elif method == "nn":
-        pts = points_orientations_nn(angles[:how_many], nx)
+        pts = points_orientations_nn(angles, nx)
 
     if out_file is not None:
         with mrcfile.new('out_file', overwrite=True) as mrc:

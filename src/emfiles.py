@@ -6,7 +6,7 @@ import mrcfile
 
 
 
-def load_data(data_dir, star_file):
+def load_data(data_dir, star_file, load_imgs = False):
     """Load all the required information from star files and mrcs files.
 
     Parameters:
@@ -23,20 +23,23 @@ def load_data(data_dir, star_file):
 
     print("load_data: number of partcles: ", len(df))
     t0 = time.time()
-    imgs, pixel_size, angles, shifts, ctf_params = get_data_from_df(df, data_dir)
+    pixel_size, angles, shifts, ctf_params, imgs = get_data_from_df(df, data_dir, load_imgs)
     t1 = time.time()
     print("load_data: data loaded, time: ", t1-t0) 
 
-    imgs_f = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs])
-    t2 = time.time()
-    print("load_data: FFT of data, time: ", t2-t1)
+    if load_imgs:
+        imgs_f = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs])
+        t2 = time.time()
+        print("load_data: FFT of data, time: ", t2-t1)
+    else:
+        imgs_f = imgs
 
     params = {'ctf_params' : ctf_params,
               'pixel_size' : pixel_size,
               'angles'     : angles,
               'shifts'     : shifts}
 
-    return imgs_f, params
+    return params, imgs_f
 
 # TODO: Move this to utils
 # TODO 2: write tests for this function and make with work with odd dimensions too.
@@ -98,7 +101,7 @@ def crop_fourier_volume(vol, x_grid, nx):
     return vol_cropped, x_grid_cropped
 
 
-def get_data_from_df(df, data_dir):
+def get_data_from_df(df, data_dir, load_imgs = False):
     """Given a data frame as returned by star.parse_star, extract the useful
     information."""
 
@@ -113,11 +116,12 @@ def get_data_from_df(df, data_dir):
     particle_paths = df[star.UCSF.IMAGE_ORIGINAL_PATH].unique()
     #for path in particle_paths[:100]:
     for path in particle_paths:
-        with mrcfile.open(data_dir + path) as mrc:
-            group_data = mrc.data
-            if group_data.ndim == 2:
-                group_data = np.array([group_data])
-
+        if load_imgs:
+            with mrcfile.open(data_dir + path) as mrc:
+                group_data = mrc.data
+                if group_data.ndim == 2:
+                    group_data = np.array([group_data])
+        
         group = gb.get_group(path)
 
         for index, p in group.iterrows():
@@ -136,18 +140,19 @@ def get_data_from_df(df, data_dir):
             ctf_p = get_ctf_params_from_df_row(p, px)
 
             img_index = p[star.UCSF.IMAGE_ORIGINAL_INDEX]
-            img = group_data[img_index]
+            if load_imgs:
+                img = group_data[img_index]
+                imgs.append(img)
 
             pixel_size.append(px)
             angles.append(angs)
             shifts.append(sh)
             ctf_params.append(ctf_p)
-            imgs.append(img)
 
     pixel_size = np.array(pixel_size)
     angles = np.array(angles)
     shifts = np.array(shifts)
     ctf_params = np.array(ctf_params)
     imgs = np.array(imgs)
-    
-    return imgs, pixel_size, angles, shifts, ctf_params
+
+    return pixel_size, angles, shifts, ctf_params, imgs
