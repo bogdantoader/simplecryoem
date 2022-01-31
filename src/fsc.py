@@ -129,6 +129,39 @@ def points_orientations_tri(angles, nx):
 
     return jnp.array(points_v)
 
+def points_orientations_tri_iter(angles, nx):
+    """As above, without vmap."""
+
+    # We set the grid spacing to one as the exact number (determined by
+    # pixel size) is irrelevant.
+    x_grid = jnp.array([1, nx])
+
+    shape = np.array([nx, nx, nx]).astype(np.int64)
+    points_v = np.zeros(shape)
+
+    for ang in angles:
+        rc = rotate_z0(x_grid, ang).T
+
+        for c in rc:
+            _,(_,xyz_idx) = find_nearest_eight_grid_points_idx(c, x_grid, x_grid, x_grid) 
+
+            # Note that x and y indices are swapped in vol, 
+            # similar to the tri_interp_point funtion.
+            # i.e. to obtain vol(x, y, z), call vol[y_idx, x_idx, z_idx]
+
+            points_v[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,0]] += 1
+            points_v[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,1]] += 1 
+            points_v[xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,0]] += 1
+            points_v[xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,1]] += 1
+            points_v[xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,0]] += 1
+            points_v[xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,1]] += 1
+            points_v[xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,0]] += 1
+            points_v[xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,1]] += 1
+
+    return jnp.array(points_v)
+
+
+
 def points_orientations_nn(angles, nx):
     """Same as points_orientations_tri but for nearest neighbour
     interpolation."""

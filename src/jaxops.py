@@ -36,7 +36,16 @@ def get_loss_funcs(slice_func, err_func = l2sq, alpha = 0):
     def loss_func_sum(v, angles, shifts, ctf_params, imgs):
         return jnp.mean(loss_func_batched(v, angles, shifts, ctf_params, imgs))
 
-    return loss_func, loss_func_batched, loss_func_sum
+    #@jax.jit 
+    def loss_func_sum_iter(v, angles, shifts, ctf_params, imgs):
+        loss = jnp.zeros(v.shape)
+
+        for i in range(angles.shape[0]):
+            loss += loss_func(v,angles[i], shifts[i], ctf_params[i], imgs[i])
+
+        return loss/v.shape[0]
+
+    return loss_func, loss_func_batched, loss_func_sum, loss_func_sum_iter
 
 # Grads
 def get_grad_v_funcs(loss_func, loss_func_sum):

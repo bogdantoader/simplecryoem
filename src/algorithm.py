@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+from tqdm import tqdm
 
 
 
@@ -10,8 +11,8 @@ def conjugate_gradient(op, b, x0, iterations, eps = 1e-16, verbose = False):
 
     x = x0
     p = r
+    #for k in tqdm(range(iterations)):
     for k in range(iterations):
-
         rkTrk = jnp.sum(jnp.conj(r) * r)
         Ap = op(p)
         
@@ -27,7 +28,7 @@ def conjugate_gradient(op, b, x0, iterations, eps = 1e-16, verbose = False):
         beta = jnp.sum(jnp.conj(r) * r) / rkTrk
         p = r + beta * p
 
-        if verbose:
+        if verbose and jnp.mod(k,50) == 0:
             print("Iter", k, "||r|| =", norm_r)
                     
     return x, k
