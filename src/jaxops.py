@@ -16,7 +16,12 @@ def get_slice_funcs(project, x_grid,  mask, interp_method = "tri"):
     def slice_func_array(v, angles, shifts, ctf_params):    
         return jax.vmap(slice_func, in_axes = (None, 0, 0, 0))(v, angles, shifts, ctf_params)
 
-    return slice_func, slice_func_array
+    @jax.jit
+    def slice_func_array_angles(v, angles, shifts, ctf_params):    
+        """Same as above, except the shifts and ctf_params are fixed and we don't vectorize them."""
+        return jax.vmap(slice_func, in_axes = (None, 0, None, None))(v, angles, shifts, ctf_params)
+
+    return slice_func, slice_func_array, slice_func_array_angles
    
 # Loss functions
 def get_loss_funcs(slice_func, err_func = l2sq, alpha = 0):
@@ -44,7 +49,7 @@ def get_loss_funcs(slice_func, err_func = l2sq, alpha = 0):
             loss += loss_func(v,angles[i], shifts[i], ctf_params[i], imgs[i])
 
         return loss/v.shape[0]
-
+    
     return loss_func, loss_func_batched, loss_func_sum, loss_func_sum_iter
 
 # Grads
