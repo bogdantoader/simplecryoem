@@ -260,6 +260,16 @@ def get_rotation_matrix(alpha, beta, gamma):
                   [sc, ss, cb]])
     return r
 
+
+def generate_uniform_orientations(N):
+    alpha = np.random.rand(N,1) * 2 * np.pi 
+    gamma = np.random.rand(N,1) * 2 * np.pi 
+    z = np.random.rand(N,1) *2 - 1
+    beta = np.arccos(z)
+    angles = np.concatenate([alpha, beta, gamma], axis = 1)
+    return jnp.array(angles)
+
+
 @jax.jit
 def l2sq(x, y = 0):
     return jnp.real(jnp.sum(jnp.conj(x-y)*(x-y)))
@@ -275,4 +285,6 @@ def create_grid(nx, px):
     x_grid = np.array([x_freq[1], len(x_freq)])
     
     return x_grid 
+
+
 
