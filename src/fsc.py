@@ -79,7 +79,7 @@ def plot_angles(angs):
     z = jnp.cos(Theta)
 
     # Get point coordinates
-    coords = jnp.array([get_rotation_matrix(a[0],a[1],a[2])@jnp.array([1.1,0,0]) for a in angs])
+    coords = jnp.array([get_rotation_matrix(a[0],a[1],a[2])@jnp.array([0,0,1.1]) for a in angs])
     xx, yy, zz = jnp.hsplit(coords, 3)
 
     fig = plt.figure()

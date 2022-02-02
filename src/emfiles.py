@@ -74,28 +74,18 @@ def crop_fourier_images(imgs, x_grid, nx):
     N = imgs.shape[0]
     mid = imgs.shape[-1]/2
 
-    #t0 = time.time()
-    #imgs_cropped = np.zeros([N, nx, nx], dtype = np.complex64)
-    #for i, f in enumerate(imgs):
-    #    img = np.fft.fftshift(f)
-    #    imgs_cropped[i] = np.fft.ifftshift(
-    #            img[int(mid-nx/2):int(mid+nx/2), int(mid-nx/2):int(mid+nx/2)])
-    #print(time.time()-t0)
-
-    t0 = time.time()
     idx = jnp.concatenate([jnp.arange(nx/2),jnp.arange(-nx/2,0)]).astype(jnp.int64)
-    imgs_cropped2 = imgs[jnp.ix_(jnp.arange(N),idx, idx)]
-    print(time.time()-t0)
+    imgs_cropped = imgs[jnp.ix_(jnp.arange(N),idx, idx)]
 
     # <<< IMPORTANT!!!>>> 
     # The grid must not be a Jax object.
     x_grid_cropped = np.array([x_grid[0], nx])
 
-    #return jnp.array(imgs_cropped), imgs_cropped2, x_grid_cropped
-    return imgs_cropped2, x_grid_cropped
+    return imgs_cropped, x_grid_cropped
 
 def crop_fourier_volume(vol, x_grid, nx):
     """Same as above, but a volume."""
+
 
     vol = np.fft.fftshift(vol)
     mid = vol.shape[-1]/2
