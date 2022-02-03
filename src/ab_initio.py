@@ -28,8 +28,7 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, N_iter = 100,
     Returns:
     
     """
-
-    print(N_cg_iter)
+    assert(imgs.ndim == 2)
 
     N = imgs.shape[0]
     nx = jnp.sqrt(imgs.shape[1]).astype(jnp.int64)
