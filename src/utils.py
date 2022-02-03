@@ -223,23 +223,72 @@ def get_pad_width(l0, l1):
             pad_width = [w+1, w]
     return jnp.array(pad_width).astype(jnp.int64)
     
-# TODO: this should take a new radius probably,rather than new grid  length
-def rescale_larger_grid(v, x_grid, y_grid, z_grid, new_grid_lengths):
-    """Assume the new grid lengths are larger than the current ones."""
+def rescale_larger_grid(v, x_grid, nx_new):
+    """Zero pad Fourier volume v to obtain a larger volume 
+    of dimension nx_new."""
     
-    x_grid_new = [x_grid[0], new_grid_lengths[0]]
-    y_grid_new = [y_grid[0], new_grid_lengths[1]]
-    z_grid_new = [z_grid[0], new_grid_lengths[2]]
-
-    pad_width_x = get_pad_width(x_grid[1], new_grid_lengths[0])
-    pad_width_y = get_pad_width(y_grid[1], new_grid_lengths[1])
-    pad_width_z = get_pad_width(z_grid[1], new_grid_lengths[2])
-    
-    v_new = jnp.pad(jnp.fft.fftshift(v), (pad_width_x, pad_width_y, pad_width_z))
+    pad_width_x = get_pad_width(x_grid[1], nx_new)
+    v_new = jnp.pad(jnp.fft.fftshift(v), pad_width_x)
     v_new = jnp.fft.ifftshift(v_new)
     
-    return v_new, x_grid_new, y_grid_new, z_grid_new  
+    x_grid_new = [x_grid[0], nx_new]
+    
+    return v_new, x_grid_new
 
+# TODO : write tests for this function and make with work with odd dimensions too.
+def crop_fourier_images(imgs, x_grid, nx_new):
+    """Given an N x nx0 x nx0 array of N images of dimension nx0 x nx0 in the 
+    frequency space with the standard ordering, crop the high-frequency entries 
+    to reduce the image to the dimensions nx x nx. 
+    Also adjust the grid arrays accordingly. 
+
+    Parameters:
+    ----------
+    imgs : N x nx0 x nx0 array
+        N stacked images of dimensions nx0 x nx0 in the Fourier domain 
+        and standard ordering.
+    x_grid: 2 x 1 array 
+        Spacing and length of the Fourier grid in each dimension (we assume
+        they are the same in all dimensions), in the format:
+        [grid_spacing, grid_length].
+    nx_new : integer
+        The target length each dimension of the images after cropping.
+
+    Returns:
+    -------
+        imgs_cropped: N x nx_new x nx_new)
+            N stacked cropped images. 
+        x_grid_cropped: 2 x 1 array
+            The new Fourier grid corresponding to the cropped images.
+    """
+    
+    N = imgs.shape[0]
+    mid = imgs.shape[-1]/2
+
+    idx = jnp.concatenate([jnp.arange(nx_new/2),jnp.arange(-nx_new/2,0)]).astype(jnp.int64)
+    imgs_cropped = imgs[jnp.ix_(jnp.arange(N),idx, idx)]
+
+    # <<< IMPORTANT!!!>>> 
+    # The grid must not be a Jax object.
+    x_grid_cropped = np.array([x_grid[0], nx_new])
+
+    return imgs_cropped, x_grid_cropped
+
+def crop_fourier_volume(vol, x_grid, nx_new):
+    """Same as above, but a volume."""
+
+    vol = np.fft.fftshift(vol)
+    mid = vol.shape[-1]/2
+
+    vol_cropped = np.fft.ifftshift(
+            vol[int(mid-nx_new/2):int(mid+nx_new/2), int(mid-nx_new/2):int(mid+nx_new/2), int(mid-nx_new/2):int(mid+nx_new/2)]
+            )
+
+    # <<< IMPORTANT!!!>>> 
+    # The grid must not be a Jax object.
+    x_grid_cropped = np.array([x_grid[0], nx_new])
+
+    return vol_cropped, x_grid_cropped
 
 def get_rotation_matrix(alpha, beta, gamma):
     """Given the Euler angles alpha, beta, gamma, return 

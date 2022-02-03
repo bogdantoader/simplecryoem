@@ -29,7 +29,7 @@ def conjugate_gradient(op, b, x0, iterations, eps = 1e-16, verbose = False):
         p = r + beta * p
 
         if verbose and jnp.mod(k,50) == 0:
-            print("Iter", k, "||r|| =", norm_r)
+            print("  cg iter", k, "||r|| =", norm_r)
                     
     return x, k
 
