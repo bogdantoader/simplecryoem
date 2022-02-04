@@ -1,4 +1,5 @@
 import jax.numpy as jnp
+import numpy as np
 from tqdm import tqdm
 
 
@@ -72,3 +73,64 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
     AA = lambda vv : jnp.conj(grad_loss_volume_sum(vv, angles, shifts, ctf_params, imgs_f)) + Ab
 
     return AA, Ab
+
+
+def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, verbose = False):
+    """SGD
+   
+   Parameters:
+   grad_func : (x, idx) -> sum_i grad(f_i(x)), i=1,...N
+        A function that takes a volume x and an array of indices idx
+        and returns the sum of the gradients of the loss functions at 
+        volume x and images indexed by idx.
+
+    N : int 
+        The total number of images/samples.
+
+    x0 : nx x nx x nx
+        Starting volume
+
+    alpha : float
+        Learning rate
+
+    N_epochs : int
+        Number of passes through the full dataset.
+
+    batch_size : int
+        Batch size
+
+    P : nx x nx x nx
+        Diagonal preconditioner (entry-wise multiplication of the gradient).
+    
+    """
+
+    rng = np.random.default_rng()
+
+    if batch_size == -1:
+        number_of_batches = 1
+    else:
+        number_of_batches = N/batch_size
+
+    if P is None:
+        P = jnp.ones(x0.shape)
+
+    x = x0
+    for epoch in range(N_epoch):
+        idx_batches = np.array_split(rng.permutation(N), number_of_batches)
+
+        for i, idx in enumerate(idx_batches):
+            x = x - alpha * P * jnp.conj(grad_func(x, idx))
+
+            if verbose and jnp.mod(epoch,1) == 0 and i == len(idx_batches)-1:
+                #print("Epoch " + str(epoch) + ": mean loss = " + str(jnp.mean(loss_func_batched(v, angles_true, shifts_true, ctf_params, imgs))))
+                print("Epoch " + str(epoch) + ": mean gradient = " + str(jnp.abs(jnp.mean(grad_func(x, idx)))))
+
+    return x
+
+
+def get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts, ctf_params, imgs):
+
+    grad_func = lambda v, idx : grad_loss_volume_batched(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx]) 
+    return grad_func
+
+
