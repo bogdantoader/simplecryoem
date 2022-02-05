@@ -121,9 +121,8 @@ def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, ve
         for i, idx in enumerate(idx_batches):
             x = x - alpha * P * jnp.conj(grad_func(x, idx))
 
-            if verbose and jnp.mod(epoch,1) == 0 and i == len(idx_batches)-1:
-                #print("Epoch " + str(epoch) + ": mean loss = " + str(jnp.mean(loss_func_batched(v, angles_true, shifts_true, ctf_params, imgs))))
-                print("Epoch " + str(epoch) + ": mean gradient = " + str(jnp.abs(jnp.mean(grad_func(x, idx)))))
+            if verbose and jnp.mod(epoch,50) == 0 and i == len(idx_batches)-1:
+                print("  sgd epoch " + str(epoch) + ": mean sampled gradient = " + str(jnp.abs(jnp.mean(grad_func(x, idx)))))
 
     return x
 

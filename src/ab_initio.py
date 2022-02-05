@@ -12,7 +12,7 @@ from src.fsc import plot_angles
 
 
 
-def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, N_iter = 100, N_cg_iter = 300, N_samples = 40000, radius0 = 0.1, dr = 0.05, alpha = 0, interp_method = 'tri', opt_vol_first = False, verbose = True, save_to_file = True, out_dir = './'):
+def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples = 40000, radius0 = 0.1, dr = 0.05, alpha = 0, interp_method = 'tri', opt_vol_first = False, verbose = True, save_to_file = True, out_dir = './'):
     """Ab initio reconstruction.
 
     Parameters:
@@ -30,21 +30,33 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, N_iter = 100,
     """
     assert(imgs.ndim == 2)
 
+
     N = imgs.shape[0]
     nx = jnp.sqrt(imgs.shape[1]).astype(jnp.int64)
     v0 = jnp.array(np.random.randn(nx,nx,nx) + 1j * np.random.randn(nx,nx,nx))
-    vcg=v0
+    v=v0
+
+    if use_sgd:
+        if batch_size == -1:
+            batch_size = N
+        if P == None:
+            P = jnp.ones(v0.shape)
 
     if opt_vol_first:
         mask3d = jnp.ones([nx,nx,nx])
-        _, grad_loss_volume_sum = get_jax_ops_iter(project_func, x_grid, mask3d, alpha, interp_method)
+        _, grad_loss_volume_batched, grad_loss_volume_sum = get_jax_ops_iter(project_func, x_grid, mask3d, alpha, interp_method)
 
         angles = generate_uniform_orientations(N)
-        AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs, v0.shape)
-        vcg, _ = conjugate_gradient(AA, Ab, v0, N_cg_iter, verbose = verbose)
+
+        if use_sgd:
+            sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts_true, ctf_params, imgs)
+            v = sgd(sgd_grad_func, N, v0, learning_rate, N_vol_iter, batch_size, P, verbose = verbose)
+        else:
+            AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs, v0.shape)
+            v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, verbose = verbose)
 
         if verbose:
-            plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(vcg[0,:,:]))))
+            plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
             plt.show()
    
     imgs = imgs.reshape([N, nx,nx])
@@ -64,9 +76,9 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, N_iter = 100,
         # At the first iteration, we reduce the size (from v0) while 
         # afterwards, we increase it (frequency marching).
         if idx_iter == 0:
-            vcg, _ = crop_fourier_volume(vcg, x_grid, nx_iter)
+            v, _ = crop_fourier_volume(v, x_grid, nx_iter)
         else:
-            vcg, _ = rescale_larger_grid(vcg, x_grid_iter, nx_iter) 
+            v, _ = rescale_larger_grid(v, x_grid_iter, nx_iter) 
 
         # Crop the images to the right size
         imgs_iter, x_grid_iter = crop_fourier_images(imgs, x_grid, nx_iter)
@@ -75,26 +87,33 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, N_iter = 100,
         mask2d = mask3d[0].reshape(1,-1)
 
         # Get the operators for the dimensions at this iteration.
-        slice_func_array_angles_iter, grad_loss_volume_sum_iter  = get_jax_ops_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
+        slice_func_array_angles_iter, grad_loss_volume_batched_iter, grad_loss_volume_sum_iter  = get_jax_ops_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
 
         # Sample the orientations
         t0 = time.time()    
-        #angles = sample_new_angles_vmap(loss_func_angles, vcg*mask3d, shifts_true, ctf_params, imgs*mask2d, N_samples) 
-        angles = sample_new_angles_cached(loss_func_imgs_batched, slice_func_array_angles_iter, vcg*mask3d, shifts_true, ctf_params, imgs_iter*mask2d, N_samples)    
+        #angles = sample_new_angles_vmap(loss_func_angles, v*mask3d, shifts_true, ctf_params, imgs*mask2d, N_samples) 
+        angles = sample_new_angles_cached(loss_func_imgs_batched, slice_func_array_angles_iter, v*mask3d, shifts_true, ctf_params, imgs_iter*mask2d, N_samples)    
         if verbose:
             print("  Time orientations sampling =", time.time()-t0)
         
         #TODO: make the above function return the loss numbers as well so they don't have to be recomputed below
-        #loss_min = loss_func_sum(vcg*mask3d, angles, shifts_true, ctf_params, imgs)/jnp.sum(mask2d)
+        #loss_min = loss_func_sum(v*mask3d, angles, shifts_true, ctf_params, imgs)/jnp.sum(mask2d)
         #print("angles loss", loss_min)
 
         # Optimise volume
         t0 = time.time()
         v0 = jnp.array(np.random.randn(nx_iter,nx_iter,nx_iter) + 1j * np.random.randn(nx_iter,nx_iter,nx_iter))
-        AA, Ab = get_cg_vol_ops(grad_loss_volume_sum_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d, v0.shape)
-        vcg, _ = conjugate_gradient(AA, Ab, v0, N_cg_iter, verbose = verbose)
+
+        if use_sgd:
+            P_iter = None
+            sgd_grad_func_iter = get_sgd_vol_ops(grad_loss_volume_batched_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d)
+            v = sgd(sgd_grad_func_iter, N, v0, learning_rate, N_vol_iter, batch_size, P_iter, verbose = verbose)
+        else:
+            AA, Ab = get_cg_vol_ops(grad_loss_volume_sum_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d, v0.shape)
+            v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, verbose = verbose)
+
         if verbose:
-            print("  Time cg =", time.time()-t0)
+            print("  Time vol optimisation =", time.time()-t0)
 
         # Increase radius
         if jnp.mod(idx_iter, 4)==0:
@@ -105,27 +124,27 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, N_iter = 100,
 
         if save_to_file:
             with mrcfile.new(out_dir + '/rec_iter.mrc', overwrite=True) as mrc:
-                vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(vcg)))
+                vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
                 mrc.set_data(vr.astype(np.float32))
                                     
 
-        if vcg.shape[0] == nx:
+        if v.shape[0] == nx:
             break
 
 
-    vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(vcg)))
+    vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
     if save_to_file:
         with mrcfile.new(out_dir + '/rec_final.mrc', overwrite=True) as mrc:
                 mrc.set_data(vr.astype(np.float32))
 
-    return vcg
+    return v
 
 
 def get_jax_ops_iter(project_func, x_grid, mask, alpha = 0, interp_method = 'tri'):
     slice_func,slice_func_array, slice_func_array_angles = get_slice_funcs(project_func, x_grid, mask, interp_method)
     loss_func, loss_func_batched, loss_func_sum, _ = get_loss_funcs(slice_func, alpha = alpha)
     grad_loss_volume, grad_loss_volume_batched, grad_loss_volume_sum = get_grad_v_funcs(loss_func, loss_func_sum)
-    return slice_func_array_angles, grad_loss_volume_sum
+    return slice_func_array_angles, grad_loss_volume_batched, grad_loss_volume_sum
 
 # Cached angles sampling
 
