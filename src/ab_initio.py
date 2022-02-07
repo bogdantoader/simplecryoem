@@ -28,8 +28,8 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
     Returns:
     
     """
-    assert(imgs.ndim == 2)
 
+    assert(imgs.ndim == 2)
 
     N = imgs.shape[0]
     nx = jnp.sqrt(imgs.shape[1]).astype(jnp.int64)
@@ -116,8 +116,10 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
             print("  Time vol optimisation =", time.time()-t0)
 
         # Increase radius
-        if jnp.mod(idx_iter, 4)==0:
+        # TODO: makke this a parameter of the algorithm
+        if jnp.mod(idx_iter, 8)==0:
             if verbose:
+                print("  nx =", nx_iter)
                 plot_angles(angles[:500])
                 plt.show()
             radius += dr
@@ -137,7 +139,7 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
         with mrcfile.new(out_dir + '/rec_final.mrc', overwrite=True) as mrc:
                 mrc.set_data(vr.astype(np.float32))
 
-    return v
+    return v, angles
 
 
 def get_jax_ops_iter(project_func, x_grid, mask, alpha = 0, interp_method = 'tri'):
@@ -167,7 +169,6 @@ def get_min_loss_indices(imgs1, imgs2, loss_func_array):
 def sample_new_angles_cached(loss_func_imgs_batched, slice_func_array_angles, vol, shifts_true, ctf_params, imgs, N_samples):
     """This function assumes ctf_params and shifts_true are the same accros 
     the first dimension, so it only uses the first row of each."""
-    
 
     ang_samples = generate_uniform_orientations(N_samples)
     imgs_sampled = slice_func_array_angles(vol, ang_samples, shifts_true[0], ctf_params[0])
