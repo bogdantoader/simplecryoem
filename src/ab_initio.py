@@ -120,9 +120,14 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
         if jnp.mod(idx_iter, 8)==0:
             if verbose:
                 print("  nx =", nx_iter)
+                print("  learning_rate =", learning_rate)
                 plot_angles(angles[:500])
                 plt.show()
             radius += dr
+            learning_rate = learning_rate * 1.4
+
+            if v.shape[0] == nx:
+                break
 
         if save_to_file:
             with mrcfile.new(out_dir + '/rec_iter.mrc', overwrite=True) as mrc:
@@ -130,8 +135,6 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
                 mrc.set_data(vr.astype(np.float32))
                                     
 
-        if v.shape[0] == nx:
-            break
 
 
     vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
