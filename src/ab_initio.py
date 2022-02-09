@@ -121,7 +121,7 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
 
         # Increase radius
         # TODO: makke this a parameter of the algorithm
-        if jnp.mod(idx_iter, 20)==0:
+        if jnp.mod(idx_iter, 10)==0:
             if verbose:
                 print(datetime.datetime.now())
                 print("  nx =", nx_iter)
