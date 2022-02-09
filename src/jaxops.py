@@ -26,6 +26,13 @@ def get_slice_funcs(project, x_grid,  mask, interp_method = "tri"):
 # Loss functions
 def get_loss_funcs(slice_func, err_func = l2sq, alpha = 0):
 
+
+    #TODO: should the regularisation term here be normalise to account for
+    # the fact that v is 3D while the arguments of err_func in the fidelity
+    # term are 2D, and also the fact that we have one regularisation term
+    # included for each image? So in SGD, when varying the batch size, 
+    # the implicit regularisation parameter will change too.
+    # Yeah, this definitely needs to be fixed.
     @jax.jit
     def loss_func(v, angles, shifts, ctf_params, img):
         """L2 squared error with L2 regularization, where alpha is the
