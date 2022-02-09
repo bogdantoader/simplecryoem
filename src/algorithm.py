@@ -75,7 +75,7 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
     return AA, Ab
 
 
-def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, verbose = False):
+def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, verbose = False, loss_func = None):
     """SGD
    
    Parameters:
@@ -106,7 +106,7 @@ def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, ve
 
     rng = np.random.default_rng()
 
-    if batch_size == -1:
+    if batch_size == -1 or batch_size == N:
         number_of_batches = 1
     else:
         number_of_batches = N/batch_size
@@ -122,14 +122,20 @@ def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, ve
             x = x - alpha * P * jnp.conj(grad_func(x, idx))
 
             if verbose and jnp.mod(epoch,50) == 0 and i == len(idx_batches)-1:
-                print("  sgd epoch " + str(epoch) + ": mean sampled gradient = " + str(jnp.abs(jnp.mean(grad_func(x, idx)))))
+                #print("  sgd epoch " + str(epoch) + ": mean sampled gradient = " + str(jnp.abs(jnp.mean(grad_func(x, idx)))))
+                #Print the full gradient for now
+                if loss_func is not None:
+                    print("  sgd epoch " + str(epoch) + ": mean loss func= " + str(loss_func(x, jnp.arange(N))))
+                else:
+                    print("  sgd epoch " + str(epoch) + ": mean full gradient = " + str(jnp.abs(jnp.mean(grad_func(x, jnp.arange(N))))))
 
     return x
 
 
-def get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts, ctf_params, imgs):
+def get_sgd_vol_ops(grad_loss_volume_batched, loss_func_sum, angles, shifts, ctf_params, imgs):
 
     grad_func = lambda v, idx : grad_loss_volume_batched(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx]) 
-    return grad_func
+    loss_func = lambda v, idx : loss_func_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx])
+    return grad_func, loss_func
 
 

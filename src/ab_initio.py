@@ -12,7 +12,7 @@ from src.fsc import plot_angles
 
 
 
-def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples = 40000, radius0 = 0.1, dr = 0.05, alpha = 0, interp_method = 'tri', opt_vol_first = False, verbose = True, save_to_file = True, out_dir = './'):
+def ab_initio(angles0, project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples = 40000, radius0 = 0.1, dr = 0.05, alpha = 0, interp_method = 'tri', opt_vol_first = False, verbose = True, save_to_file = True, out_dir = './'):
     """Ab initio reconstruction.
 
     Parameters:
@@ -46,7 +46,8 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
         mask3d = jnp.ones([nx,nx,nx])
         _, grad_loss_volume_batched, grad_loss_volume_sum = get_jax_ops_iter(project_func, x_grid, mask3d, alpha, interp_method)
 
-        angles = generate_uniform_orientations(N)
+        #angles = generate_uniform_orientations(N)
+        angles = angles0 
 
         if use_sgd:
             sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts_true, ctf_params, imgs)
@@ -86,6 +87,9 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
         mask3d = create_3d_mask(x_grid_iter, (0,0,0),  radius)
         mask2d = mask3d[0].reshape(1,-1)
 
+        if use_sgd and P is not None:
+            P_iter, _ = crop_fourier_volume(P, x_grid, nx_iter)
+
         # Get the operators for the dimensions at this iteration.
         slice_func_array_angles_iter, grad_loss_volume_batched_iter, grad_loss_volume_sum_iter  = get_jax_ops_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
 
@@ -105,7 +109,6 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
         v0 = jnp.array(np.random.randn(nx_iter,nx_iter,nx_iter) + 1j * np.random.randn(nx_iter,nx_iter,nx_iter))
 
         if use_sgd:
-            P_iter = None
             sgd_grad_func_iter = get_sgd_vol_ops(grad_loss_volume_batched_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d)
             v = sgd(sgd_grad_func_iter, N, v0, learning_rate, N_vol_iter, batch_size, P_iter, verbose = verbose)
         else:
@@ -120,11 +123,9 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
         if jnp.mod(idx_iter, 8)==0:
             if verbose:
                 print("  nx =", nx_iter)
-                print("  learning_rate =", learning_rate)
                 plot_angles(angles[:500])
                 plt.show()
             radius += dr
-            learning_rate = learning_rate * 1.4
 
             if v.shape[0] == nx:
                 break

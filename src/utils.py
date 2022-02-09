@@ -80,6 +80,31 @@ def spherical_volume(shape, dimensions, centre, radius, intensity, rand_or_not,
 
     return vol
 
+def get_preconditioner(x_grid):
+
+    x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1/(x_grid[1] * x_grid[0]))
+    y_freq = x_freq
+    z_freq = x_freq
+
+    X, Y, Z = np.meshgrid(x_freq, z_freq, y_freq)
+
+    return X**2 + Y**2 + Z**2
+
+
+def get_sinc(x_grid):
+
+    x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1/(x_grid[1] * x_grid[0]))
+    y_freq = x_freq
+    z_freq = x_freq
+
+    X, Y, Z = np.meshgrid(x_freq, z_freq, y_freq)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        res = np.sin(np.pi*X) * np.sin(np.pi*Y) * np.sin(np.pi*Z) / (X*Y*Z*np.pi**3)
+    res[0,0,0] = 1 
+    
+    return jnp.array(res)
+
 def create_3d_mask(x_grid, centre, radius):
     """Works in the Fourier domain with the standard ordering, but obviously
     it can be applied in the spatial domain too."""
