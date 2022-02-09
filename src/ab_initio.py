@@ -1,4 +1,5 @@
 import time
+import datetime
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -12,7 +13,7 @@ from src.fsc import plot_angles
 
 
 
-def ab_initio(angles0, project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples = 40000, radius0 = 0.1, dr = 0.05, alpha = 0, interp_method = 'tri', opt_vol_first = False, verbose = True, save_to_file = True, out_dir = './'):
+def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples = 40000, radius0 = 0.1, dr = 0.05, alpha = 0, interp_method = 'tri', opt_vol_first = False, verbose = True, save_to_file = True, out_dir = './'):
     """Ab initio reconstruction.
 
     Parameters:
@@ -46,8 +47,7 @@ def ab_initio(angles0, project_func, imgs, shifts_true, ctf_params, x_grid, use_
         mask3d = jnp.ones([nx,nx,nx])
         _, grad_loss_volume_batched, grad_loss_volume_sum = get_jax_ops_iter(project_func, x_grid, mask3d, alpha, interp_method)
 
-        #angles = generate_uniform_orientations(N)
-        angles = angles0 
+        angles = generate_uniform_orientations(N)
 
         if use_sgd:
             sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts_true, ctf_params, imgs)
@@ -58,6 +58,7 @@ def ab_initio(angles0, project_func, imgs, shifts_true, ctf_params, x_grid, use_
 
         if verbose:
             plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
+            plt.colorbar()
             plt.show()
    
     imgs = imgs.reshape([N, nx,nx])
@@ -120,20 +121,23 @@ def ab_initio(angles0, project_func, imgs, shifts_true, ctf_params, x_grid, use_
 
         # Increase radius
         # TODO: makke this a parameter of the algorithm
-        if jnp.mod(idx_iter, 8)==0:
+        if jnp.mod(idx_iter, 20)==0:
             if verbose:
+                print(datetime.datetime.now())
                 print("  nx =", nx_iter)
                 plot_angles(angles[:500])
                 plt.show()
-            radius += dr
+
+
+            if save_to_file:
+                with mrcfile.new(out_dir + '/rec_iter_' + str(idx_iter) + '.mrc', overwrite=True) as mrc:
+                    vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
+                    mrc.set_data(vr.astype(np.float32))
+                radius += dr
 
             if v.shape[0] == nx:
                 break
 
-        if save_to_file:
-            with mrcfile.new(out_dir + '/rec_iter.mrc', overwrite=True) as mrc:
-                vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
-                mrc.set_data(vr.astype(np.float32))
                                     
 
 

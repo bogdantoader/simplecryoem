@@ -136,6 +136,6 @@ def get_sgd_vol_ops(grad_loss_volume_batched, loss_func_sum, angles, shifts, ctf
 
     grad_func = lambda v, idx : grad_loss_volume_batched(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx]) 
     loss_func = lambda v, idx : loss_func_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx])
-    return grad_func, loss_func
+    return grad_func
 
 
