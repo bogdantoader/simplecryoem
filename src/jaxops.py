@@ -39,14 +39,18 @@ def get_loss_funcs(slice_func, err_func = l2sq, alpha = 0):
         regularization parameter."""
         
         return 1/(2* v.shape[-1]**2) * (alpha * l2sq(v) + err_func(slice_func(v, angles, shifts, ctf_params), img))
+        #return 1/2 * (alpha * l2sq(v) + err_func(slice_func(v, angles, shifts, ctf_params), img))
 
     @jax.jit 
     def loss_func_batched(v, angles, shifts, ctf_params, imgs):
         return jax.vmap(loss_func, in_axes = (None, 0, 0, 0, 0))(v, angles, shifts, ctf_params, imgs)
 
+    # TODO: and is it ok to take the mean instead of the sum here?
+    # Does it break the Hastings ratio?
     @jax.jit
     def loss_func_sum(v, angles, shifts, ctf_params, imgs):
         return jnp.mean(loss_func_batched(v, angles, shifts, ctf_params, imgs))
+        #return jnp.sum(loss_func_batched(v, angles, shifts, ctf_params, imgs))
 
     #@jax.jit 
     def loss_func_sum_iter(v, angles, shifts, ctf_params, imgs):
@@ -68,7 +72,8 @@ def get_grad_v_funcs(loss_func, loss_func_sum):
 
     @jax.jit
     def grad_loss_volume_batched(v, angles, shifts, ctf_params, imgs):
-        return 1/imgs.shape[0] * jnp.sum(jax.vmap(grad_loss_volume, in_axes = (None, 0, 0, 0, 0))(v, angles, shifts, ctf_params, imgs), axis=0)
+        #return 1/imgs.shape[0] * jnp.sum(jax.vmap(grad_loss_volume, in_axes = (None, 0, 0, 0, 0))(v, angles, shifts, ctf_params, imgs), axis=0)
+        return jnp.sum(jax.vmap(grad_loss_volume, in_axes = (None, 0, 0, 0, 0))(v, angles, shifts, ctf_params, imgs), axis=0)
 
     @jax.jit
     def grad_loss_volume_sum(v, angles, shifts, ctf_params, imgs):

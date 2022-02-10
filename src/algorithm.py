@@ -2,6 +2,8 @@ import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
 
+from src.utils import l2sq
+
 
 
 
@@ -129,8 +131,48 @@ def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, ve
     return x
 
 
-def get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts, ctf_params, imgs):
+def get_sgd_vol_ops(loss_func_sum, grad_loss_volume_batched, angles, shifts, ctf_params, imgs):
+    loss_func = lambda v, idx : loss_func_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx]) 
     grad_func = lambda v, idx : grad_loss_volume_batched(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx]) 
-    return grad_func
+
+    return loss_func, grad_func
+
+
+def mala_vol_proposal(loss_func, grad_func, N, v0, tau):
+    """Generate a new proposal for the volume with a Langevin step.
+    Returns the proposal and the Hastings ratio."""
+
+    rng = np.random.default_rng()
+    noise = jnp.array(rng.standard_normal(v0.shape))
+
+    # Full gradient for now
+    idx = jnp.arange(N)
+
+    # Note the minus sign since the loss function implicitly has a minus too.
+    g = grad_func(v0, idx)
+    det_term = v0 - tau**2/2 * jnp.conj(g)
+    v1 =  det_term + tau * noise
+    #v1 = det_term
+    #print(jnp.abs(jnp.mean(g)))
+
+    # How and where to compute the Hastings radio (or some of its components)
+    # for maximum efficiency.
+    qv0v1_exparg = tau*noise #v1-det_term
+    qv1v0_exparg = v0 - v1 + tau**2/2 * jnp.conj(grad_func(v1, idx) )
+
+    q_ratio = jnp.exp(-1/(2*tau**2) * (l2sq(qv1v0_exparg) - l2sq(qv0v1_exparg)))
+    h_ratio = jnp.exp(-loss_func(v1, idx) + loss_func(v0, idx))
+    ratio = q_ratio*h_ratio
+
+    #print("MALA")
+    #print(-loss_func(v1,idx))
+    #print(-loss_func(v0,idx))
+    #print(q_ratio)
+    #print(h_ratio)
+
+    return v1, ratio
+
+
+
 
 
