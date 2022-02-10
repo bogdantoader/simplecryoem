@@ -173,6 +173,18 @@ def mala_vol_proposal(loss_func, grad_func, N, v0, tau):
     return v1, ratio
 
 
+def mala_proposal(logPi, gradLogPi, x0, tau):
+    rng = np.random.default_rng()
+    noise = jnp.array(rng.standard_normal(x0.shape))
+    x1 = x0 + tau**2/2 * gradLogPi(x0) + tau * noise
+
+    qx0x1_exparg = tau*noise
+    qx1x0_exparg = x0 - x1 - tau**2/2 * gradLogPi(x1)
+    q_ratio = jnp.exp(-1/(2*tau**2) * (l2sq(qx1x0_exparg) - l2sq(qx0x1_exparg)))
+    h_ratio = jnp.exp(logPi(x1)-logPi(x0))
+    r = q_ratio * h_ratio
+
+    return x1, r
 
 
 
