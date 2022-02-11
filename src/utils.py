@@ -264,7 +264,7 @@ def rescale_larger_grid(v, x_grid, nx_new):
 def crop_fourier_images(imgs, x_grid, nx_new):
     """Given an N x nx0 x nx0 array of N images of dimension nx0 x nx0 in the 
     frequency space with the standard ordering, crop the high-frequency entries 
-    to reduce the image to the dimensions nx x nx. 
+    to reduce the image to the dimensions nx_new x nx_new. 
     Also adjust the grid arrays accordingly. 
 
     Parameters:

@@ -13,7 +13,7 @@ from src.fsc import plot_angles
 
 
 
-def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples = 40000, radius0 = 0.1, dr = 0.05, alpha = 0, interp_method = 'tri', opt_vol_first = False, verbose = True, save_to_file = True, out_dir = './'):
+def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples = 40000, radius0 = 0.1, dr = 0.05, alpha = 0, eps_cg = 1e-16, interp_method = 'tri', opt_vol_first = False, verbose = True, save_to_file = True, out_dir = './'):
     """Ab initio reconstruction.
 
     Parameters:
@@ -34,7 +34,7 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
 
     N = imgs.shape[0]
     nx = jnp.sqrt(imgs.shape[1]).astype(jnp.int64)
-    v0 = jnp.array(np.random.randn(nx,nx,nx) + 1j * np.random.randn(nx,nx,nx))
+    v0 = jnp.zeros([nx,nx,nx])* 1j
     v=v0
 
     if use_sgd:
@@ -53,8 +53,8 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
             sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts_true, ctf_params, imgs)
             v = sgd(sgd_grad_func, N, v0, learning_rate, N_vol_iter, batch_size, P, verbose = verbose)
         else:
-            AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs, v0.shape)
-            v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, verbose = verbose)
+            AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs, v0.shape, sigma_noise)
+            v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_cg, verbose = verbose)
 
         if verbose:
             plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
@@ -63,6 +63,10 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
    
     imgs = imgs.reshape([N, nx,nx])
     radius = radius0
+
+    # Reshaping sigma_noise this way so that we can apply crop_fourier_images 
+    # at each iteration.
+    sigma_noise = sigma_noise.reshape([1, nx, nx])
 
     for idx_iter in range(N_iter):
         if verbose:
@@ -85,6 +89,8 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
         # Crop the images to the right size
         imgs_iter, x_grid_iter = crop_fourier_images(imgs, x_grid, nx_iter)
         imgs_iter = imgs_iter.reshape([N,nx_iter*nx_iter])
+        sigma_noise_iter, _ = crop_fourier_images(sigma_noise, x_grid, nx_iter)
+        sigma_noise_iter = sigma_noise_iter.reshape(-1)
         mask3d = create_3d_mask(x_grid_iter, (0,0,0),  radius)
         mask2d = mask3d[0].reshape(1,-1)
 
@@ -97,7 +103,7 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
         # Sample the orientations
         t0 = time.time()    
         #angles = sample_new_angles_vmap(loss_func_angles, v*mask3d, shifts_true, ctf_params, imgs*mask2d, N_samples) 
-        angles = sample_new_angles_cached(loss_func_imgs_batched, slice_func_array_angles_iter, v*mask3d, shifts_true, ctf_params, imgs_iter*mask2d, N_samples)    
+        angles = sample_new_angles_cached(loss_func_imgs_batched, slice_func_array_angles_iter, v*mask3d, shifts_true, ctf_params, imgs_iter*mask2d, N_samples, sigma_noise_iter)    
         if verbose:
             print("  Time orientations sampling =", time.time()-t0)
         
@@ -107,21 +113,21 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
 
         # Optimise volume
         t0 = time.time()
-        v0 = jnp.array(np.random.randn(nx_iter,nx_iter,nx_iter) + 1j * np.random.randn(nx_iter,nx_iter,nx_iter))
+        v0 = jnp.zeros([nx_iter, nx_iter, nx_iter])* 1j
 
         if use_sgd:
             sgd_grad_func_iter = get_sgd_vol_ops(grad_loss_volume_batched_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d)
             v = sgd(sgd_grad_func_iter, N, v0, learning_rate, N_vol_iter, batch_size, P_iter, verbose = verbose)
         else:
-            AA, Ab = get_cg_vol_ops(grad_loss_volume_sum_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d, v0.shape)
-            v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, verbose = verbose)
+            AA, Ab = get_cg_vol_ops(grad_loss_volume_sum_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d, v0.shape, sigma_noise_iter)
+            v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_cg, verbose = verbose)
 
         if verbose:
             print("  Time vol optimisation =", time.time()-t0)
 
         # Increase radius
         # TODO: makke this a parameter of the algorithm
-        if jnp.mod(idx_iter, 10)==0:
+        if jnp.mod(idx_iter, 8)==0:
             if verbose:
                 print(datetime.datetime.now())
                 print("  nx =", nx_iter)
@@ -140,8 +146,6 @@ def ab_initio(project_func, imgs, shifts_true, ctf_params, x_grid, use_sgd, N_it
 
                                     
 
-
-
     vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
     if save_to_file:
         with mrcfile.new(out_dir + '/rec_final.mrc', overwrite=True) as mrc:
@@ -158,29 +162,29 @@ def get_jax_ops_iter(project_func, x_grid, mask, alpha = 0, interp_method = 'tri
 
 # Cached angles sampling
 
-def loss_func_imgs_batched(img0, imgs):
+def loss_func_imgs_batched(img0, imgs, sigma):
     """Compute the loss between img0 and each image in the imgs array."""
-    return jax.vmap(l2sq, in_axes = (None, 0))(img0, imgs)
+    return jax.vmap(wl2sq, in_axes = (None, 0, None))(img0, imgs, 1/sigma**2)
 
 
-def get_min_loss_index(img0, imgs, loss_func_array):
+def get_min_loss_index(img0, imgs, loss_func_array, sigma):
     """Given img0 and the array imgs, return the index in imgs of the image
     with the lowest loss with img0."""
 
-    loss = loss_func_array(img0, imgs) 
+    loss = loss_func_array(img0, imgs, sigma) 
     return jnp.argmin(loss)
 
 
-def get_min_loss_indices(imgs1, imgs2, loss_func_array):
-    return jax.vmap(get_min_loss_index, in_axes=(0, None, None))(imgs1, imgs2, loss_func_array)
+def get_min_loss_indices(imgs1, imgs2, loss_func_array, sigma):
+    return jax.vmap(get_min_loss_index, in_axes=(0, None, None, None))(imgs1, imgs2, loss_func_array, sigma)
 
-def sample_new_angles_cached(loss_func_imgs_batched, slice_func_array_angles, vol, shifts_true, ctf_params, imgs, N_samples):
+def sample_new_angles_cached(loss_func_imgs_batched, slice_func_array_angles, vol, shifts_true, ctf_params, imgs, N_samples, sigma_noise):
     """This function assumes ctf_params and shifts_true are the same accros 
     the first dimension, so it only uses the first row of each."""
 
     ang_samples = generate_uniform_orientations(N_samples)
     imgs_sampled = slice_func_array_angles(vol, ang_samples, shifts_true[0], ctf_params[0])
-    indices = get_min_loss_indices(imgs, imgs_sampled, loss_func_imgs_batched) 
+    indices = get_min_loss_indices(imgs, imgs_sampled, loss_func_imgs_batched, sigma_noise) 
 
     return ang_samples[indices]
 
@@ -195,14 +199,14 @@ def sample_new_angles_one_img(loss_func_angles, vol, shifts_true, ctf_params, im
     li = jnp.argmin(loss)
     return ang_samples[li]
 
-def sample_new_angles(loss_func_angles, vol, shifts_true, ctf_params, imgs, N_samples):
+def sample_new_angles(loss_func_angles, vol, shifts_true, ctf_params, imgs, N_samples, sigma_noise):
     angles = []
     for ai in range(N):
         ang_samples = generate_uniform_orientations(N_samples)
-        loss = loss_func_angles(vol, ang_samples, shifts_true[ai], ctf_params[ai], imgs[ai])
+        loss = loss_func_angles(vol, ang_samples, shifts_true[ai], ctf_params[ai], imgs[ai], sigma_noise)
         li = jnp.argmin(loss)
         angles.append(ang_samples[li])
     return jnp.array(angles) 
 
-sample_new_angles_vmap = jax.vmap(sample_new_angles_one_img, in_axes = (None, None, 0, 0, 0, None))
+sample_new_angles_vmap = jax.vmap(sample_new_angles_one_img, in_axes = (None, None, 0, 0, 0, None, None))
                                                 
