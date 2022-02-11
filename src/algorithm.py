@@ -37,7 +37,7 @@ def conjugate_gradient(op, b, x0, iterations, eps = 1e-16, verbose = False):
     return x, k
 
 
-def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol_shape):
+def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol_shape, sigma = 1):
     """Get the AA and Ab required to apply CG to find
     the volume for known angles and shifts.
     
@@ -69,10 +69,10 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
     """
 
     zero = jnp.zeros(vol_shape).astype(jnp.complex64)
-    Abfun = grad_loss_volume_sum(zero, angles, shifts, ctf_params, imgs_f)
+    Abfun = grad_loss_volume_sum(zero, angles, shifts, ctf_params, imgs_f, sigma)
 
     Ab = - jnp.conj(Abfun)
-    AA = lambda vv : jnp.conj(grad_loss_volume_sum(vv, angles, shifts, ctf_params, imgs_f)) + Ab
+    AA = lambda vv : jnp.conj(grad_loss_volume_sum(vv, angles, shifts, ctf_params, imgs_f, sigma)) + Ab
 
     return AA, Ab
 
@@ -124,18 +124,18 @@ def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, ve
             x = x - alpha * P * jnp.conj(grad_func(x, idx))
 
             if verbose and jnp.mod(epoch,50) == 0 and i == len(idx_batches)-1:
-                #print("  sgd epoch " + str(epoch) + ": mean sampled gradient = " + str(jnp.abs(jnp.mean(grad_func(x, idx)))))
+                print("  sgd epoch " + str(epoch) + ": mean sampled gradient = " + str(jnp.abs(jnp.mean(grad_func(x, idx)))))
                 #Print the full gradient for now
-                print("  sgd epoch " + str(epoch) + ": mean full gradient = " + str(jnp.abs(jnp.mean(grad_func(x, jnp.arange(N))))))
+                #print("  sgd epoch " + str(epoch) + ": mean full gradient = " + str(jnp.abs(jnp.mean(grad_func(x, jnp.arange(N))))))
 
     return x
 
 
-def get_sgd_vol_ops(loss_func_sum, grad_loss_volume_batched, angles, shifts, ctf_params, imgs):
-    loss_func = lambda v, idx : loss_func_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx]) 
-    grad_func = lambda v, idx : grad_loss_volume_batched(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx]) 
+def get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts, ctf_params, imgs, sigma):
+    #loss_func = lambda v, idx : loss_func_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx]) 
+    grad_func = lambda v, idx : grad_loss_volume_batched(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma) 
 
-    return loss_func, grad_func
+    return grad_func
 
 
 def mala_vol_proposal(loss_func, grad_func, N, v0, tau):

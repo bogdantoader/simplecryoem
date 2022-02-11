@@ -348,6 +348,10 @@ def generate_uniform_orientations(N):
 def l2sq(x, y = 0):
     return jnp.real(jnp.sum(jnp.conj(x-y)*(x-y)))
 
+@jax.jit
+def wl2sq(x, y = 0, w = 1):
+    """Weighted l2 squared norm/error."""
+    return jnp.real(jnp.sum(w * jnp.conj(x-y)*(x-y)))
 
 def create_grid(nx, px):
     """Create the (one dimensional) Fourier grid used for projections.
@@ -359,6 +363,23 @@ def create_grid(nx, px):
     x_grid = np.array([x_freq[1], len(x_freq)])
     
     return x_grid 
+
+
+def estimate_real_noise(imgs):
+    """Given an array [N x ...] of real images, compute the
+    pixel-wise standard deviation accross all images."""
+
+    imgs_mean = jnp.mean(imgs, axis = 0)
+    imgs_stddev = jnp.sqrt(jnp.mean((imgs - imgs_mean)**2, axis = 0))
+
+    return imgs_stddev
+
+
+
+
+
+
+
 
 
 
