@@ -372,11 +372,33 @@ def estimate_real_noise(imgs):
     imgs_mean = jnp.mean(imgs, axis = 0)
     imgs_stddev = jnp.sqrt(jnp.mean((imgs - imgs_mean)**2, axis = 0))
 
-    return imgs_stddev
+    return imgs_stddev, imgs_mean
 
 
+#TODO: if the corner is too large and doesn't cover empty space, we need
+# to take a smaller corner and then interpolate the noise to the desired 
+# dimensions.
+def estimate_noise_imgs(imgs, nx):
+    """Givben an array [N, nx0, nx0] of real centred images, estimate the 
+    pixel-wise Fourier noise using the nx x nx corners of the real images."""
+
+    #fft = lambda img : jnp.fft.fft2(jnp.fft.ifftshift(img))
+    fft = lambda img : jnp.fft.fft2(img)
+
+    imgs_f = jax.vmap(fft, in_axes = 0)(imgs[:, :nx, :nx])
+    #imgs_f = jax.vmap(fft, in_axes = 0)(imgs[:, 224:, 224:])
+    #imgs_stddev = estimate_real_noise(jnp.real(imgs_f)) + 1j * estimate_real_noise(jnp.imag(imgs_f))
+    #imgs_stddev, imgs_mean  = estimate_real_noise(jnp.abs(imgs_f))
+    
+    imgs_stddev_r, imgs_mean_r = estimate_real_noise(jnp.real(imgs_f)) 
+    imgs_stddev_i, imgs_mean_i = estimate_real_noise(jnp.imag(imgs_f))
+
+    imgs_stddev = imgs_stddev_r + 1j * imgs_stddev_i
+    imgs_mean = imgs_mean_r + 1j * imgs_mean_i
+    return imgs_stddev, imgs_mean
 
 
+    
 
 
 

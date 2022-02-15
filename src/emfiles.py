@@ -8,15 +8,23 @@ import mrcfile
 
 
 
-def load_data(data_dir, star_file, load_imgs = False):
+def load_data(data_dir, star_file, load_imgs = False, fourier = True):
     """Load all the required information from star files and mrcs files.
 
     Parameters:
     ----------
     data_dir : string
                Directory containing the star file
-    star_file: string
+
+    star_file : string
                Name of the star file (relative to the directory path).
+
+    load_imgs : Boolean
+                If true, load the actual images and if false, don't load them.
+
+    fourier : Boolean
+                Return the images in the Fourier domain if true, or the
+                spatial domain otherwise.
     Returns:
 
     """
@@ -29,19 +37,17 @@ def load_data(data_dir, star_file, load_imgs = False):
     t1 = time.time()
     print("load_data: data loaded, time: ", t1-t0) 
 
-    if load_imgs:
-        imgs_f = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs])
+    if fourier:
+        imgs = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs])
         t2 = time.time()
         print("load_data: FFT of data, time: ", t2-t1)
-    else:
-        imgs_f = imgs
 
     params = {'ctf_params' : ctf_params,
               'pixel_size' : pixel_size,
               'angles'     : angles,
               'shifts'     : shifts}
 
-    return params, imgs_f
+    return params, imgs
 
 
 def get_data_from_df(df, data_dir, load_imgs = False):
