@@ -13,7 +13,7 @@ from src.fsc import plot_angles
 
 
 
-def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples = 40000, radius0 = 0.1, dr = 0.05, alpha = 0, eps_cg = 1e-16, interp_method = 'tri', opt_vol_first = False, verbose = True, save_to_file = True, out_dir = './'):
+def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples = 40000, radius0 = 0.1, dr = 0.05, alpha = 0, eps_vol = 1e-16, interp_method = 'tri', opt_vol_first = False, verbose = True, save_to_file = True, out_dir = './'):
     """Ab initio reconstruction.
 
     Parameters:
@@ -51,10 +51,10 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
 
         if use_sgd:
             sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts_true, ctf_params, imgs)
-            v = sgd(sgd_grad_func, N, v0, learning_rate, N_vol_iter, batch_size, P, verbose = verbose)
+            v = sgd(sgd_grad_func, N, v0, learning_rate, N_vol_iter, batch_size, P, eps_vol, verbose = verbose)
         else:
             AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs, v0.shape, sigma_noise)
-            v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_cg, verbose = verbose)
+            v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_vol, verbose = verbose)
 
         if verbose:
             plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
@@ -117,10 +117,10 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
 
         if use_sgd:
             sgd_grad_func_iter = get_sgd_vol_ops(grad_loss_volume_batched_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d)
-            v = sgd(sgd_grad_func_iter, N, v0, learning_rate, N_vol_iter, batch_size, P_iter, verbose = verbose)
+            v = sgd(sgd_grad_func_iter, N, v0, learning_rate, N_vol_iter, batch_size, P_iter, eps_vol, verbose = verbose)
         else:
             AA, Ab = get_cg_vol_ops(grad_loss_volume_sum_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d, v0.shape, sigma_noise_iter)
-            v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_cg, verbose = verbose)
+            v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_vol, verbose = verbose)
 
         if verbose:
             print("  Time vol optimisation =", time.time()-t0)

@@ -94,40 +94,64 @@ def rotate_list(x_grid, angles):
     rc = jax.vmap(rotate_z0, in_axes = (None, 0))(x_grid, angles)
     return jnp.swapaxes(rc, 1, 2).reshape(-1,3).T
 
-def points_orientations_tri(angles, nx):
+
+def points_orientations_tri(angles, nx, number_of_batches = 100):
     """Given a list of orientations as angles, return a volume that
     contains, at each entry, the number of times that volume entry is 
     used by the interpolation function for the given orientations.
 
     We assume the volume has equal size and grid spacing in all dimensions.
     """
-
     # We set the grid spacing to one as the exact number (determined by
     # pixel size) is irrelevant.
     x_grid = jnp.array([1, nx])
 
+    print("Rotating coordinates")
     rc = rotate_list(x_grid, angles)
+    print("Finding point indices")
     _,(_,xyz_idxs) = jax.vmap(find_nearest_eight_grid_points_idx, 
             in_axes = (1,None, None, None))(rc, x_grid, x_grid, x_grid)
-
-    # Note that x and y indices are swapped in vol, 
-    # similar to the tri_interp_point funtion.
-    # i.e. to obtain vol(x, y, z), call vol[y_idx, x_idx, z_idx]
 
     shape = np.array([nx, nx, nx]).astype(np.int64)
     points_v = np.zeros(shape)
 
-    for xyz_idx in xyz_idxs:
-        points_v[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,0]] += 1
-        points_v[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,1]] += 1 
-        points_v[xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,0]] += 1
-        points_v[xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,1]] += 1
-        points_v[xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,0]] += 1
-        points_v[xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,1]] += 1
-        points_v[xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,0]] += 1
-        points_v[xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,1]] += 1
+    print("Splitting in batches.")
+    # If number_of_batches is too high, this
+    #        can take a surprisingly long time
+    xyz_idx_batches = jnp.array_split(xyz_idxs, number_of_batches)
+
+    print("Adding up number of points from batches.")
+    # This needs to be balanced
+    #        carefully with the amount of GPU memory available
+    for xyz_idx_batch in xyz_idx_batches:
+        rr = jnp.sum(jax.vmap(points_orientations_to_vol_tri_one, in_axes=0)(xyz_idx_batch), axis=0)
+
+        # The same as the line above, without jax magic for debugging
+        #rr = jnp.sum(
+        #    jnp.array([points_orientations_to_vol_tri_one(xyz_idx) for xyz_idx in xyz_idx_batch]),
+        #axis=0)
+
+        points_v += rr
 
     return jnp.array(points_v)
+
+@jax.jit
+def points_orientations_to_vol_tri_one(xyz_idx):
+    # Note that x and y indices are swapped in vol, 
+    # similar to the tri_interp_point funtion.
+    # i.e. to obtain vol(x, y, z), call vol[y_idx, x_idx, z_idx]
+
+    points_v = jnp.zeros([32,32,32])
+    points_v = points_v.at[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,0]].set(1)
+    points_v = points_v.at[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,1]].set(1) 
+    points_v = points_v.at[xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,0]].set(1)
+    points_v = points_v.at[xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,1]].set(1)
+    points_v = points_v.at[xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,0]].set(1)
+    points_v = points_v.at[xyz_idx[1,0], xyz_idx[0,1], xyz_idx[2,1]].set(1)
+    points_v = points_v.at[xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,0]].set(1)
+    points_v = points_v.at[xyz_idx[1,1], xyz_idx[0,1], xyz_idx[2,1]].set(1)
+
+    return points_v
 
 def points_orientations_tri_iter(angles, nx):
     """As above, without vmap."""

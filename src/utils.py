@@ -375,33 +375,52 @@ def estimate_real_noise(imgs):
     return imgs_stddev, imgs_mean
 
 
-#TODO: if the corner is too large and doesn't cover empty space, we need
-# to take a smaller corner and then interpolate the noise to the desired 
-# dimensions.
-def estimate_noise_imgs(imgs, nx):
+def estimate_noise_imgs(imgs, nx_empty = 48, nx_final = 32):
     """Givben an array [N, nx0, nx0] of real centred images, estimate the 
-    pixel-wise Fourier noise using the nx x nx corners of the real images."""
+    pixel-wise Fourier noise using the empty corners of the real images.
 
-    #fft = lambda img : jnp.fft.fft2(jnp.fft.ifftshift(img))
-    fft = lambda img : jnp.fft.fft2(img)
+    Parameters:
+    ----------
+    imgs : [N, nx0, nx0] array
+        The images for which we want to estimate the noise.
 
-    imgs_f = jax.vmap(fft, in_axes = 0)(imgs[:, :nx, :nx])
-    #imgs_f = jax.vmap(fft, in_axes = 0)(imgs[:, 224:, 224:])
-    #imgs_stddev = estimate_real_noise(jnp.real(imgs_f)) + 1j * estimate_real_noise(jnp.imag(imgs_f))
-    #imgs_stddev, imgs_mean  = estimate_real_noise(jnp.abs(imgs_f))
+    nx_empty : int
+        The side length of the corner to use for estimating the noise.
+
+    nx_final: int
+        The dimension of the cropped images (and of the noise estimation). 
+
+    Returns:
+    -------
+
+    stddev : [nx_final * nx_final] int array
+        The standard deviation of the Fourier coefficients of the noise,
+        with the standard ordering and reshaped as a 1D array.
     
-    imgs_stddev_r, imgs_mean_r = estimate_real_noise(jnp.real(imgs_f)) 
-    imgs_stddev_i, imgs_mean_i = estimate_real_noise(jnp.imag(imgs_f))
+    """
 
-    imgs_stddev = imgs_stddev_r + 1j * imgs_stddev_i
-    imgs_mean = imgs_mean_r + 1j * imgs_mean_i
-    return imgs_stddev, imgs_mean
+    nx0 = imgs.shape[2]
 
+    # Crop the empty corners from the real images.
+    corners = imgs[:, :nx_empty, :nx_empty]
 
+    # Take padded FFT so that the result has the same dimensions as the 
+    # initial images.
+    f_corners = jnp.fft.fft2(corners, s = [nx0, nx0])
+
+    # Crop the FFT of the empty corner in the same way that we will crop 
+    # the particle images
+    x_grid = [1,f_corners.shape[2]]
+    f_corners, _ = crop_fourier_images(f_corners, x_grid, nx_final)
+
+    # Now we have the Fourier transforms of the noise, of the same 
+    # dimensions and crop as the particle images. 
+    # Compute the standard deviation of the noise, with the appropriate 
+    # scaling due to taking Fourier transforms 
+    # (scaling empirically determined, to check on paper).
+    stddev = jnp.std(f_corners, axis=0)/nx_empty * nx0
     
-
-
-
+    return stddev.reshape(-1)
 
 
 
