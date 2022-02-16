@@ -50,7 +50,7 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
         angles = generate_uniform_orientations(N)
 
         if use_sgd:
-            sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts_true, ctf_params, imgs)
+            sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts_true, ctf_params, imgs, sigma_noise)
             v = sgd(sgd_grad_func, N, v0, learning_rate, N_vol_iter, batch_size, P, eps_vol, verbose = verbose)
         else:
             AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs, v0.shape, sigma_noise)
@@ -116,7 +116,7 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
         v0 = jnp.zeros([nx_iter, nx_iter, nx_iter])* 1j
 
         if use_sgd:
-            sgd_grad_func_iter = get_sgd_vol_ops(grad_loss_volume_batched_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d)
+            sgd_grad_func_iter = get_sgd_vol_ops(grad_loss_volume_batched_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
             v = sgd(sgd_grad_func_iter, N, v0, learning_rate, N_vol_iter, batch_size, P_iter, eps_vol, verbose = verbose)
         else:
             AA, Ab = get_cg_vol_ops(grad_loss_volume_sum_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d, v0.shape, sigma_noise_iter)
