@@ -34,7 +34,8 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
 
     N = imgs.shape[0]
     nx = jnp.sqrt(imgs.shape[1]).astype(jnp.int64)
-    v0 = jnp.zeros([nx,nx,nx])* 1j
+    #v0 = jnp.zeros([nx,nx,nx])* 1j
+    v0 = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
     v=v0
 
     if use_sgd:
@@ -133,13 +134,6 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
         else:
             AA, Ab = get_cg_vol_ops(grad_loss_volume_sum_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d, v0.shape, sigma_noise_iter)
             v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_vol, verbose = verbose)
-
-        #v = v * mask3d
-
-        #plt.imshow(jnp.fft.fftshift(mask3d[:,:,0])); plt.colorbar()
-        #plt.show()
-
-        #v = 0.9*v_prev + 0.1*v
 
         if verbose:
             print("  Time vol optimisation =", time.time()-t0)
