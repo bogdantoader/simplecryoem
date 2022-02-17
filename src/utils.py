@@ -422,5 +422,27 @@ def estimate_noise_imgs(imgs, nx_empty = 48, nx_final = 32):
     
     return stddev.reshape(-1)
 
+def average_radially(img, grid, dr):
+    """Radially average a 2D array in the Fourier domain.""" 
+        
+    # Calculate the radius in the Fourier domain.
+    x_freq = jnp.fft.fftfreq(int(grid[1]), 1/(grid[0]*grid[1]))
+    X, Y = jnp.meshgrid(x_freq, x_freq)
+    r = np.sqrt(X**2 + Y**2)
 
+    # Max radius so that the shells are not outside the
+    # rectangular domain.
+    max_rad = jnp.max(r[:,0,0])
+
+    # Calculate the shells.
+    s1 = []
+    s2 = []
+    res = []
+    R = 0
+    while R + dr <= max_rad:
+        cond = jnp.where((r >= R) & (r < R + dr))
+        s1.append(v1[cond])
+        s2.append(v2[cond])
+        res.append(R)
+        R += dr
 

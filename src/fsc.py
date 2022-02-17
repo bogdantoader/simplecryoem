@@ -122,7 +122,9 @@ def points_orientations_tri(angles, nx, number_of_batches = 100):
 
     print("Adding up number of points from batches.")
     # This needs to be balanced
-    #        carefully with the amount of GPU memory available
+    # carefully with the amount of GPU memory available.
+    # We want the number of batches to be as small as possible, but not so  
+    # small that we cannot allocate enough memory for one batch on the GPU. 
     for xyz_idx_batch in xyz_idx_batches:
         rr = jnp.sum(jax.vmap(points_orientations_to_vol_tri_one, in_axes=0)(xyz_idx_batch), axis=0)
 
