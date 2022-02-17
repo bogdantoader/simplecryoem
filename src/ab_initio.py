@@ -139,7 +139,7 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
         #plt.imshow(jnp.fft.fftshift(mask3d[:,:,0])); plt.colorbar()
         #plt.show()
 
-        v = 0.9*v_prev + 0.1*v
+        #v = 0.9*v_prev + 0.1*v
 
         if verbose:
             print("  Time vol optimisation =", time.time()-t0)
