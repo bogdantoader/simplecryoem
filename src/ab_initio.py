@@ -13,7 +13,8 @@ from src.fsc import plot_angles
 
 
 
-def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples = 40000, radius0 = 0.1, dr = 0.05, alpha = 0, eps_vol = 1e-16, interp_method = 'tri', opt_vol_first = False, verbose = True, save_to_file = True, out_dir = './'):
+
+def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples = 40000, radius0 = 0.1, dr = None, alpha = 0, eps_vol = 1e-16, interp_method = 'tri', opt_vol_first = True, verbose = True, save_to_file = True, out_dir = './'):
     """Ab initio reconstruction.
 
     Parameters:
@@ -36,7 +37,24 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
     nx = jnp.sqrt(imgs.shape[1]).astype(jnp.int64)
     #v0 = jnp.zeros([nx,nx,nx])* 1j
     v0 = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
-    v=v0
+    v = v0    
+
+    # Determine the frequency marching step size, if not given 
+    if dr is None:
+        x_freq = jnp.fft.fftfreq(int(x_grid[1]), 1/(x_grid[0]*x_grid[1]))
+        X, Y, Z = jnp.meshgrid(x_freq, x_freq, x_freq)
+        r = np.sqrt(X**2 + Y**2 + Z**2)
+        dr = r[1,1,1]
+    if verbose:
+        max_radius = x_grid[0]*x_grid[1]/2
+        n_steps = (jnp.floor((max_radius-radius0)/dr) + 1).astype(jnp.int64)
+
+        print("Fourier radius: " + str(max_radius))
+        print("Starting radius: " + str(radius0))
+        print("Frequency marching step size: " + str(dr))
+        print("Number of frequency marching steps:", str(n_steps))
+        print("------------------------------------\n")
+
 
     if use_sgd:
         if batch_size == -1:
@@ -45,10 +63,13 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
             P = jnp.ones(v0.shape)
 
     if opt_vol_first:
+        if verbose:
+            print("Initialitsing volume")
+        
         mask3d = jnp.ones([nx,nx,nx])
         mask2d = mask3d[0].reshape(1,-1)
 
-        _, grad_loss_volume_batched, grad_loss_volume_sum, _ = get_jax_ops_iter(project_func, x_grid, mask3d, alpha, interp_method)
+        _, grad_loss_volume_batched, grad_loss_volume_sum, _ = get_jax_ops_iter(project_func, x_grid, mask3d, 0, interp_method)
 
         angles = generate_uniform_orientations(N)
 
@@ -66,7 +87,8 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
             plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
             plt.colorbar()
             plt.show()
-   
+
+
     imgs = imgs.reshape([N, nx,nx])
     radius = radius0
 
@@ -129,9 +151,8 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
 
         # Optimise volume
         t0 = time.time()
-        v0 = jnp.zeros([nx_iter, nx_iter, nx_iter])* 1j
+        v0 = jnp.zeros([nx_iter,nx_iter,nx_iter])* 1j
 
-        v_prev = v
         if use_sgd:
             sgd_grad_func_iter = get_sgd_vol_ops(grad_loss_volume_batched_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
             v = sgd(sgd_grad_func_iter, N, v0, learning_rate, N_vol_iter, batch_size, P_iter, eps_vol, verbose = verbose)
@@ -143,14 +164,13 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
             print("  Time vol optimisation =", time.time()-t0)
 
             if diagnostics:
-                ff ,lf =  get_diagnostics_funs_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
-                fid = ff(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
-                reg = 1/2 * l2sq(v) * alpha
-                loss = lf(v, angles, shifts_true,ctf_params, imgs_iter*mask2d,sigma_noise_iter)
-
-                print("  fid =", fid)
-                print("  reg =", reg)
-                print("  loss =", loss)
+                #ff ,lf =  get_diagnostics_funs_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
+                #fid = ff(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
+                #reg = 1/2 * l2sq(v) * alpha
+                #loss = lf(v, angles, shifts_true,ctf_params, imgs_iter*mask2d,sigma_noise_iter)
+                #print("  fid =", fid)
+                #print("  reg =", reg)
+                #print("  loss =", loss)
 
                 plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
                 #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
@@ -158,20 +178,21 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
                 plt.show()
 
         # Increase radius
-        # TODO: makke this a parameter of the algorithm
+        # TODO: make this a parameter of the algorithm
         if jnp.mod(idx_iter, 8)==0:
             if verbose:
+                print(datetime.datetime.now())
+                print("  nx =", nx_iter)
+
                 plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
                 #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
                 plt.colorbar()
                 plt.show()
 
-                plt.imshow(jnp.fft.fftshift((sigma_noise_iter*mask2d).reshape([nx_iter, nx_iter]))); 
-                plt.colorbar()
-                plt.show()
+                #plt.imshow(jnp.fft.fftshift((sigma_noise_iter*mask2d).reshape([nx_iter, nx_iter]))); 
+                #plt.colorbar()
+                #plt.show()
 
-                print(datetime.datetime.now())
-                print("  nx =", nx_iter)
                 plot_angles(angles[:500])
                 plt.show()
 

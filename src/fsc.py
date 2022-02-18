@@ -8,7 +8,7 @@ from src.interpolate import find_nearest_eight_grid_points_idx, find_nearest_one
 from src.emfiles import load_data
 import mrcfile
 
-def calc_fsc(v1, v2, grid, dr = 0.05):
+def calc_fsc(v1, v2, grid, dr = None):
     """Calculate the fourier shell correlation between the Fourier 
     volumes v1 and v2 on the Fourier grid given by grid and shell
     width given by dr.
@@ -42,16 +42,20 @@ def calc_fsc(v1, v2, grid, dr = 0.05):
     # rectangular domain.
     max_rad = jnp.max(r[:,0,0])
 
+    # "Calculate" dr if not given
+    if dr is None:
+        dr = r[1,1,1]
+
     # Calculate the shells.
     s1 = []
     s2 = []
     res = []
-    R = 0
+    R = -dr/2
     while R + dr <= max_rad:
-        cond = jnp.where((r >= R) & (r < R + dr))
+        cond = ((r >= R) & (r < R + dr))
         s1.append(v1[cond])
         s2.append(v2[cond])
-        res.append(R)
+        res.append(R+dr)
         R += dr
 
     # The correlations between corresponding shells.
@@ -125,8 +129,9 @@ def points_orientations_tri(angles, nx, number_of_batches = 100):
     # carefully with the amount of GPU memory available.
     # We want the number of batches to be as small as possible, but not so  
     # small that we cannot allocate enough memory for one batch on the GPU. 
+    po_func = get_points_orientations_to_vol_tri_one(nx)
     for xyz_idx_batch in xyz_idx_batches:
-        rr = jnp.sum(jax.vmap(points_orientations_to_vol_tri_one, in_axes=0)(xyz_idx_batch), axis=0)
+        rr = jnp.sum(jax.vmap(po_func, in_axes=0)(xyz_idx_batch), axis=0)
 
         # The same as the line above, without jax magic for debugging
         #rr = jnp.sum(
@@ -137,13 +142,19 @@ def points_orientations_tri(angles, nx, number_of_batches = 100):
 
     return jnp.array(points_v)
 
-@jax.jit
-def points_orientations_to_vol_tri_one(xyz_idx):
+
+# Closure to return the below function without jit issues if 
+# nx was an argument
+def get_points_orientations_to_vol_tri_one(nx):
+    po_func = lambda xyz_idx : points_orientations_to_vol_tri_one(xyz_idx, nx)
+    return jax.jit(po_func)
+
+def points_orientations_to_vol_tri_one(xyz_idx, nx):
     # Note that x and y indices are swapped in vol, 
     # similar to the tri_interp_point funtion.
     # i.e. to obtain vol(x, y, z), call vol[y_idx, x_idx, z_idx]
 
-    points_v = jnp.zeros([32,32,32])
+    points_v = jnp.zeros([nx, nx, nx])
     points_v = points_v.at[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,0]].set(1)
     points_v = points_v.at[xyz_idx[1,0], xyz_idx[0,0], xyz_idx[2,1]].set(1) 
     points_v = points_v.at[xyz_idx[1,1], xyz_idx[0,0], xyz_idx[2,0]].set(1)
@@ -235,7 +246,7 @@ def points_orientations_star(data_dir, star_file, nx = -1, method = "tri", out_f
 
 
 
-def shell_points_used(points, grid, dr = 0.05):
+def shell_points_used(points, grid, dr = None):
     """Given a volume containing the number of orientations that uses each 
     point (as output by the points_orientations_tri and points_orientations_nn 
     functions), using the standard Fourier ordering, 
@@ -252,14 +263,18 @@ def shell_points_used(points, grid, dr = 0.05):
     # rectangular domain.
     max_rad = jnp.max(r[:,0,0])
 
+    # "Calculate" dr if not given
+    if dr is None:
+        dr = r[1,1,1]
+
     # Calculate the shells.
     shells = []
     res = []
-    R = 0
+    R = -dr
     while R + dr <= max_rad:
-        cond = jnp.where((r >= R) & (r < R + dr))
+        cond = ((r >= R) & (r < R + dr))
         shells.append(points[cond])
-        res.append(R)
+        res.append(R+dr)
         R += dr
 
     res = jnp.array(res)
@@ -267,9 +282,6 @@ def shell_points_used(points, grid, dr = 0.05):
     shell_points_total = jnp.array([len(s) for s in shells])
 
     return res, jnp.divide(shell_points_used, shell_points_total) 
-
-
-
 
 
 
