@@ -113,10 +113,14 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
         #angles = sample_new_angles_vmap(loss_func_angles, v*mask3d, shifts_true, ctf_params, imgs_iter*mask2d, N_samples, sigma_noise_iter) 
         angles = sample_new_angles_cached(loss_func_imgs_batched, slice_func_array_angles_iter, v*mask3d, shifts_true, ctf_params, imgs_iter*mask2d, N_samples, sigma_noise_iter)    
 
+        diagnostics = False
+
         if verbose:
             print("  Time orientations sampling =", time.time()-t0)
-            plot_angles(angles[:500])
-            plt.show()
+            
+            if diagnostics:
+                plot_angles(angles[:500])
+                plt.show()
 
 
         #TODO: make the above function return the loss numbers as well so they don't have to be recomputed below
@@ -138,7 +142,6 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
         if verbose:
             print("  Time vol optimisation =", time.time()-t0)
 
-            diagnostics = False
             if diagnostics:
                 ff ,lf =  get_diagnostics_funs_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
                 fid = ff(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
@@ -148,18 +151,20 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
                 print("  fid =", fid)
                 print("  reg =", reg)
                 print("  loss =", loss)
-                   
 
-
-            plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
-            #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
-            plt.colorbar()
-            plt.show()
+                plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
+                #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
+                plt.colorbar()
+                plt.show()
 
         # Increase radius
         # TODO: makke this a parameter of the algorithm
         if jnp.mod(idx_iter, 8)==0:
             if verbose:
+                plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
+                #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
+                plt.colorbar()
+                plt.show()
 
                 plt.imshow(jnp.fft.fftshift((sigma_noise_iter*mask2d).reshape([nx_iter, nx_iter]))); 
                 plt.colorbar()
