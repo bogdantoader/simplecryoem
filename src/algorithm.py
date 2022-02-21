@@ -1,9 +1,10 @@
+import jax
+from jax import random
 import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
 
 from src.utils import l2sq
-
 
 
 
@@ -177,10 +178,9 @@ def mala_vol_proposal(loss_func, grad_func, N, v0, tau):
 
     return v1, ratio
 
-
-def mala_proposal(logPi, gradLogPi, x0, tau):
-    rng = np.random.default_rng()
-    noise = jnp.array(rng.standard_normal(x0.shape))
+@jax.jit
+def mala_proposal(key, logPi, gradLogPi, x0, tau):
+    noise = jnp.array(random.normal(key, x0.shape))
     x1 = x0 + tau**2/2 * gradLogPi(x0) + tau * noise
 
     qx0x1_exparg = tau*noise
