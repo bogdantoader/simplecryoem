@@ -125,7 +125,7 @@ def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, ep
         for i, idx in enumerate(idx_batches):
             x = x - alpha * P * jnp.conj(grad_func(x, idx))
 
-            if jnp.mod(epoch, 50) == 0 and i == len(idx_batches)-1:
+            if jnp.mod(epoch, 10) == 0 and i == len(idx_batches)-1:
                 full_grad = jnp.abs(jnp.mean(grad_func(x, jnp.arange(N))))
 
                 if verbose:
@@ -137,7 +137,7 @@ def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, ep
     return x
 
 
-def get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts, ctf_params, imgs, sigma):
+def get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts, ctf_params, imgs, sigma = 1):
     #loss_func = lambda v, idx : loss_func_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx]) 
     grad_func = lambda v, idx : grad_loss_volume_batched(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma) 
 
