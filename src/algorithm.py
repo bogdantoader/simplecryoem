@@ -178,8 +178,8 @@ def mala_vol_proposal(loss_func, grad_func, N, v0, tau):
 
     return v1, ratio
 
-#@jax.jit
-def mala_proposal(key, logPi, gradLogPi, x0, tau):
+
+def proposal_mala(key, logPi, gradLogPi, x0, tau):
     noise = jnp.array(random.normal(key, x0.shape))
     x1 = x0 + tau**2/2 * gradLogPi(x0) + tau * noise
 
@@ -192,7 +192,7 @@ def mala_proposal(key, logPi, gradLogPi, x0, tau):
     return x1, r
 
 
-def hmc_proposal(key, logPi, gradLogPi, x0, dt, L = 1):
+def proposal_hmc(key, logPi, gradLogPi, x0, dt, L = 1):
     p0 = random.normal(key, x0.shape)
     r0exponent = logPi(x0) - jnp.sum(jnp.real(jnp.conj(p0) * p0))/2
 
@@ -208,3 +208,83 @@ def hmc_proposal(key, logPi, gradLogPi, x0, dt, L = 1):
 
     r = jnp.exp(r1exponent - r0exponent)
     return x1, r
+
+
+def mcmc(key, N_samples, proposal_func, logPi, gradLogPi, x0, proposal_params, save_samples = -1, verbose = True):
+    """Generic code for MCMC sampling.
+
+    Parameters:
+    ----------
+    key : jnp.random.PRNGKey
+        Key for jax random functions
+
+    N_samples : int
+        Number of MCMC samples
+
+    proposal_func : 
+        Function that gives a proposal sample and its 
+        Metropolis-Hastings ratio r.
+
+    logPi : 
+        Function that evaluates the log of the target 
+        distribution Pi.
+
+    gradLogPi :
+        Function that evaluates the gradient of the log of the target
+        distribution Pi.
+
+    x0:
+        Starting point.
+
+    proposal_params: dict
+        A dict of params corresponding to the specific parameters of 
+        the proposal_func.
+
+    save_samples: int
+        Save and return all the samples with index i such that
+        mod(i, save_samples) = 0. If save_samples = -1, return an
+        empty array instead.
+
+    Returns:
+    -------
+    x_mean : 
+        The mean of the samples.
+  
+    r : array
+        Array containing all the Metropolis Hastings ratios.
+
+    samples : 
+        The array of saved samples. Empty if save_samples = -1.
+    """ 
+
+
+    key, *keys = random.split(key, 2*N_samples+1)
+
+    r_samples = []
+    samples = []
+    x_mean = jnp.zeros(x0.shape)
+
+    x1 = x0
+    for i in range(1, N_samples):
+        x0 = x1
+        x1, r = proposal_func(keys[2*i], logPi, gradLogPi, x0, **proposal_params)
+        a = jnp.minimum(1, r)
+        r_samples.append(a)
+
+        x1 = jax.lax.cond(random.uniform(keys[2*i+1]) < a,
+            true_fun = lambda _ : x1,
+            false_fun = lambda _ : x0,
+            operand = None)  
+
+        if save_samples and jnp.mod(i, save_samples) == 0:
+            samples.append(x1)
+
+        if verbose and jnp.mod(i, 10) == 0:
+            print("Iter", i, ", a = ", a)
+
+        x_mean = (x_mean * (i-1) + x1) / i
+
+    r_samples = jnp.array(r_samples)
+    samples = jnp.array(samples)
+
+    return x_mean, r_samples, samples 
