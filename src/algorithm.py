@@ -178,7 +178,7 @@ def mala_vol_proposal(loss_func, grad_func, N, v0, tau):
 
     return v1, ratio
 
-@jax.jit
+#@jax.jit
 def mala_proposal(key, logPi, gradLogPi, x0, tau):
     noise = jnp.array(random.normal(key, x0.shape))
     x1 = x0 + tau**2/2 * gradLogPi(x0) + tau * noise
@@ -192,4 +192,19 @@ def mala_proposal(key, logPi, gradLogPi, x0, tau):
     return x1, r
 
 
+def hmc_proposal(key, logPi, gradLogPi, x0, dt, L = 1):
+    p0 = random.normal(key, x0.shape)
+    r0 = jnp.exp(logPi(x0)-p0@p0/2)
 
+    for i in range(L):
+        p01 = p0 + dt/2 * gradLogPi(x0)
+        x1 = x0 + dt * p01
+        p1 = p01 + dt/2 * gradLogPi(x1)
+
+        p0 = p1
+        x0 = x1
+
+    r1 = jnp.exp(logPi(x1)-p1@p1/2)
+    r = r1/r0
+
+    return x1, r
