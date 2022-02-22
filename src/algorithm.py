@@ -194,7 +194,7 @@ def mala_proposal(key, logPi, gradLogPi, x0, tau):
 
 def hmc_proposal(key, logPi, gradLogPi, x0, dt, L = 1):
     p0 = random.normal(key, x0.shape)
-    r0 = jnp.exp(logPi(x0)-p0@p0/2)
+    r0exponent = logPi(x0) - jnp.sum(jnp.real(jnp.conj(p0) * p0))/2
 
     for i in range(L):
         p01 = p0 + dt/2 * gradLogPi(x0)
@@ -204,7 +204,7 @@ def hmc_proposal(key, logPi, gradLogPi, x0, dt, L = 1):
         p0 = p1
         x0 = x1
 
-    r1 = jnp.exp(logPi(x1)-p1@p1/2)
-    r = r1/r0
+    r1exponent = logPi(x1) - jnp.sum(jnp.real(jnp.conj(p1) * p1))/2
 
+    r = jnp.exp(r1exponent - r0exponent)
     return x1, r
