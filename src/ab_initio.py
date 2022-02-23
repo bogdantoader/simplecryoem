@@ -35,9 +35,6 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
 
     N = imgs.shape[0]
     nx = jnp.sqrt(imgs.shape[1]).astype(jnp.int64)
-    #v0 = jnp.zeros([nx,nx,nx])* 1j
-    v0 = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
-    v = v0    
 
     # Determine the frequency marching step size, if not given 
     if dr is None:
@@ -60,34 +57,12 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
         if batch_size == -1:
             batch_size = N
         if P == None:
-            P = jnp.ones(v0.shape)
+            P = jnp.ones([nx,nx,nx])
 
     if opt_vol_first:
-        if verbose:
-            print("Initialitsing volume")
-        
-        mask3d = jnp.ones([nx,nx,nx])
-        mask2d = mask3d[0].reshape(1,-1)
-
-        _, grad_loss_volume_batched, grad_loss_volume_sum, _ = get_jax_ops_iter(project_func, x_grid, mask3d, 0, interp_method)
-
-        angles = generate_uniform_orientations(N)
-
-        if use_sgd:
-            sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts_true, ctf_params, imgs*mask2d, sigma_noise)
-            v = sgd(sgd_grad_func, N, v0, learning_rate, N_vol_iter, batch_size, P, eps_vol, verbose = verbose)
-        else:
-            AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs*mask2d, v0.shape, sigma_noise)
-            v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_vol, verbose = verbose)
-
-        v = v * mask3d
-
-        if verbose:
-            #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
-            plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
-            plt.colorbar()
-            plt.show()
-
+        v = initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, use_sgd, learning_rate, batch_size,  P, interp_method, verbose)
+    else:    
+        v = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
 
     imgs = imgs.reshape([N, nx,nx])
     radius = radius0
@@ -212,6 +187,35 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
 
     return v, angles
 
+
+
+def initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise = 1, use_sgd = True, learning_rate = 1, batch_size = -1,  P = None, interp_method = 'tri', verbose = True):
+    if verbose:
+        print("Initialitsing volume")
+
+    N = imgs.shape[0]
+    nx = jnp.sqrt(imgs.shape[1]).astype(jnp.int64)
+
+    v0 = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
+    mask3d = jnp.ones([nx,nx,nx])
+
+    _, grad_loss_volume_batched, grad_loss_volume_sum, _ = get_jax_ops_iter(project_func, x_grid, mask3d, 0, interp_method)
+    angles = generate_uniform_orientations(N)
+
+    if use_sgd:
+        sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts_true, ctf_params, imgs, sigma_noise)
+        v = sgd(sgd_grad_func, N, v0, learning_rate, N_vol_iter, batch_size, P, eps_vol, verbose = verbose)
+    else:
+        AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs*mask2d, v0.shape, sigma_noise)
+        v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_vol, verbose = verbose)
+
+    if verbose:
+        #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
+        plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
+        plt.colorbar()
+        plt.show()
+
+    return v 
 
 
 def get_diagnostics_funs_iter(project_func, x_grid, mask, alpha = 0, interp_method = 'tri'):

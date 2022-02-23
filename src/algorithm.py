@@ -3,6 +3,8 @@ from jax import random
 import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
+from  matplotlib import pyplot as plt
+
 
 from src.utils import l2sq
 
@@ -192,23 +194,33 @@ def proposal_mala(key, logPi, gradLogPi, x0, tau):
     return x1, r
 
 
-def proposal_hmc(key, logPi, gradLogPi, x0, dt, L = 1):
-    p0 = random.normal(key, x0.shape)
+def proposal_hmc(key, logPi, gradLogPi, x0, dt, L = 1, M = 1):
+    """ Hamiltonian Monte Carlo proposal function.
+    For simplicity, the mass matrix M is an array of 
+    entry-wise scalings (i.e. a diagonal matrix).
+    This should be scaled roughly similarly to gradLogPi, e.g.
+    for the Relion tutorial data, I take
+    M = 1/max(sigma_noise)**2 * ones.
+    """
+
+    p0 = random.normal(key, x0.shape) * M
     r0exponent = logPi(x0) - jnp.sum(jnp.real(jnp.conj(p0) * p0))/2
 
     for i in range(L):
         p01 = p0 + dt/2 * gradLogPi(x0)
-        x1 = x0 + dt * p01
+        x1 = x0 + dt * p01 / M
         p1 = p01 + dt/2 * gradLogPi(x1)
 
         p0 = p1
         x0 = x1
 
     r1exponent = logPi(x1) - jnp.sum(jnp.real(jnp.conj(p1) * p1))/2
-
     r = jnp.exp(r1exponent - r0exponent)
+
     return x1, r
 
+
+#def proposal_uniform_orientations(key, logPi, gradLogPi, x0
 
 def mcmc(key, N_samples, proposal_func, logPi, gradLogPi, x0, proposal_params, save_samples = -1, verbose = True):
     """Generic code for MCMC sampling.
@@ -276,13 +288,15 @@ def mcmc(key, N_samples, proposal_func, logPi, gradLogPi, x0, proposal_params, s
             false_fun = lambda _ : x0,
             operand = None)  
 
+        x_mean = (x_mean * (i-1) + x1) / i
+        
         if save_samples and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
-        if verbose and jnp.mod(i, 10) == 0:
+        if verbose and jnp.mod(i, 5) == 0:
             print("Iter", i, ", a = ", a)
-
-        x_mean = (x_mean * (i-1) + x1) / i
+            #plt.imshow(jnp.fft.fftshift(jnp.abs(x_mean[0]))); plt.colorbar()
+            #plt.show()
 
     r_samples = jnp.array(r_samples)
     samples = jnp.array(samples)
