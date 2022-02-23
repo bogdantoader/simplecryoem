@@ -1,6 +1,7 @@
 import numpy as np
 import jax
 import jax.numpy as jnp
+from jax import random
 from  matplotlib import pyplot as plt
 
 
@@ -343,6 +344,13 @@ def generate_uniform_orientations(N):
     angles = np.concatenate([alpha, beta, gamma], axis = 1)
     return jnp.array(angles)
 
+def generate_uniform_orientations_jax(key, N):
+    key1, key2, key3 = random.split(key, 3)
+    alpha = random.uniform(key1, (N,)) * 2 * np.pi 
+    gamma = random.uniform(key2, (N,)) * 2 * np.pi 
+    z = random.uniform(key3, (N,)) *2 - 1
+    beta = jnp.arccos(z)
+    return jnp.array([alpha, beta, gamma]).transpose()
 
 @jax.jit
 def l2sq(x, y = 0):
