@@ -5,8 +5,7 @@ import numpy as np
 from tqdm import tqdm
 from  matplotlib import pyplot as plt
 
-
-from src.utils import l2sq
+from src.utils import l2sq, generate_uniform_orientations_jax
 
 
 
@@ -181,7 +180,7 @@ def mala_vol_proposal(loss_func, grad_func, N, v0, tau):
     return v1, ratio
 
 
-def proposal_mala(key, logPi, gradLogPi, x0, tau):
+def proposal_mala(key, logPi, x0, gradLogPi, tau):
     noise = jnp.array(random.normal(key, x0.shape))
     x1 = x0 + tau**2/2 * gradLogPi(x0) + tau * noise
 
@@ -194,7 +193,7 @@ def proposal_mala(key, logPi, gradLogPi, x0, tau):
     return x1, r
 
 
-def proposal_hmc(key, logPi, gradLogPi, x0, dt, L = 1, M = 1):
+def proposal_hmc(key, logPi, x0, gradLogPi, dt, L = 1, M = 1):
     """ Hamiltonian Monte Carlo proposal function.
     For simplicity, the mass matrix M is an array of 
     entry-wise scalings (i.e. a diagonal matrix).
@@ -220,9 +219,38 @@ def proposal_hmc(key, logPi, gradLogPi, x0, dt, L = 1, M = 1):
     return x1, r
 
 
-#def proposal_uniform_orientations(key, logPi, gradLogPi, x0
+#TODO: Remove gradLogPi when the mcmc function doesn't require it.
+def proposal_uniform_orientations(key, logPi, x0):
+    """Uniform orientations proposal function, for N
+    (independent) images at once.
+    
+    Parameters:
+    -----------
+    key : jax.random.PRNGKey
+    
+    logPi :
+        Function that computes the log of the target
+        density function Pi. If working on multiple images, 
+        logPi returns a vector.
+        
+    x0 : array 
+        Current state, with N = x0.shape[0]. It is important
+        that x0 is an array even when N=1.
+    
+    Returns:
+    --------
+    Proposed sample x1 and the Metropolis-Hastings ratio r.
+    """
 
-def mcmc(key, N_samples, proposal_func, logPi, gradLogPi, x0, proposal_params, save_samples = -1, verbose = True):
+    N = x0.shape[0]
+    x1 = generate_uniform_orientations_jax(key, N)
+    r = jnp.exp(logPi(x1) - logPi(x0))
+
+    return x1, r
+
+
+
+def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch = 1, save_samples = -1, verbose = True):
     """Generic code for MCMC sampling.
 
     Parameters:
@@ -250,7 +278,13 @@ def mcmc(key, N_samples, proposal_func, logPi, gradLogPi, x0, proposal_params, s
 
     proposal_params: dict
         A dict of params corresponding to the specific parameters of 
-        the proposal_func.
+        the proposal_func. This includes gradLogPi if required by
+        the proposal function.
+
+    N_batch : int
+        The number of independent variables that are being sampled
+        in parallel (e.g. for volume it would be one, for orientations
+        it would be more).
 
     save_samples: int
         Save and return all the samples with index i such that
@@ -271,7 +305,7 @@ def mcmc(key, N_samples, proposal_func, logPi, gradLogPi, x0, proposal_params, s
 
 
     key, *keys = random.split(key, 2*N_samples+1)
-
+    
     r_samples = []
     samples = []
     x_mean = jnp.zeros(x0.shape)
@@ -279,22 +313,27 @@ def mcmc(key, N_samples, proposal_func, logPi, gradLogPi, x0, proposal_params, s
     x1 = x0
     for i in range(1, N_samples):
         x0 = x1
-        x1, r = proposal_func(keys[2*i], logPi, gradLogPi, x0, **proposal_params)
+        x1, r = proposal_func(keys[2*i], logPi, x0, **proposal_params)
         a = jnp.minimum(1, r)
         r_samples.append(a)
-
-        x1 = jax.lax.cond(random.uniform(keys[2*i+1]) < a,
-            true_fun = lambda _ : x1,
-            false_fun = lambda _ : x0,
-            operand = None)  
+  
+        if N_batch > 1:
+            unif_var = random.uniform(keys[2*i+1], (N_batch,)) 
+            x1 = accept_reject_vmap(unif_var, a, x0, x1)
+        else:
+            unif_var = random.uniform(keys[2*i+1]) 
+            x1 = accept_reject_scalar(unif_var, a, x0, x1)
 
         x_mean = (x_mean * (i-1) + x1) / i
         
         if save_samples and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
-        if verbose and jnp.mod(i, 5) == 0:
-            print("Iter", i, ", a = ", a)
+        if verbose and jnp.mod(i, 50) == 0:
+            if N_batch > 1:
+                print("Iter", i, ", a[0] = ", a[0])
+            else:
+                print("Iter", i, ", a = ", a)
             #plt.imshow(jnp.fft.fftshift(jnp.abs(x_mean[0]))); plt.colorbar()
             #plt.show()
 
@@ -302,3 +341,29 @@ def mcmc(key, N_samples, proposal_func, logPi, gradLogPi, x0, proposal_params, s
     samples = jnp.array(samples)
 
     return x_mean, r_samples, samples 
+
+
+def accept_reject_scalar(unif_var, a, x0, x1):
+    return jax.lax.cond(unif_var < a, 
+        true_fun = lambda _ : x1,
+        false_fun = lambda _ : x0,
+        operand = None)
+
+accept_reject_vmap = jax.vmap(accept_reject_scalar, in_axes = (0, 0, 0, 0))
+
+# Not used anywhere, to delete
+def mcmc_batch_step(key, N_samples, logPi_batch, x0):
+    """MCMC sampling of N independent variables, batched 
+    (e.g. orientations of different images)."""
+    key1, key2 = random.split(key, 2)
+    
+    N = x0.shape[0]             
+    x1 = generate_uniform_orientations_jax(key1, N)       
+    r0exponent = logPi_batch(x0)
+    r1exponent = logPi_batch(x1)
+       
+    r = jnp.exp(r1exponent-r0exponent)
+    a = jnp.minimum(1, r)
+    
+    unif_var = random.uniform(key2, (N,))
+    return accept_reject_vmap(unif_var, a, x0, x1)
