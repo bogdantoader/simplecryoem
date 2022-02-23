@@ -329,7 +329,7 @@ def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch
         if save_samples and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
-        if verbose and jnp.mod(i, 50) == 0:
+        if verbose and jnp.mod(i, 20) == 0:
             if N_batch > 1:
                 print("Iter", i, ", a[0] = ", a[0])
             else:
