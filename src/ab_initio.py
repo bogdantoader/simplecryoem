@@ -322,7 +322,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
 
         v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, N_samples_vol, proposal_hmc, logPi_vol, v, proposal_params_hmc)
         v = v_hmc_mean 
-        #v = v_hmc_samples[N_samples_vol-3] 
+        #v = v_hmc_samples[0] 
         v = v*mask3d
 
         if verbose:
@@ -369,6 +369,13 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
 
             if v.shape[0] == nx:
                 break
+
+    # At the end, take the mean 
+    # TODO: take the mean over all samples, not only the last run
+    # A bit tricky because they have different dimensions. Should be able
+    # to just same each Iter's mean, enlarge to full size, and then average 
+    # all
+    #v = v_hmc_mean 
 
     vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
     if save_to_file:
