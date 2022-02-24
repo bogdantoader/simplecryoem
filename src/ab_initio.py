@@ -289,11 +289,11 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
         logPi_angles_batch = lambda a : -loss_func_batched0_iter(v, a, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
 
         t0 = time.time()    
-        _, r_samples_angles, samples_angles = mcmc(subkey, N_samples_angles, proposal_uniform_orientations, logPi_angles_batch, angles, empty_params, N, verbose = False)
+        _, r_samples_angles, samples_angles = mcmc(subkey, N_samples_angles, proposal_uniform_orientations, logPi_angles_batch, angles, empty_params, N, verbose = True)
         angles = samples_angles[N_samples_angles-3] 
 
 
-        diagnostics = False
+        diagnostics = False 
 
         if verbose:
             print("  Time orientations sampling =", time.time()-t0)
@@ -321,7 +321,8 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
         proposal_params_hmc = {"dt" : 0.5, "L" : 10, "gradLogPi" : gradLogPi_vol, "M" : M_iter}
 
         v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, N_samples_vol, proposal_hmc, logPi_vol, v, proposal_params_hmc)
-        v = v_hmc_samples[0] 
+        v = v_hmc_mean #v_hmc_samples[0] 
+        v = v*mask3d
 
         if verbose:
             print("  Time vol optimisation =", time.time()-t0)

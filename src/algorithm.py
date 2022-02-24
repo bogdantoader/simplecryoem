@@ -331,9 +331,13 @@ def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch
 
         if verbose and jnp.mod(i, 20) == 0:
             if N_batch > 1:
-                print("Iter", i, ", a[0] = ", a[0])
+                loss_i = jnp.abs(jnp.mean(logPi(x1)))
+                #print("  Iter", i, ", a_mean = ", jnp.mean(a))
             else:
-                print("Iter", i, ", a = ", a)
+                loss_i = jnp.abs(logPi(x1))
+                #print("  Iter", i, ", a = ", a)
+            print("  MC sample", i, ", loss =", loss_i)
+
             #plt.imshow(jnp.fft.fftshift(jnp.abs(x_mean[0]))); plt.colorbar()
             #plt.show()
 
