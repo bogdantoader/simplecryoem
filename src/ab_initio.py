@@ -321,7 +321,8 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
         proposal_params_hmc = {"dt" : 0.5, "L" : 10, "gradLogPi" : gradLogPi_vol, "M" : M_iter}
 
         v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, N_samples_vol, proposal_hmc, logPi_vol, v, proposal_params_hmc)
-        v = v_hmc_mean #v_hmc_samples[0] 
+        v = v_hmc_mean 
+        #v = v_hmc_samples[N_samples_vol-3] 
         v = v*mask3d
 
         if verbose:
