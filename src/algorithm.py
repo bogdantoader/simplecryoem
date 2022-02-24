@@ -288,8 +288,8 @@ def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch
 
     save_samples: int
         Save and return all the samples with index i such that
-        mod(i, save_samples) = 0. If save_samples = -1, return an
-        empty array instead.
+        mod(i, save_samples) = 0. If save_samples = -1, only return 
+        the last sample.
 
     Returns:
     -------
@@ -326,7 +326,7 @@ def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch
 
         x_mean = (x_mean * (i-1) + x1) / i
         
-        if save_samples and jnp.mod(i, save_samples) == 0:
+        if save_samples > 0 and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
         if verbose and jnp.mod(i, 20) == 0:
@@ -336,6 +336,9 @@ def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch
                 print("Iter", i, ", a = ", a)
             #plt.imshow(jnp.fft.fftshift(jnp.abs(x_mean[0]))); plt.colorbar()
             #plt.show()
+
+    if save_samples == -1:
+        samples.append(x1)
 
     r_samples = jnp.array(r_samples)
     samples = jnp.array(samples)

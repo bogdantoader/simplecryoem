@@ -2,6 +2,7 @@ import time
 import datetime
 import jax
 import jax.numpy as jnp
+from jax import random
 import numpy as np
 from matplotlib import pyplot as plt
 import mrcfile
@@ -60,7 +61,7 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
             P = jnp.ones([nx,nx,nx])
 
     if opt_vol_first:
-        v = initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, use_sgd, learning_rate, batch_size,  P, interp_method, verbose)
+        v, _ = initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, use_sgd, learning_rate, batch_size,  P, interp_method, verbose)
     else:    
         v = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
 
@@ -103,7 +104,7 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
             P_iter, _ = crop_fourier_volume(P, x_grid, nx_iter)
 
         # Get the operators for the dimensions at this iteration.
-        slice_func_array_angles_iter, grad_loss_volume_batched_iter, grad_loss_volume_sum_iter, loss_func_angles  = get_jax_ops_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
+        slice_func_array_angles_iter, grad_loss_volume_batched_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter = get_jax_ops_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
 
         # Sample the orientations
         t0 = time.time()    
@@ -189,6 +190,204 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
 
 
 
+def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples_angles = 100, N_samples_vol = 100, radius0 = 0.1, dr = None, alpha = 0, eps_vol = 1e-16, interp_method = 'tri', opt_vol_first = True, verbose = True, save_to_file = True, out_dir = './'):
+    """Ab initio reconstruction using MCMC.
+
+    Parameters:
+    ----------
+    imgs : N x nx*nx array
+        The 2d images, vectorised.
+    
+    x_grid : [dx, nx]
+        The Fourier grid of the images.
+
+    alpha : regularisation parameter
+
+    Returns:
+    
+    """
+
+    assert(imgs.ndim == 2)
+
+    N = imgs.shape[0]
+    nx = jnp.sqrt(imgs.shape[1]).astype(jnp.int64)
+
+    # Determine the frequency marching step size, if not given 
+    if dr is None:
+        x_freq = jnp.fft.fftfreq(int(x_grid[1]), 1/(x_grid[0]*x_grid[1]))
+        X, Y, Z = jnp.meshgrid(x_freq, x_freq, x_freq)
+        r = np.sqrt(X**2 + Y**2 + Z**2)
+        dr = r[1,1,1]
+    if verbose:
+        max_radius = x_grid[0]*x_grid[1]/2
+        n_steps = (jnp.floor((max_radius-radius0)/dr) + 1).astype(jnp.int64)
+
+        print("Fourier radius: " + str(max_radius))
+        print("Starting radius: " + str(radius0))
+        print("Frequency marching step size: " + str(dr))
+        print("Number of frequency marching steps:", str(n_steps))
+        print("------------------------------------\n")
+
+
+    if use_sgd:
+        if batch_size == -1:
+            batch_size = N
+        if P == None:
+            P = jnp.ones([nx,nx,nx])
+
+    if opt_vol_first:
+        v, angles = initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, use_sgd, learning_rate, batch_size,  P, interp_method, verbose)
+    else:    
+        v = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
+
+    imgs = imgs.reshape([N, nx,nx])
+    radius = radius0
+
+    # Reshaping sigma_noise this way so that we can apply crop_fourier_images 
+    # at each iteration.
+    sigma_noise = sigma_noise.reshape([1, nx, nx])
+
+    for idx_iter in range(N_iter):
+        if verbose:
+            print("Iter ", idx_iter)
+   
+        # The nx of the volume at the current iteration        
+        mask3d = create_3d_mask(x_grid, (0,0,0), radius)
+        nx_iter = jnp.sum(mask3d[0,0,:]).astype(jnp.int64)
+        # Ensure that we work with even images so that all the masking stuff works
+        if jnp.mod(nx_iter,2) == 1:
+            nx_iter +=1
+
+        # At the first iteration, we reduce the size (from v0) while 
+        # afterwards, we increase it (frequency marching).
+        if idx_iter == 0:
+            v, _ = crop_fourier_volume(v, x_grid, nx_iter)
+        else:
+            v, _ = rescale_larger_grid(v, x_grid_iter, nx_iter) 
+
+        # Crop the images to the right size
+        imgs_iter, x_grid_iter = crop_fourier_images(imgs, x_grid, nx_iter)
+        imgs_iter = imgs_iter.reshape([N,nx_iter*nx_iter])
+        sigma_noise_iter, _ = crop_fourier_images(sigma_noise, x_grid, nx_iter)
+        sigma_noise_iter = sigma_noise_iter.reshape(-1)
+        mask3d = create_3d_mask(x_grid_iter, (0,0,0),  radius)
+        mask2d = mask3d[0].reshape(1,-1)
+
+        v = v * mask3d
+
+        if use_sgd and P is not None:
+            P_iter, _ = crop_fourier_volume(P, x_grid, nx_iter)
+
+        # Get the operators for the dimensions at this iteration.
+        slice_func_array_angles_iter, grad_loss_volume_batched_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter = get_jax_ops_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
+
+
+        key, subkey = random.split(key)
+        empty_params = {}
+
+        # Sample the orientations
+        logPi_angles_batch = lambda a : -loss_func_batched0_iter(v, a, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
+
+        t0 = time.time()    
+        _, r_samples_angles, samples_angles = mcmc(subkey, N_samples_angles, proposal_uniform_orientations, logPi_angles_batch, angles, empty_params, N, verbose = False)
+        angles = samples_angles[N_samples_angles-3] 
+
+
+        diagnostics = False
+
+        if verbose:
+            print("  Time orientations sampling =", time.time()-t0)
+            
+            if diagnostics:
+                plot_angles(angles[:500])
+                plt.show()
+
+
+        #TODO: make the above function return the loss numbers as well so they don't have to be recomputed below
+        #loss_min = loss_func_sum(v*mask3d, angles, shifts_true, ctf_params, imgs)/jnp.sum(mask2d)
+        #print("angles loss", loss_min)
+
+        # Optimise volume
+        t0 = time.time()
+        v0 = jnp.zeros([nx_iter,nx_iter,nx_iter])* 1j
+        key, subkey = random.split(key)
+
+        logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
+        gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_batched_iter(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter))
+   
+        M_iter = 1/jnp.max(sigma_noise_iter)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
+
+        #TODO: dt and L should be arguments of the ab_initio_mcmc function.
+        proposal_params_hmc = {"dt" : 0.5, "L" : 10, "gradLogPi" : gradLogPi_vol, "M" : M_iter}
+
+        v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, N_samples_vol, proposal_hmc, logPi_vol, v, proposal_params_hmc)
+        v = v_hmc_samples[0] 
+
+        if verbose:
+            print("  Time vol optimisation =", time.time()-t0)
+
+            if diagnostics:
+                #ff ,lf =  get_diagnostics_funs_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
+                #fid = ff(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
+                #reg = 1/2 * l2sq(v) * alpha
+                #loss = lf(v, angles, shifts_true,ctf_params, imgs_iter*mask2d,sigma_noise_iter)
+                #print("  fid =", fid)
+                #print("  reg =", reg)
+                #print("  loss =", loss)
+
+                plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
+                #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
+                plt.colorbar()
+                plt.show()
+
+        # Increase radius
+        # TODO: make this a parameter of the algorithm
+        if jnp.mod(idx_iter, 8)==0:
+            if verbose:
+                print(datetime.datetime.now())
+                print("  nx =", nx_iter)
+
+                plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0]*mask3d[:,:,0])))
+                #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
+                plt.colorbar()
+                plt.show()
+
+                #plt.imshow(jnp.fft.fftshift((sigma_noise_iter*mask2d).reshape([nx_iter, nx_iter]))); 
+                #plt.colorbar()
+                #plt.show()
+
+                plot_angles(angles[:500])
+                plt.show()
+
+            if save_to_file:
+                with mrcfile.new(out_dir + '/rec_iter_' + str(idx_iter) + '.mrc', overwrite=True) as mrc:
+                    vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
+                    mrc.set_data(vr.astype(np.float32))
+                radius += dr
+
+            if v.shape[0] == nx:
+                break
+
+    vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
+    if save_to_file:
+        with mrcfile.new(out_dir + '/rec_final.mrc', overwrite=True) as mrc:
+                mrc.set_data(vr.astype(np.float32))
+
+    return v, angles
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise = 1, use_sgd = True, learning_rate = 1, batch_size = -1,  P = None, interp_method = 'tri', verbose = True):
     if verbose:
         print("Initialitsing volume")
@@ -199,7 +398,7 @@ def initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid
     v0 = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
     mask3d = jnp.ones([nx,nx,nx])
 
-    _, grad_loss_volume_batched, grad_loss_volume_sum, _ = get_jax_ops_iter(project_func, x_grid, mask3d, 0, interp_method)
+    _, grad_loss_volume_batched, grad_loss_volume_sum, _, _, _ = get_jax_ops_iter(project_func, x_grid, mask3d, 0, interp_method)
     angles = generate_uniform_orientations(N)
 
     if use_sgd:
@@ -215,7 +414,7 @@ def initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid
         plt.colorbar()
         plt.show()
 
-    return v 
+    return v , angles
 
 
 def get_diagnostics_funs_iter(project_func, x_grid, mask, alpha = 0, interp_method = 'tri'):
@@ -232,8 +431,9 @@ def get_jax_ops_iter(project_func, x_grid, mask, alpha = 0, interp_method = 'tri
     loss_func, loss_func_batched, loss_func_sum, _ = get_loss_funcs(slice_func, alpha = alpha)
     grad_loss_volume, grad_loss_volume_batched, grad_loss_volume_sum = get_grad_v_funcs(loss_func, loss_func_sum)
     loss_func_angles = get_loss_func_angles(loss_func)
+    _, loss_func_batched0, _, _ = get_loss_funcs(slice_func, alpha = 0)
 
-    return slice_func_array_angles, grad_loss_volume_batched, grad_loss_volume_sum, loss_func_angles
+    return slice_func_array_angles, grad_loss_volume_batched, grad_loss_volume_sum, loss_func_angles, loss_func_batched0, loss_func_sum
 
 # Cached angles sampling
 
