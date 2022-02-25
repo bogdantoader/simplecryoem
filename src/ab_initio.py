@@ -190,7 +190,7 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
 
 
 
-def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, N_vol_iter = 300, learning_rate = 1, batch_size = -1, P = None, N_samples_angles = 100, N_samples_vol = 100, radius0 = 0.1, dr = None, alpha = 0, eps_vol = 1e-16, interp_method = 'tri', opt_vol_first = True, verbose = True, save_to_file = True, out_dir = './'):
+def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, learning_rate = 1, batch_size = -1, P = None, N_samples_angles = 100, N_samples_vol = 100, dt = 0.5, L = 10, radius0 = 0.1, dr = None, alpha = 0, eps_vol = 1e-16, interp_method = 'tri', opt_vol_first = True, verbose = True, save_to_file = True, out_dir = './'):
     """Ab initio reconstruction using MCMC.
 
     Parameters:
@@ -236,6 +236,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
             P = jnp.ones([nx,nx,nx])
 
     if opt_vol_first:
+        N_vol_iter = 1000000
         v, angles = initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, use_sgd, learning_rate, batch_size,  P, interp_method, verbose)
     else:    
         v = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
@@ -303,11 +304,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
                 plt.show()
 
 
-        #TODO: make the above function return the loss numbers as well so they don't have to be recomputed below
-        #loss_min = loss_func_sum(v*mask3d, angles, shifts_true, ctf_params, imgs)/jnp.sum(mask2d)
-        #print("angles loss", loss_min)
-
-        # Optimise volume
+        # Sample the volume
         t0 = time.time()
         v0 = jnp.zeros([nx_iter,nx_iter,nx_iter])* 1j
         key, subkey = random.split(key)
@@ -315,10 +312,10 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
         logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
         gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_batched_iter(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter))
    
-        M_iter = 1/jnp.max(sigma_noise_iter)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
+        #M_iter = 1/jnp.max(sigma_noise_iter)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
+        M_iter = 1/jnp.max(sigma_noise)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
 
-        #TODO: dt and L should be arguments of the ab_initio_mcmc function.
-        proposal_params_hmc = {"dt" : 0.5, "L" : 10, "gradLogPi" : gradLogPi_vol, "M" : M_iter}
+        proposal_params_hmc = {"dt" : dt, "L" : L, "gradLogPi" : gradLogPi_vol, "M" : M_iter}
 
         v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, N_samples_vol, proposal_hmc, logPi_vol, v, proposal_params_hmc)
         #v = v_hmc_mean 

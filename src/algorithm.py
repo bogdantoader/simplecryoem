@@ -336,7 +336,7 @@ def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch
                 print("  MC sample", i, ", loss =", loss_i)
             else:
                 loss_i = jnp.abs(logPi(x_mean))
-                #print("  Iter", i, ", a = ", a)
+                print("  Iter", i, ", a = ", a)
                 print("  MC sample", i, ", loss (of mean) =", loss_i)
 
             #plt.imshow(jnp.fft.fftshift(jnp.abs(x_mean[0]))); plt.colorbar()
