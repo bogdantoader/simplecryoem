@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
 from  matplotlib import pyplot as plt
+import time
 
 from src.utils import l2sq, generate_uniform_orientations_jax
 
@@ -192,7 +193,6 @@ def proposal_mala(key, logPi, x0, gradLogPi, tau):
 
     return x1, r
 
-
 def proposal_hmc(key, logPi, x0, gradLogPi, dt, L = 1, M = 1):
     """ Hamiltonian Monte Carlo proposal function.
     For simplicity, the mass matrix M is an array of 
@@ -205,13 +205,20 @@ def proposal_hmc(key, logPi, x0, gradLogPi, dt, L = 1, M = 1):
     p0 = random.normal(key, x0.shape) * M
     r0exponent = logPi(x0) - jnp.sum(jnp.real(jnp.conj(p0) * p0))/2
 
+    # Doing this so that we don't compute gradLogPi(x1) twice.
+    gradLogPiX0 = gradLogPi(x0)
     for i in range(L):
-        p01 = p0 + dt/2 * gradLogPi(x0)
+        # note the + instead of in the p updates since we take U(x)=-log(pi(x))
+        p01 = p0 + dt/2 * gradLogPiX0
+
         x1 = x0 + dt * p01 / M
-        p1 = p01 + dt/2 * gradLogPi(x1)
+        gradLogPiX1 = gradLogPi(x1)
+
+        p1 = p01 + dt/2 * gradLogPiX1
 
         p0 = p1
         x0 = x1
+        gradLogPiX0 = gradLogPiX1
 
     r1exponent = logPi(x1) - jnp.sum(jnp.real(jnp.conj(p1) * p1))/2
     r = jnp.exp(r1exponent - r0exponent)
@@ -219,7 +226,6 @@ def proposal_hmc(key, logPi, x0, gradLogPi, dt, L = 1, M = 1):
     return x1, r
 
 
-#TODO: Remove gradLogPi when the mcmc function doesn't require it.
 def proposal_uniform_orientations(key, logPi, x0):
     """Uniform orientations proposal function, for N
     (independent) images at once.
@@ -312,6 +318,8 @@ def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch
 
     x1 = x0
     for i in range(1, N_samples):
+        #t0 = time.time()
+
         x0 = x1
         x1, r = proposal_func(keys[2*i], logPi, x0, **proposal_params)
         a = jnp.minimum(1, r)
@@ -341,6 +349,7 @@ def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch
 
             #plt.imshow(jnp.fft.fftshift(jnp.abs(x_mean[0]))); plt.colorbar()
             #plt.show()
+        #print(time.time() - t0)
 
     if save_samples == -1:
         samples.append(x1)
@@ -352,7 +361,7 @@ def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch
 
 
 def accept_reject_scalar(unif_var, a, x0, x1):
-    return jax.lax.cond(unif_var < a, 
+    return jax.lax.cond(unif_var <= a, 
         true_fun = lambda _ : x1,
         false_fun = lambda _ : x0,
         operand = None)

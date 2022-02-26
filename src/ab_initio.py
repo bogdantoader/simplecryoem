@@ -249,6 +249,11 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
     sigma_noise = sigma_noise.reshape([1, nx, nx])
 
     for idx_iter in range(N_iter):
+        if idx_iter == N_iter-1:
+           N_samples_angles = 1000
+           N_samples_vol = 100
+
+
         if verbose:
             print("Iter ", idx_iter)
    
@@ -290,8 +295,8 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
         logPi_angles_batch = lambda a : -loss_func_batched0_iter(v, a, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
 
         t0 = time.time()    
-        _, r_samples_angles, samples_angles = mcmc(subkey, N_samples_angles, proposal_uniform_orientations, logPi_angles_batch, angles, empty_params, N, verbose = True)
-        angles = samples_angles[N_samples_angles-3] 
+        _, r_samples_angles, samples_angles = mcmc(subkey, N_samples_angles, proposal_uniform_orientations, logPi_angles_batch, angles, empty_params, N, 1, verbose = True)
+        angles = samples_angles[N_samples_angles-2] 
 
 
         diagnostics = False 
@@ -380,7 +385,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
         with mrcfile.new(out_dir + '/rec_final.mrc', overwrite=True) as mrc:
                 mrc.set_data(vr.astype(np.float32))
 
-    return v, angles
+    return v, angles, samples_angles
 
 
 
