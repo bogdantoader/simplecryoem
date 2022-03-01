@@ -190,7 +190,7 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
 
 
 
-def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, vol0 = None, angles0 = None, N_iter = 100, learning_rate = 1, batch_size = -1, P = None, N_samples_angles = 100, N_samples_vol = 100, dt = 0.5, L = 10, radius0 = 0.1, dr = None, alpha = 0, eps_vol = 1e-16, interp_method = 'tri', opt_vol_first = True, verbose = True, save_to_file = True, out_dir = './'):
+def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, vol0 = None, angles0 = None, N_iter = 100, learning_rate = 1, batch_size = -1, P = None, N_samples_angles = 100, N_samples_vol = 100, dt_list = [0.5], L = 10, radius0 = 0.1, dr = None, alpha = 0, eps_vol = 1e-16, interp_method = 'tri', opt_vol_first = True, verbose = True, save_to_file = True, out_dir = './'):
     """Ab initio reconstruction using MCMC.
 
     Parameters:
@@ -325,7 +325,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
         #M_iter = 1/jnp.max(sigma_noise_iter)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
         M_iter = 1/jnp.max(sigma_noise)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
 
-        proposal_params_hmc = {"dt" : dt, "L" : L, "gradLogPi" : gradLogPi_vol, "M" : M_iter}
+        proposal_params_hmc = {"dt_list" : jnp.array(dt_list), "L" : L, "gradLogPi" : gradLogPi_vol, "M" : M_iter}
 
         v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, N_samples_vol, proposal_hmc, logPi_vol, v, proposal_params_hmc, save_samples = 1)
         #v = v_hmc_mean 
