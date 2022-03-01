@@ -326,10 +326,11 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
 
         proposal_params_hmc = {"dt" : dt, "L" : L, "gradLogPi" : gradLogPi_vol, "M" : M_iter}
 
-        v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, N_samples_vol, proposal_hmc, logPi_vol, v, proposal_params_hmc)
+        v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, N_samples_vol, proposal_hmc, logPi_vol, v, proposal_params_hmc, save_samples = 1)
         #v = v_hmc_mean 
-        v = v_hmc_samples[0] 
+        v = v_hmc_samples[N_samples_vol-2] 
         v = v*mask3d
+
 
         if verbose:
             print("  Time vol optimisation =", time.time()-t0)
@@ -389,7 +390,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
         with mrcfile.new(out_dir + '/rec_final.mrc', overwrite=True) as mrc:
                 mrc.set_data(vr.astype(np.float32))
 
-    return v, angles, samples_angles
+    return v, angles, samples_angles, r_samples_angles,  v_hmc_samples , r_hmc
 
 
 
