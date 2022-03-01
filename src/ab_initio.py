@@ -190,7 +190,7 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
 
 
 
-def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, N_iter = 100, learning_rate = 1, batch_size = -1, P = None, N_samples_angles = 100, N_samples_vol = 100, dt = 0.5, L = 10, radius0 = 0.1, dr = None, alpha = 0, eps_vol = 1e-16, interp_method = 'tri', opt_vol_first = True, verbose = True, save_to_file = True, out_dir = './'):
+def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, vol0 = None, angles0 = None, N_iter = 100, learning_rate = 1, batch_size = -1, P = None, N_samples_angles = 100, N_samples_vol = 100, dt = 0.5, L = 10, radius0 = 0.1, dr = None, alpha = 0, eps_vol = 1e-16, interp_method = 'tri', opt_vol_first = True, verbose = True, save_to_file = True, out_dir = './'):
     """Ab initio reconstruction using MCMC.
 
     Parameters:
@@ -235,11 +235,15 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
         if P == None:
             P = jnp.ones([nx,nx,nx])
 
-    if opt_vol_first:
+    if vol0 is None and opt_vol_first:
         N_vol_iter = 1000000
         v, angles = initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, use_sgd, learning_rate, batch_size,  P, interp_method, verbose)
-    else:    
+    elif vol0 is None:    
         v = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
+    else:
+        print("cool")
+        v = vol0
+        angles = angles0
 
     imgs = imgs.reshape([N, nx,nx])
     radius = radius0
@@ -249,7 +253,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
     sigma_noise = sigma_noise.reshape([1, nx, nx])
 
     for idx_iter in range(N_iter):
-        if idx_iter == N_iter-1:
+        if nx_iter == nx and jnp.mod(idx_iter, 7)==0:
            N_samples_angles = 1000
            N_samples_vol = 100
 
@@ -369,7 +373,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
                     mrc.set_data(vr.astype(np.float32))
                 radius += dr
 
-            if v.shape[0] == nx:
+            if nx_iter == nx:
                 break
 
     # At the end, take the mean 
