@@ -251,7 +251,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
     # Reshaping sigma_noise this way so that we can apply crop_fourier_images 
     # at each iteration.
     sigma_noise = sigma_noise.reshape([1, nx, nx])
-
+    nx_iter = 0
     for idx_iter in range(N_iter):
         if nx_iter == nx and jnp.mod(idx_iter, 7)==0:
            N_samples_angles = 1000
