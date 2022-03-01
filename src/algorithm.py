@@ -193,7 +193,7 @@ def proposal_mala(key, logPi, x0, gradLogPi, tau):
 
     return x1, r
 
-def proposal_hmc(key, logPi, x0, gradLogPi, dt, L = 1, M = 1):
+def proposal_hmc(key, logPi, x0, gradLogPi, dt_list, L = 1, M = 1, DH_thershold = jnp.inf):
     """ Hamiltonian Monte Carlo proposal function.
     For simplicity, the mass matrix M is an array of 
     entry-wise scalings (i.e. a diagonal matrix).
@@ -202,25 +202,39 @@ def proposal_hmc(key, logPi, x0, gradLogPi, dt, L = 1, M = 1):
     M = 1/max(sigma_noise)**2 * ones.
     """
 
+    key, subkey = random.split(key)
+    dt = random.permutation(subkey, dt_list)[0]
+    #print("dt =", dt) 
+
     p0 = random.normal(key, x0.shape) * M
-    r0exponent = logPi(x0) - jnp.sum(jnp.real(jnp.conj(p0) * p0))/2
+    logPiX0 = logPi(x0)
+    r0exponent = logPiX0 - jnp.sum(jnp.real(jnp.conj(p0) * p0))/2
 
     # Doing this so that we don't compute gradLogPi(x1) twice.
     gradLogPiX0 = gradLogPi(x0)
+    logPiX0 = logPi(x0)
     for i in range(L):
         # note the + instead of in the p updates since we take U(x)=-log(pi(x))
         p01 = p0 + dt/2 * gradLogPiX0
 
         x1 = x0 + dt * p01 / M
         gradLogPiX1 = gradLogPi(x1)
+        logPiX1 = logPi(x1)
 
         p1 = p01 + dt/2 * gradLogPiX1
 
+        DH = jnp.abs(logPiX1 - logPiX0)
+        #print("i = ", i, ", DH = ", DH) 
+
+        if i > 1 and DH > 100:
+            break
+        
         p0 = p1
         x0 = x1
         gradLogPiX0 = gradLogPiX1
+        logPiX0 = logPiX1
 
-    r1exponent = logPi(x1) - jnp.sum(jnp.real(jnp.conj(p1) * p1))/2
+    r1exponent = logPiX1 - jnp.sum(jnp.real(jnp.conj(p1) * p1))/2
     r = jnp.exp(r1exponent - r0exponent)
 
     return x1, r

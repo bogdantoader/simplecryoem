@@ -196,7 +196,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
     Parameters:
     ----------
     imgs : N x nx*nx array
-        The 2d images, vectorised.
+        The 2d2images, vectorised.
     
     x_grid : [dx, nx]
         The Fourier grid of the images.
@@ -307,6 +307,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
 
         if verbose:
             print("  Time orientations sampling =", time.time()-t0)
+            print("  mean(a_angles) =", jnp.mean(r_samples_angles))
             
             if diagnostics:
                 plot_angles(angles[:500])
@@ -333,7 +334,8 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
 
 
         if verbose:
-            print("  Time vol optimisation =", time.time()-t0)
+            print("  Time volume sampling =", time.time()-t0)
+            print("  mean(a_vol) =", jnp.mean(r_hmc))
 
             if diagnostics:
                 #ff ,lf =  get_diagnostics_funs_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
