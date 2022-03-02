@@ -88,6 +88,7 @@ def get_grad_v_funcs(loss_func, loss_func_sum):
 
     @jax.jit
     def grad_loss_volume_batched(v, angles, shifts, ctf_params, imgs, sigma):
+
         return jnp.mean(jax.vmap(grad_loss_volume, in_axes = (None, 0, 0, 0, 0, None))(v, angles, shifts, ctf_params, imgs, sigma), axis=0)
         #return jnp.sum(jax.vmap(grad_loss_volume, in_axes = (None, 0, 0, 0, 0, None))(v, angles, shifts, ctf_params, imgs, sigma), axis=0)
 

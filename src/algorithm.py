@@ -125,10 +125,13 @@ def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, ep
         idx_batches = np.array_split(rng.permutation(N), number_of_batches)
 
         for i, idx in enumerate(idx_batches):
-            x = x - alpha * P * jnp.conj(grad_func(x, idx))
+            gradx = grad_func(x, idx)
+            x = x - alpha * P * jnp.conj(gradx)
 
             if jnp.mod(epoch, 10) == 0 and i == len(idx_batches)-1:
-                full_grad = jnp.abs(jnp.mean(grad_func(x, jnp.arange(N))))
+                #full_grad = jnp.abs(jnp.mean(grad_func(x, jnp.arange(N))))
+                # OOM here, obvs
+                full_grad = jnp.abs(jnp.mean(gradx))
 
                 if verbose:
                     print("  sgd epoch " + str(epoch) + ": mean gradient = " + str(full_grad))
