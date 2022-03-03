@@ -61,8 +61,6 @@ def get_loss_funcs(slice_func, err_func = wl2sq, alpha = 0):
     def loss_func_batched(v, angles, shifts, ctf_params, imgs, sigma):
         return jax.vmap(loss_func, in_axes = (None, 0, 0, 0, 0, None))(v, angles, shifts, ctf_params, imgs, sigma)
 
-    # TODO: and is it ok to take the mean instead of the sum here?
-    # Does it break the Hastings ratio?
     @jax.jit
     def loss_func_sum(v, angles, shifts, ctf_params, imgs, sigma):
         return jnp.mean(loss_func_batched(v, angles, shifts, ctf_params, imgs, sigma))
@@ -88,7 +86,6 @@ def get_grad_v_funcs(loss_func, loss_func_sum):
 
     @jax.jit
     def grad_loss_volume_batched(v, angles, shifts, ctf_params, imgs, sigma):
-
         return jnp.mean(jax.vmap(grad_loss_volume, in_axes = (None, 0, 0, 0, 0, None))(v, angles, shifts, ctf_params, imgs, sigma), axis=0)
         #return jnp.sum(jax.vmap(grad_loss_volume, in_axes = (None, 0, 0, 0, 0, None))(v, angles, shifts, ctf_params, imgs, sigma), axis=0)
 
@@ -97,5 +94,6 @@ def get_grad_v_funcs(loss_func, loss_func_sum):
         return jax.grad(loss_func_sum)(v, angles, shifts, ctf_params, imgs, sigma)
 
     return grad_loss_volume, grad_loss_volume_batched, grad_loss_volume_sum
+
 
 

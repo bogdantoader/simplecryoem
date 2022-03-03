@@ -318,10 +318,11 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
         t0 = time.time()
         v0 = jnp.zeros([nx_iter,nx_iter,nx_iter])* 1j
         key, subkey = random.split(key)
-
+        
         logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
-        gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_batched_iter(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter))
-   
+        gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_sum_iter(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter))
+        #gradLogPi_vol = lambda v : gradLogPi_split(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter, grad_loss_volume_batched_iter, 20) 
+    
         #M_iter = 1/jnp.max(sigma_noise_iter)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
         M_iter = 1/jnp.max(sigma_noise)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
 
@@ -420,8 +421,11 @@ def initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid
     _, grad_loss_volume_batched, grad_loss_volume_sum, _, _, _ = get_jax_ops_iter(project_func, x_grid, mask3d, 0, interp_method)
     angles = generate_uniform_orientations(N)
 
+
+    grad_loss_volume_batched_sum = lambda v, a, s, c, imgs, sig : grad_loss_volume_batched(v, a, s, c, imgs, sig) / a.shape[0]
+
     if use_sgd:
-        sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_batched, angles, shifts_true, ctf_params, imgs, sigma_noise)
+        sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs, sigma_noise)
         v = sgd(sgd_grad_func, N, v0, learning_rate, N_vol_iter, batch_size, P, eps_vol, verbose = verbose)
     else:
         AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs*mask2d, v0.shape, sigma_noise)
@@ -504,4 +508,21 @@ def sample_new_angles(loss_func_angles, vol, shifts_true, ctf_params, imgs, N_sa
 
 sample_new_angles_vmap = jax.vmap(sample_new_angles_one_img, in_axes = (None, None, 0, 0, 0, None, None))
 
-                                                
+
+def gradLogPi_split(v, angles, shifts, ctf_params, imgs_f, sigma_noise, grad_loss_volume_batched, number_of_batches):
+   
+    # IMPORTANT to use np.array_split and not the jnp
+    # version, as we don't want to load the images into GPU
+    # memory just yet.
+    angles_b = np.array_split(angles, number_of_batches)
+    shifts_b = np.array_split(shifts, number_of_batches)
+    ctf_params_b = np.array_split(ctf_params, number_of_batches)
+    imgs_f_b = np.array_split(imgs_f, number_of_batches)
+
+    grad_loss_vol = [grad_loss_volume_batched(v, angles_b[i], shifts_b[i], ctf_params_b[i], imgs_f_b[i], sigma_noise) 
+                     for i in range(len(angles_b))]
+
+    return -jnp.conj(jnp.sum(jnp.array(grad_loss_vol))/angles.shape[0])
+                                               
+
+

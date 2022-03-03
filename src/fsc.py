@@ -122,7 +122,9 @@ def points_orientations_tri(angles, nx, number_of_batches = 100):
     print("Splitting in batches.")
     # If number_of_batches is too high, this
     #        can take a surprisingly long time
-    xyz_idx_batches = jnp.array_split(xyz_idxs, number_of_batches)
+    # BECAUSE jnp.array_split loads the images into memory.
+    # Use regular np instead.
+    xyz_idx_batches = np.array_split(xyz_idxs, number_of_batches)
 
     print("Adding up number of points from batches.")
     # This needs to be balanced
