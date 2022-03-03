@@ -41,12 +41,6 @@ def get_loss_funcs(slice_func, err_func = wl2sq, alpha = 0):
     """
 
 
-    #TODO: should the regularisation term here be normalise to account for
-    # the fact that v is 3D while the arguments of err_func in the fidelity
-    # term are 2D, and also the fact that we have one regularisation term
-    # included for each image? So in SGD, when varying the batch size, 
-    # the implicit regularisation parameter will change too.
-    # Yeah, this definitely needs to be fixed.
     @jax.jit
     def loss_func(v, angles, shifts, ctf_params, img, sigma):
         """L2 squared error with L2 regularization, where alpha is the
@@ -54,7 +48,6 @@ def get_loss_funcs(slice_func, err_func = wl2sq, alpha = 0):
         deviation of the noise."""
 
         nx = v.shape[-1]
-        #return 1/2 * (1/nx**3 * alpha * l2sq(v) + 1/nx**2 *err_func(slice_func(v, angles, shifts, ctf_params), img, 1/sigma**2))
         return 1/2 * (alpha * l2sq(v) + err_func(slice_func(v, angles, shifts, ctf_params), img, 1/sigma**2))
 
     @jax.jit 
@@ -64,7 +57,6 @@ def get_loss_funcs(slice_func, err_func = wl2sq, alpha = 0):
     @jax.jit
     def loss_func_sum(v, angles, shifts, ctf_params, imgs, sigma):
         return jnp.mean(loss_func_batched(v, angles, shifts, ctf_params, imgs, sigma))
-        #return jnp.sum(loss_func_batched(v, angles, shifts, ctf_params, imgs, sigma))
 
     #@jax.jit 
     def loss_func_sum_iter(v, angles, shifts, ctf_params, imgs):
@@ -85,15 +77,13 @@ def get_grad_v_funcs(loss_func, loss_func_sum):
         return jax.grad(loss_func)(v, angles, shifts, ctf_params, img, sigma)
 
     @jax.jit
-    def grad_loss_volume_batched(v, angles, shifts, ctf_params, imgs, sigma):
-        return jnp.mean(jax.vmap(grad_loss_volume, in_axes = (None, 0, 0, 0, 0, None))(v, angles, shifts, ctf_params, imgs, sigma), axis=0)
-        #return jnp.sum(jax.vmap(grad_loss_volume, in_axes = (None, 0, 0, 0, 0, None))(v, angles, shifts, ctf_params, imgs, sigma), axis=0)
-
-    @jax.jit
     def grad_loss_volume_sum(v, angles, shifts, ctf_params, imgs, sigma):
         return jax.grad(loss_func_sum)(v, angles, shifts, ctf_params, imgs, sigma)
 
-    return grad_loss_volume, grad_loss_volume_batched, grad_loss_volume_sum
+    # If these functions run out of memory, can do batching on the CPU and then call
+    # the gpu batched functions for each batch
+
+    return grad_loss_volume, grad_loss_volume_sum
 
 
 

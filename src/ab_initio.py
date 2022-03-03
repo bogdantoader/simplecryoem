@@ -104,7 +104,7 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
             P_iter, _ = crop_fourier_volume(P, x_grid, nx_iter)
 
         # Get the operators for the dimensions at this iteration.
-        slice_func_array_angles_iter, grad_loss_volume_batched_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter = get_jax_ops_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
+        slice_func_array_angles_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter = get_jax_ops_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
 
         # Sample the orientations
         t0 = time.time()    
@@ -130,7 +130,7 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
         v0 = jnp.zeros([nx_iter,nx_iter,nx_iter])* 1j
 
         if use_sgd:
-            sgd_grad_func_iter = get_sgd_vol_ops(grad_loss_volume_batched_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
+            sgd_grad_func_iter = get_sgd_vol_ops(grad_loss_volume_sum_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
             v = sgd(sgd_grad_func_iter, N, v0, learning_rate, N_vol_iter, batch_size, P_iter, eps_vol, verbose = verbose)
         else:
             AA, Ab = get_cg_vol_ops(grad_loss_volume_sum_iter, angles, shifts_true, ctf_params, imgs_iter*mask2d, v0.shape, sigma_noise_iter)
@@ -253,9 +253,9 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
     sigma_noise = sigma_noise.reshape([1, nx, nx])
     nx_iter = 0
     for idx_iter in range(N_iter):
-        if nx_iter == nx and jnp.mod(idx_iter, 7)==0:
-           N_samples_angles = 1000
-           N_samples_vol = 100
+        #if nx_iter == nx and jnp.mod(idx_iter, 7)==0:
+        #   N_samples_angles = 1000
+        #   N_samples_vol = 100
 
 
         if verbose:
@@ -289,7 +289,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
             P_iter, _ = crop_fourier_volume(P, x_grid, nx_iter)
 
         # Get the operators for the dimensions at this iteration.
-        slice_func_array_angles_iter, grad_loss_volume_batched_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter = get_jax_ops_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
+        slice_func_array_angles_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter = get_jax_ops_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
 
 
         key, subkey = random.split(key)
@@ -321,7 +321,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
         
         logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
         gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_sum_iter(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter))
-        #gradLogPi_vol = lambda v : gradLogPi_split(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter, grad_loss_volume_batched_iter, 20) 
+        #gradLogPi_vol = lambda v : gradLogPi_split(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter, grad_loss_volume_sum_iter, 20) 
     
         #M_iter = 1/jnp.max(sigma_noise_iter)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
         M_iter = 1/jnp.max(sigma_noise)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
@@ -397,17 +397,6 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 def initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise = 1, use_sgd = True, learning_rate = 1, batch_size = -1,  P = None, interp_method = 'tri', verbose = True):
     if verbose:
         print("Initialitsing volume")
@@ -418,11 +407,11 @@ def initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid
     v0 = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
     mask3d = jnp.ones([nx,nx,nx])
 
-    _, grad_loss_volume_batched, grad_loss_volume_sum, _, _, _ = get_jax_ops_iter(project_func, x_grid, mask3d, 0, interp_method)
+    _, grad_loss_volume_sum, _, _, _ = get_jax_ops_iter(project_func, x_grid, mask3d, 0, interp_method)
     angles = generate_uniform_orientations(N)
 
 
-    grad_loss_volume_batched_sum = lambda v, a, s, c, imgs, sig : grad_loss_volume_batched(v, a, s, c, imgs, sig) / a.shape[0]
+    #grad_loss_volume_batched_sum = lambda v, a, s, c, imgs, sig : grad_loss_volume_batched(v, a, s, c, imgs, sig) / a.shape[0]
 
     if use_sgd:
         sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs, sigma_noise)
@@ -452,11 +441,11 @@ def get_diagnostics_funs_iter(project_func, x_grid, mask, alpha = 0, interp_meth
 def get_jax_ops_iter(project_func, x_grid, mask, alpha = 0, interp_method = 'tri'):
     slice_func,slice_func_array, slice_func_array_angles = get_slice_funcs(project_func, x_grid, mask, interp_method)
     loss_func, loss_func_batched, loss_func_sum, _ = get_loss_funcs(slice_func, alpha = alpha)
-    grad_loss_volume, grad_loss_volume_batched, grad_loss_volume_sum = get_grad_v_funcs(loss_func, loss_func_sum)
+    grad_loss_volume, grad_loss_volume_sum = get_grad_v_funcs(loss_func, loss_func_sum)
     loss_func_angles = get_loss_func_angles(loss_func)
     _, loss_func_batched0, _, _ = get_loss_funcs(slice_func, alpha = 0)
 
-    return slice_func_array_angles, grad_loss_volume_batched, grad_loss_volume_sum, loss_func_angles, loss_func_batched0, loss_func_sum
+    return slice_func_array_angles, grad_loss_volume_sum, loss_func_angles, loss_func_batched0, loss_func_sum
 
 # Cached angles sampling
 
@@ -508,8 +497,8 @@ def sample_new_angles(loss_func_angles, vol, shifts_true, ctf_params, imgs, N_sa
 
 sample_new_angles_vmap = jax.vmap(sample_new_angles_one_img, in_axes = (None, None, 0, 0, 0, None, None))
 
-
-def gradLogPi_split(v, angles, shifts, ctf_params, imgs_f, sigma_noise, grad_loss_volume_batched, number_of_batches):
+# Not really working for now
+def gradLogPi_split(v, angles, shifts, ctf_params, imgs_f, sigma_noise, grad_loss_volume_sum, number_of_batches):
    
     # IMPORTANT to use np.array_split and not the jnp
     # version, as we don't want to load the images into GPU
@@ -519,7 +508,7 @@ def gradLogPi_split(v, angles, shifts, ctf_params, imgs_f, sigma_noise, grad_los
     ctf_params_b = np.array_split(ctf_params, number_of_batches)
     imgs_f_b = np.array_split(imgs_f, number_of_batches)
 
-    grad_loss_vol = [grad_loss_volume_batched(v, angles_b[i], shifts_b[i], ctf_params_b[i], imgs_f_b[i], sigma_noise) 
+    grad_loss_vol = [grad_loss_volume_sum(v, angles_b[i], shifts_b[i], ctf_params_b[i], imgs_f_b[i], sigma_noise) 
                      for i in range(len(angles_b))]
 
     return -jnp.conj(jnp.sum(jnp.array(grad_loss_vol))/angles.shape[0])
