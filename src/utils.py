@@ -448,3 +448,24 @@ def average_radially(img, x_grid):
         img_avg[idx] = img_rad_avg
 
     return jnp.array(img_avg)
+
+
+def compare_orientations(angles1, angles2):
+    """Get the angular distances between the orientations
+    a1_i and a2_i from the N x 3 arrays angles1 and angles2."""
+
+    # Making get_rotation_matrix function vmap friendly
+    get_rot_mat = lambda a : get_rotation_matrix(a[0], a[1], a[2])    
+    
+    # Get the matrix for each orientation
+    M1 = jax.vmap(get_rot_mat, in_axes=0)(angles1)
+    M2 = jax.vmap(get_rot_mat, in_axes=0)(angles2)
+
+    # The chordal distance (Frobenium norm error between matrices)
+    err0 = jnp.sqrt(jnp.sum((M-M_rec)**2, axis=(1,2)))
+
+    # The actual angular distance
+    theta = 2*jnp.arcsin(err/(2*jnp.sqrt(2)))
+
+    return theta
+
