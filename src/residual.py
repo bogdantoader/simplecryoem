@@ -14,15 +14,15 @@ def get_volume_residual(v, angles, shifts, ctf_params, imgs, x_grid, slice_func_
     nx = x_grid[1].astype(jnp.int32)
 
     @jax.jit
-    def get_v_resid(v_idx, loss):
-        v_loss_sum = jnp.zeros([nx,nx,nx])
-        v_loss_counts = jnp.zeros([nx,nx,nx])
+    def get_v_resid(v_idx, resid):
+        v_resid_sum = jnp.zeros([nx,nx,nx])
+        v_resid_counts = jnp.zeros([nx,nx,nx])
 
         for i in jnp.arange(v_idx.shape[0]):
-            v_loss_sum = v_loss_sum.at[tuple(v_idx[i])].add(loss[i])
-            v_loss_counts = v_loss_counts.at[tuple(v_idx[i])].add(1)
+            v_resid_sum = v_resid_sum.at[tuple(v_idx[i])].add(resid[i])
+            v_resid_counts = v_resid_counts.at[tuple(v_idx[i])].add(1)
 
-        return v_loss_sum, v_loss_counts
+        return v_resid_sum, v_resid_counts
 
     def get_v_resid_batch(vol_idx, resid, N_batches, get_v_resid):
         # Make sure the batches are on the CPU.
