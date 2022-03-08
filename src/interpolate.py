@@ -157,9 +157,6 @@ def tri_interp_point(i_coords, vol, xyz_and_idx):
     return i_val
 
 
-# Can this be vectorized? 
-# If using vmap and jax.numpy.apply_along_axis (which is implemented using jax
-# vmap, maybe no need to vectorize?
 def find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid):
     """For a point given by coords and a grid defined by
     x_grid, y_grid, z_grid, return the grid indices of the nearest grid point to coords.
