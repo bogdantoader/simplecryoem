@@ -33,7 +33,9 @@ def get_volume_residual(v, angles, shifts, ctf_params, imgs, sigma_noise, x_grid
     def get_v_resid(v_idx, resid):
         v_resid_sum = jnp.zeros([nx,nx,nx])
         v_resid_counts = jnp.zeros([nx,nx,nx])
-
+    
+        #TODO: replace with jax.fori_loop, it should reduce the 
+        # compilation time
         for i in jnp.arange(v_idx.shape[0]):
             v_resid_sum = v_resid_sum.at[tuple(v_idx[i])].add(resid[i])
             v_resid_counts = v_resid_counts.at[tuple(v_idx[i])].add(1)

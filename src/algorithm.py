@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
 from  matplotlib import pyplot as plt
+import functools
 import time
 
 from src.utils import l2sq, generate_uniform_orientations_jax
@@ -196,7 +197,7 @@ def proposal_mala(key, logPi, x0, gradLogPi, tau):
 
     return x1, r
 
-@jax.jit
+@functools.partial(jax.jit, static_argnums=(1,3))
 def proposal_hmc(key, logPi, x0, gradLogPi, dt_list, L = 1, M = 1, DH_thershold = jnp.inf):
     """ Hamiltonian Monte Carlo proposal function.
     For simplicity, the mass matrix M is an array of 
@@ -217,6 +218,8 @@ def proposal_hmc(key, logPi, x0, gradLogPi, dt_list, L = 1, M = 1, DH_thershold 
     # Doing this so that we don't compute gradLogPi(x1) twice.
     gradLogPiX0 = gradLogPi(x0)
     logPiX0 = logPi(x0)
+
+    #TODO: should probably replace the forloop with jax.fori_loop
     for i in range(L):
         # note the + instead of in the p updates since we take U(x)=-log(pi(x))
         p01 = p0 + dt/2 * gradLogPiX0
