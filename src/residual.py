@@ -7,10 +7,26 @@ from src.projection import rotate_z0
 from src.interpolate import find_nearest_one_grid_point_idx
 
 
-def get_volume_residual(v, angles, shifts, ctf_params, imgs, x_grid, slice_func_array, N_batches):
+def get_volume_residual(v, angles, shifts, ctf_params, imgs, sigma_noise, x_grid, slice_func_array, N_batches):
 
-    coords, resid =  voxel_wise_resid_fun(v, angles, shifts, ctf_params, imgs, x_grid, slice_func_array)
-    nn_vol_idx = jax.vmap(find_nearest_one_grid_point_idx, in_axes=(0,None,None,None))(coords, x_grid, x_grid, x_grid)
+    coords, resid =  voxel_wise_resid_fun(v, angles, shifts, ctf_params, imgs, sigma_noise, x_grid, slice_func_array)
+
+     
+    find_nearest_one_grid_point_idx_vmap = jax.vmap(find_nearest_one_grid_point_idx, in_axes=(0,None,None,None))
+
+    # The N_batch here should be much smaller, as there is enough memory (and otherwise it's too slow with the same N_batch)
+    def find_nearest_one_grid_point_idx_batch(coords, x_grid, N_batches):
+        coords_batches = np.array_split(coords, N_batches)
+       
+        nn_vol_idx = []
+        for i in tqdm(range(N_batches)):
+            nn_vol_idx_b = find_nearest_one_grid_point_idx_vmap(coords_batches[i], x_grid, x_grid, x_grid)
+            nn_vol_idx.append(nn_vol_idx_b)
+
+        return np.concatenate(nn_vol_idx, axis=0)
+
+    nn_vol_idx = find_nearest_one_grid_point_idx_batch(coords, x_grid, 10) 
+    #nn_vol_idx = jax.vmap(find_nearest_one_grid_point_idx, in_axes = (0, None, None, None))(coords, x_grid, x_grid, x_grid) 
     nx = x_grid[1].astype(jnp.int32)
 
     @jax.jit
@@ -32,7 +48,7 @@ def get_volume_residual(v, angles, shifts, ctf_params, imgs, x_grid, slice_func_
         v_resid_sum = np.zeros([nx,nx,nx])
         v_resid_counts = np.zeros([nx,nx,nx])
 
-        for i in tqdm(range(len(vol_idx_batches))):
+        for i in tqdm(range(N_batches)):
             vrs, vrc = get_v_resid(vol_idx_batches[i], resid_batches[i])
 
             v_resid_sum += vrs
@@ -48,9 +64,9 @@ def get_volume_residual(v, angles, shifts, ctf_params, imgs, x_grid, slice_func_
 
 
 
-def voxel_wise_resid_fun(v, angles, shifts, ctf_params, imgs, x_grid, slice_func_array):
+def voxel_wise_resid_fun(v, angles, shifts, ctf_params, imgs, sigma_noise, x_grid, slice_func_array):
 
-    resid = jnp.abs(slice_func_array(v, angles, shifts, ctf_params) - imgs)
+    resid = jnp.abs(slice_func_array(v, angles, shifts, ctf_params) - imgs)/sigma_noise
     resid = resid.reshape(-1)   
 
     proj_coords = jax.vmap(rotate_z0, in_axes = (None, 0))(x_grid, angles)
