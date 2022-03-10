@@ -196,6 +196,7 @@ def proposal_mala(key, logPi, x0, gradLogPi, tau):
 
     return x1, r
 
+@jax.jit
 def proposal_hmc(key, logPi, x0, gradLogPi, dt_list, L = 1, M = 1, DH_thershold = jnp.inf):
     """ Hamiltonian Monte Carlo proposal function.
     For simplicity, the mass matrix M is an array of 
