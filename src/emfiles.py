@@ -64,6 +64,7 @@ def get_data_from_df(df, data_dir, load_imgs = False):
 
     particle_paths = df[star.UCSF.IMAGE_ORIGINAL_PATH].unique()
     #for path in particle_paths[:100]:
+
     for path in particle_paths:
         if load_imgs:
             with mrcfile.open(data_dir + path) as mrc:
@@ -75,16 +76,23 @@ def get_data_from_df(df, data_dir, load_imgs = False):
 
         for index, p in group.iterrows():
 
-            angrot = p[star.Relion.ANGLEROT]
-            angtilt = p[star.Relion.ANGLETILT]
-            angpsi = p[star.Relion.ANGLEPSI]
+            angrot = p.get(star.Relion.ANGLEROT)
+            angtilt = p.get(star.Relion.ANGLETILT)
+            angpsi = p.get(star.Relion.ANGLEPSI)
 
             px = star.calculate_apix(p) 
 
-            shx = p[star.Relion.ORIGINX] * px
-            shy = p[star.Relion.ORIGINY] * px
+            shx = p.get(star.Relion.ORIGINX) 
+            shy = p.get(star.Relion.ORIGINY) 
 
-            angs = np.deg2rad(np.array([angpsi, angtilt, angrot]))
+            if shx is not None:
+                shx = shx * px
+            if shy is not None:
+                shy = shy * px
+            
+            angs = np.array([angpsi, angtilt, angrot])
+            if angrot is not None:
+                angs = np.deg2rad(angs)
             sh = np.array([shx, shy])
             ctf_p = get_ctf_params_from_df_row(p, px)
 
