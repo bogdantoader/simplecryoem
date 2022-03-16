@@ -190,7 +190,36 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
 
 
 
-def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, use_sgd, vol0 = None, angles0 = None, N_iter = 100, learning_rate = 1, batch_size = -1, P = None, N_samples_angles = 100, N_samples_vol = 100, dt_list = [0.5], L = 10, radius0 = 0.1, dr = None, alpha = 0, eps_vol = 1e-16, interp_method = 'tri', opt_vol_first = True, verbose = True, save_to_file = True, out_dir = './'):
+def ab_initio_mcmc(
+        key, 
+        project_func, 
+        imgs, 
+        sigma_noise, 
+        ctf_params, 
+        x_grid, 
+        use_sgd, 
+        vol0 = None, 
+        angles0 = None, 
+        shifts0 = None,
+        N_iter = 100, 
+        learning_rate = 1, 
+        batch_size = -1, 
+        P = None, 
+        N_samples_vol = 100, 
+        N_samples_angles = 1000, 
+        N_samples_shifts = 1000,
+        dt_list = [0.5], 
+        L = 10, 
+        radius0 = 0.1, 
+        dr = None, 
+        alpha = 0, 
+        eps_vol = 1e-16, 
+        B = 1,
+        interp_method = 'tri', 
+        opt_vol_first = True, 
+        verbose = True, 
+        save_to_file = True, 
+        out_dir = './'):
     """Ab initio reconstruction using MCMC.
 
     Parameters:
@@ -237,7 +266,8 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
 
     if vol0 is None and opt_vol_first:
         N_vol_iter = 1000000
-        v, angles = initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, use_sgd, learning_rate, batch_size,  P, interp_method, verbose)
+        key, subkey = random.split(key)
+        v, angles, shifts = initialize_ab_initio_vol(key, project_func, imgs, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, use_sgd, learning_rate, batch_size,  P, B, interp_method, verbose)
     elif vol0 is None:    
         v = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
     else:
@@ -292,15 +322,26 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
         slice_func_array_angles_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter = get_jax_ops_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
 
 
-        key, subkey = random.split(key)
+        key, key_angles, key_shifts = random.split(key, 3)
         empty_params = {}
 
         # Sample the orientations
         logPi_angles_batch = lambda a : -loss_func_batched0_iter(v, a, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
 
         t0 = time.time()    
-        _, r_samples_angles, samples_angles = mcmc(subkey, N_samples_angles, proposal_uniform_orientations, logPi_angles_batch, angles, empty_params, N, 1, verbose = True)
+        _, r_samples_angles, samples_angles = mcmc(key_angles, N_samples_angles, proposal_uniform_orientations, logPi_angles_batch, angles, empty_params, N, 1, verbose = True)
         angles = samples_angles[N_samples_angles-2] 
+
+         
+        # Sample the shifts 
+        logPi_shifts_batch = lambda sh : -loss_func_batched0_iter(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
+
+        t0 = time.time()    
+        _, r_samples_angles, samples_angles = mcmc(key_angles, N_samples_angles, proposal_uniform_orientations, logPi_angles_batch, angles, empty_params, N, 1, verbose = True)
+        angles = samples_angles[N_samples_angles-2] 
+        
+
+
 
 
         diagnostics = False 
@@ -397,7 +438,7 @@ def ab_initio_mcmc(key, project_func, imgs, sigma_noise, shifts_true, ctf_params
 
 
 
-def initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise = 1, use_sgd = True, learning_rate = 1, batch_size = -1,  P = None, interp_method = 'tri', verbose = True):
+def initialize_ab_initio_vol(key, project_func, imgs, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise = 1, use_sgd = True, learning_rate = 1, batch_size = -1,  P = None, B = 1, interp_method = 'tri', verbose = True):
     if verbose:
         print("Initialitsing volume")
 
@@ -408,16 +449,20 @@ def initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid
     mask3d = jnp.ones([nx,nx,nx])
 
     _, grad_loss_volume_sum, _, _, _ = get_jax_ops_iter(project_func, x_grid, mask3d, 0, interp_method)
-    angles = generate_uniform_orientations(N)
+
+    key1, key2 = random.split(key)
+
+    angles = generate_uniform_orientations_jax(key, N)
+    shifts = jnp.zeros([N, 2]) #generate_uniform_shifts(key, N, B)
 
 
     #grad_loss_volume_batched_sum = lambda v, a, s, c, imgs, sig : grad_loss_volume_batched(v, a, s, c, imgs, sig) / a.shape[0]
 
     if use_sgd:
-        sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs, sigma_noise)
+        sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs, sigma_noise)
         v = sgd(sgd_grad_func, N, v0, learning_rate, N_vol_iter, batch_size, P, eps_vol, verbose = verbose)
     else:
-        AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts_true, ctf_params, imgs*mask2d, v0.shape, sigma_noise)
+        AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs*mask2d, v0.shape, sigma_noise)
         v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_vol, verbose = verbose)
 
     if verbose:
@@ -426,7 +471,7 @@ def initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid
         plt.colorbar()
         plt.show()
 
-    return v , angles
+    return v, angles, shifts
 
 
 def get_diagnostics_funs_iter(project_func, x_grid, mask, alpha = 0, interp_method = 'tri'):
