@@ -87,14 +87,16 @@ def get_grad_v_funcs(loss_func, loss_func_sum):
 # Loss from proj functions - to be used for MCMC for shifts
 def get_loss_proj_funcs(apply_shifts_and_ctf, x_grid, err_func = wl2sq, alpha = 0):
 
+    @jax.jit
+    def apply_shifts_and_ctf_jit(proj, shifts, ctf_params):
+        return apply_shifts_and_ctf(proj, shifts, ctf_params, x_grid)
 
     @jax.jit
     def loss_proj_func(v, proj, shifts, ctf_params, img, sigma):
         """L2 squared error with L2 regularization, where alpha is the
         regularization parameter and sigma is the pixel-wise standard 
         deviation of the noise."""
-
-        proj = apply_shifts_and_ctf(proj, shifts, ctf_params, x_grid)
+        proj = apply_shifts_and_ctf_jit(proj, shifts, ctf_params)
 
         return 1/2 * (alpha * l2sq(v) + err_func(proj, img, 1/sigma**2))
 

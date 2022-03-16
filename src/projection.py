@@ -9,6 +9,7 @@ from jax.config import config
 from external.pyem.pyem.vop import grid_correct
 from external.pyem.pyem import star
 from matplotlib import pyplot as plt
+import functools
 
 config.update("jax_enable_x64", True)
 
@@ -85,8 +86,7 @@ def rotate_and_interpolate(vol, angles, grid_vol, grid_proj, interpolation_metho
     proj_coords = rotate_z0(grid_proj, angles) 
     return interpolate(proj_coords, grid_vol, vol, interpolation_method)
 
-# TODO: Set default ctf_params (e.g. ones) so that we don't need the if statement
-# and therefore we can jit this.
+
 def apply_shifts_and_ctf(proj, shifts, ctf_params, grid_proj):
     shift = get_shift_term(grid_proj, grid_proj, shifts)
     proj *= shift
