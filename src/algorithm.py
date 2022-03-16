@@ -4,7 +4,6 @@ import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
 from  matplotlib import pyplot as plt
-import functools
 import time
 
 from src.utils import l2sq, generate_uniform_orientations_jax, generate_uniform_shifts
@@ -185,7 +184,7 @@ def mala_vol_proposal(loss_func, grad_func, N, v0, tau):
     return v1, ratio
 
 
-def proposal_mala(key, logPi, x0, gradLogPi, tau):
+def proposal_mala(key, x0, logPi, gradLogPi, tau):
     noise = jnp.array(random.normal(key, x0.shape))
     x1 = x0 + tau**2/2 * gradLogPi(x0) + tau * noise
 
@@ -197,8 +196,8 @@ def proposal_mala(key, logPi, x0, gradLogPi, tau):
 
     return x1, r
 
-#@functools.partial(jax.jit, static_argnums=(1,3))
-def proposal_hmc(key, logPi, x0, gradLogPi, dt_list, L = 1, M = 1, DH_thershold = jnp.inf):
+
+def proposal_hmc(key, x0, logPi, gradLogPi, dt_list, L = 1, M = 1):
     """ Hamiltonian Monte Carlo proposal function.
     For simplicity, the mass matrix M is an array of 
     entry-wise scalings (i.e. a diagonal matrix).
@@ -218,35 +217,31 @@ def proposal_hmc(key, logPi, x0, gradLogPi, dt_list, L = 1, M = 1, DH_thershold 
     # Doing this so that we don't compute gradLogPi(x1) twice.
     gradLogPiX0 = gradLogPi(x0)
 
-    #TODO: should probably replace the forloop with jax.fori_loop
-    for i in jnp.arange(L):
-        # note the + instead of in the p updates since we take U(x)=-log(pi(x))
-        p01 = p0 + dt/2 * gradLogPiX0
+    body_func = lambda i, xpg0: leapfrog_step(i, xpg0, dt, gradLogPi, M) 
 
-        x1 = x0 + dt * p01 / M
-        gradLogPiX1 = gradLogPi(x1)
-        logPiX1 = logPi(x1)
+    x1, p1, _ = jax.lax.fori_loop(0, L, body_func, jnp.array([x0, p0, gradLogPiX0]))
 
-        p1 = p01 + dt/2 * gradLogPiX1
-
-        DH = jnp.abs(logPiX1 - logPiX0)
-        #print("i = ", i, ", DH = ", DH) 
-
-        if i > 1 and DH > 100:
-            break
-        
-        p0 = p1
-        x0 = x1
-        gradLogPiX0 = gradLogPiX1
-        logPiX0 = logPiX1
-
+    logPiX1 = logPi(x1)
     r1exponent = logPiX1 - jnp.sum(jnp.real(jnp.conj(p1) * p1))/2
     r = jnp.exp(r1exponent - r0exponent)
 
     return x1, r
 
 
-def proposal_uniform_orientations(key, logPi, x0):
+def leapfrog_step(i, xpg0, dt, gradLogPi, M):
+    x0, p0, gradLogPiX0 = xpg0 
+    
+    # note the + instead of in the p updates since we take U(x)=-log(pi(x))
+    p01 = p0 + dt/2 * gradLogPiX0
+    x1 = x0 + dt * p01 / M
+
+    gradLogPiX1 = gradLogPi(x1)
+    p1 = p01 + dt/2 * gradLogPiX1
+    
+    return jnp.array([x1, p1, gradLogPiX1]) 
+
+
+def proposal_uniform_orientations(key, x0, logPi):
     """Uniform orientations proposal function, for N
     (independent) images at once.
     
@@ -275,7 +270,7 @@ def proposal_uniform_orientations(key, logPi, x0):
     return x1, r
 
 
-def proposal_uniform_shifts(key, logPi, x0, B):
+def proposal_uniform_shifts(key, x0, logPi, B):
     """Same as the proposal_uniform_orientations function."""
 
     N = x0.shape[0]
@@ -285,7 +280,7 @@ def proposal_uniform_shifts(key, logPi, x0, B):
     return x1, r
 
 
-def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch = 1, save_samples = -1, verbose = True):
+def mcmc(key, proposal_func, x0, N_samples, logPi, N_batch = 1, save_samples = -1, verbose = True):
     """Generic code for MCMC sampling.
 
     Parameters:
@@ -293,28 +288,19 @@ def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch
     key : jnp.random.PRNGKey
         Key for jax random functions
 
-    N_samples : int
-        Number of MCMC samples
-
     proposal_func : 
         Function that gives a proposal sample and its 
         Metropolis-Hastings ratio r.
-
-    logPi : 
-        Function that evaluates the log of the target 
-        distribution Pi.
-
-    gradLogPi :
-        Function that evaluates the gradient of the log of the target
-        distribution Pi.
-
     x0:
         Starting point.
 
-    proposal_params: dict
-        A dict of params corresponding to the specific parameters of 
-        the proposal_func. This includes gradLogPi if required by
-        the proposal function.
+    N_samples : int
+        Number of MCMC samples
+
+    logPi : 
+        Function that evaluates the log of the target 
+        distribution Pi. It is only used for displaying progress
+        or debugging, the actual computation is done inside proposal_func.
 
     N_batch : int
         The number of independent variables that are being sampled
@@ -350,7 +336,7 @@ def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch
         #t0 = time.time()
 
         x0 = x1
-        x1, r = proposal_func(keys[2*i], logPi, x0, **proposal_params)
+        x1, r = proposal_func(keys[2*i], x0)
         a = jnp.minimum(1, r)
         r_samples.append(a)
   
@@ -366,7 +352,7 @@ def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch
         if save_samples > 0 and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
-        if verbose and jnp.mod(i, 20) == 0:
+        if verbose and jnp.mod(i, 100) == 0:
             if N_batch > 1:
                 loss_i = jnp.abs(jnp.mean(logPi(x1)))
                 #print("  Iter", i, ", a_mean = ", jnp.mean(a))
@@ -397,19 +383,3 @@ def accept_reject_scalar(unif_var, a, x0, x1):
 
 accept_reject_vmap = jax.vmap(accept_reject_scalar, in_axes = (0, 0, 0, 0))
 
-# Not used anywhere, to delete
-def mcmc_batch_step(key, N_samples, logPi_batch, x0):
-    """MCMC sampling of N independent variables, batched 
-    (e.g. orientations of different images)."""
-    key1, key2 = random.split(key, 2)
-    
-    N = x0.shape[0]             
-    x1 = generate_uniform_orientations_jax(key1, N)       
-    r0exponent = logPi_batch(x0)
-    r1exponent = logPi_batch(x1)
-       
-    r = jnp.exp(r1exponent-r0exponent)
-    a = jnp.minimum(1, r)
-    
-    unif_var = random.uniform(key2, (N,))
-    return accept_reject_vmap(unif_var, a, x0, x1)
