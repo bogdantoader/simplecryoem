@@ -46,8 +46,6 @@ def get_loss_funcs(slice_func, err_func = wl2sq, alpha = 0):
         """L2 squared error with L2 regularization, where alpha is the
         regularization parameter and sigma is the pixel-wise standard 
         deviation of the noise."""
-
-        nx = v.shape[-1]
         return 1/2 * (alpha * l2sq(v) + err_func(slice_func(v, angles, shifts, ctf_params), img, 1/sigma**2))
 
     @jax.jit 
@@ -86,4 +84,22 @@ def get_grad_v_funcs(loss_func, loss_func_sum):
     return grad_loss_volume, grad_loss_volume_sum
 
 
+# Loss from proj functions - to be used for MCMC for shifts
+def get_loss_proj_funcs(apply_shifts_and_ctf, x_grid, err_func = wl2sq, alpha = 0):
 
+
+    @jax.jit
+    def loss_proj_func(v, proj, shifts, ctf_params, img, sigma):
+        """L2 squared error with L2 regularization, where alpha is the
+        regularization parameter and sigma is the pixel-wise standard 
+        deviation of the noise."""
+
+        proj = apply_shifts_and_ctf(proj, shifts, ctf_params, x_grid)
+
+        return 1/2 * (alpha * l2sq(v) + err_func(proj, img, 1/sigma**2))
+
+    @jax.jit 
+    def loss_proj_func_batched(v, proj, shifts, ctf_params, imgs, sigma):
+        return jax.vmap(loss_proj_func, in_axes = (None, 0, 0, 0, 0, None))(v, proj, shifts, ctf_params, imgs, sigma)
+
+    return loss_proj_func_batched

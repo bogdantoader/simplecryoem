@@ -70,12 +70,24 @@ def project(vol, angles, shifts, ctf_params, grid_vol, grid_proj, interpolation_
     --------
 
     """
-   
+    
+    # Get the rotated coordinates of the projection in the z=0 plane.
+    proj = rotate_and_interpolate(vol, angles, grid_vol, grid_proj, interpolation_method = "tri")
+
+    # Apply the shift and the CTF.        
+    proj = apply_shifts_and_ctf(proj, shifts, ctf_params, grid_proj)
+    
+    return proj
+
+
+def rotate_and_interpolate(vol, angles, grid_vol, grid_proj, interpolation_method = "tri"):
     # Get the rotated coordinates of the projection in the z=0 plane.
     proj_coords = rotate_z0(grid_proj, angles) 
+    return interpolate(proj_coords, grid_vol, vol, interpolation_method)
 
-    proj = interpolate(proj_coords, grid_vol, vol, interpolation_method)
-
+# TODO: Set default ctf_params (e.g. ones) so that we don't need the if statement
+# and therefore we can jit this.
+def apply_shifts_and_ctf(proj, shifts, ctf_params, grid_proj):
     shift = get_shift_term(grid_proj, grid_proj, shifts)
     proj *= shift
 
@@ -86,13 +98,11 @@ def project(vol, angles, shifts, ctf_params, grid_vol, grid_proj, interpolation_
         theta  = jnp.arctan2(Y, X)
 
         ctf = eval_ctf(r, theta, ctf_params)
-
-        #plt.imshow(r); plt.colorbar()
-
         proj *= ctf.ravel()
     
     #return proj, proj_coords
     return proj
+
 
 def rotate_z0(grid_proj, angles):
     """Rotate the coordinates X, Y, Z=0
