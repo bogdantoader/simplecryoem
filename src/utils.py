@@ -346,11 +346,18 @@ def generate_uniform_orientations(N):
 
 def generate_uniform_orientations_jax(key, N):
     key1, key2, key3 = random.split(key, 3)
-    alpha = random.uniform(key1, (N,)) * 2 * np.pi 
-    gamma = random.uniform(key2, (N,)) * 2 * np.pi 
+    alpha = random.uniform(key1, (N,)) * 2 * jnp.pi 
+    gamma = random.uniform(key2, (N,)) * 2 * jnp.pi 
     z = random.uniform(key3, (N,)) *2 - 1
     beta = jnp.arccos(z)
     return jnp.array([alpha, beta, gamma]).transpose()
+
+def generate_uniform_shifts(key, N, B):
+    """Generate uniformly sampled shifts in [-B,B] x [-B,B]."""
+    
+    return random.uniform(key, (N,2)) * 2*B - B
+
+
 
 @jax.jit
 def l2sq(x, y = 0):
@@ -469,3 +476,13 @@ def compare_orientations(angles1, angles2):
 
     return theta
 
+@jax.jit
+def wrap_around_distance_2d(x1, x2, B):
+    """The wrap around distance between x1 and x2 on the square [-B, B]^2."""
+    d = jnp.abs(x1-x2)
+    d  = jnp.abs(jnp.minimum(d, 2*B-d))
+    return jnp.sqrt(jnp.sum(d**2))
+
+@jax.jit
+def wrap_arround_distance_2d_array(x1, x2, B):
+    return jax.vmap(wrap_around_distance_2d, in_axes=(0,0,None))(x1,x2,B)

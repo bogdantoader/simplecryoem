@@ -7,7 +7,7 @@ from  matplotlib import pyplot as plt
 import functools
 import time
 
-from src.utils import l2sq, generate_uniform_orientations_jax
+from src.utils import l2sq, generate_uniform_orientations_jax, generate_uniform_shifts
 
 
 
@@ -217,7 +217,6 @@ def proposal_hmc(key, logPi, x0, gradLogPi, dt_list, L = 1, M = 1, DH_thershold 
 
     # Doing this so that we don't compute gradLogPi(x1) twice.
     gradLogPiX0 = gradLogPi(x0)
-    logPiX0 = logPi(x0)
 
     #TODO: should probably replace the forloop with jax.fori_loop
     for i in jnp.arange(L):
@@ -275,6 +274,15 @@ def proposal_uniform_orientations(key, logPi, x0):
 
     return x1, r
 
+
+def proposal_uniform_shifts(key, logPi, x0, B):
+    """Same as the proposal_uniform_orientations function."""
+
+    N = x0.shape[0]
+    x1 = generate_uniform_shifts(key, N, B)
+    r = jnp.exp(logPi(x1) - logPi(x0))
+
+    return x1, r
 
 
 def mcmc(key, N_samples, proposal_func, logPi, x0, proposal_params = {}, N_batch = 1, save_samples = -1, verbose = True):
