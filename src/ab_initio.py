@@ -269,7 +269,7 @@ def ab_initio_mcmc(
             P = jnp.ones([nx,nx,nx])
 
     if vol0 is None and opt_vol_first:
-        N_vol_iter = 1000
+        N_vol_iter = 3000
         key, subkey = random.split(key)
         v, angles, shifts = initialize_ab_initio_vol(key, project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, imgs, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, use_sgd, learning_rate, batch_size,  P, B, interp_method, verbose)
     elif vol0 is None:    
@@ -441,7 +441,7 @@ def ab_initio_mcmc(
 
         # Increase radius
         # TODO: make this a parameter of the algorithm
-        if jnp.mod(idx_iter, 4)==0:
+        if jnp.mod(idx_iter, 8)==0:
             radius += dr
 
             if nx_iter == nx:
