@@ -359,11 +359,12 @@ def ab_initio_mcmc(
         logPi_shifts = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
 
         @jax.jit
-        def proposal_gaussian_shifts_func(key, x0):
+        def proposal_shifts_func(key, x0):
             return proposal_gaussian_shifts(key, x0, logPi_shifts, B)
+            #return proposal_uniform_shifts(key, x0, logPi_shifts, B)
 
         t0 = time.time()    
-        _, r_samples_shifts, samples_shifts = mcmc(key_angles, proposal_gaussian_shifts_func, shifts, N_samples_shifts, logPi_shifts, N, 1, verbose = True)
+        _, r_samples_shifts, samples_shifts = mcmc(key_angles, proposal_shifts_func, shifts, N_samples_shifts, logPi_shifts, N, 1, verbose = True)
         shifts = samples_shifts[N_samples_shifts-2] 
        
         if verbose:
@@ -390,9 +391,10 @@ def ab_initio_mcmc(
         def proposal_hmc_jit(key, x0):
             return proposal_hmc(key, x0, logPi_vol, gradLogPi_vol, jnp.array(dt_list), L, M_iter)
 
-        v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, proposal_hmc_jit, v, N_samples_vol, logPi_vol, save_samples = 1)
+        v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, proposal_hmc_jit, v, N_samples_vol, logPi_vol, save_samples = -1)
         #v = v_hmc_mean 
-        v = v_hmc_samples[N_samples_vol-2] 
+        #v = v_hmc_samples[N_samples_vol-2] 
+        v = v_hmc_samples[0] 
         v = v*mask3d
 
 
