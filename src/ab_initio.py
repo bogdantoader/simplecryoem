@@ -415,27 +415,26 @@ def ab_initio_mcmc(
                 plt.show()
 
         
-        if jnp.mod(idx_iter, 1)==0:
-            if verbose:
-                print(datetime.datetime.now())
-                print("  nx =", nx_iter)
+        if jnp.mod(idx_iter, 8)==0 and verbose:
+            print(datetime.datetime.now())
+            print("  nx =", nx_iter)
 
-                plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0]*mask3d[:,:,0])))
-                #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
-                plt.colorbar()
-                plt.show()
+            plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0]*mask3d[:,:,0])))
+            #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
+            plt.colorbar()
+            plt.show()
 
-                #plt.imshow(jnp.fft.fftshift((sigma_noise_iter*mask2d).reshape([nx_iter, nx_iter]))); 
-                #plt.colorbar()
-                #plt.show()
+            #plt.imshow(jnp.fft.fftshift((sigma_noise_iter*mask2d).reshape([nx_iter, nx_iter]))); 
+            #plt.colorbar()
+            #plt.show()
 
-                plot_angles(angles[:500])
-                plt.show()
+            plot_angles(angles[:500])
+            plt.show()
 
-            if save_to_file:
-                with mrcfile.new(out_dir + '/rec_iter_' + str(idx_iter) + '.mrc', overwrite=True) as mrc:
-                    vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
-                    mrc.set_data(vr.astype(np.float32))
+        if jnp.mod(idx_iter, 1)==0 and save_to_file:
+            with mrcfile.new(out_dir + '/rec_iter_' + str(idx_iter) + '.mrc', overwrite=True) as mrc:
+                vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
+                mrc.set_data(vr.astype(np.float32))
 
 
         # Increase radius
