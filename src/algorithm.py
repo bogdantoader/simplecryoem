@@ -6,7 +6,7 @@ from tqdm import tqdm
 from  matplotlib import pyplot as plt
 import time
 
-from src.utils import l2sq, generate_uniform_orientations_jax, generate_uniform_shifts
+from src.utils import l2sq, generate_uniform_orientations_jax, generate_uniform_shifts,generate_gaussian_shifts
 
 
 
@@ -275,6 +275,16 @@ def proposal_uniform_shifts(key, x0, logPi, B):
 
     N = x0.shape[0]
     x1 = generate_uniform_shifts(key, N, B)
+    r = jnp.exp(logPi(x1) - logPi(x0))
+
+    return x1, r
+
+
+def proposal_gaussian_shifts(key, x0, logPi, B):
+    """Same as the proposal_uniform_shifts function, but Guassian."""
+
+    N = x0.shape[0]
+    x1 = generate_gaussian_shifts(key, N, B)
     r = jnp.exp(logPi(x1) - logPi(x0))
 
     return x1, r

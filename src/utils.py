@@ -357,6 +357,11 @@ def generate_uniform_shifts(key, N, B):
     
     return random.uniform(key, (N,2)) * 2*B - B
 
+def generate_gaussian_shifts(key, N, B):
+    """Generate normally sampled shifts around (0,0) 
+    with standard deviation B."""
+    
+    return random.normal(key, (N,2)) * B 
 
 
 @jax.jit
