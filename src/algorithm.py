@@ -219,7 +219,17 @@ def proposal_hmc(key, x0, logPi, gradLogPi, dt_list, L = 1, M = 1):
 
     body_func = lambda i, xpg0: leapfrog_step(i, xpg0, dt, gradLogPi, M) 
 
-    x1, p1, _ = jax.lax.fori_loop(0, L, body_func, jnp.array([x0, p0, gradLogPiX0]))
+#    x1, p1, _ = jax.lax.fori_loop(0, L, body_func, jnp.array([x0, p0, gradLogPiX0]))
+    # Trying regular for loop to avoid the OOM issue maybe?
+    # Yup working now - looks like fori_loop+jit leads to
+    # some memory leak? try to reproduce and submit bug
+    x1 = x0
+    p1 = p0
+    gradLogPiX1 = gradLogPiX0
+    print("a")
+    for i in range(0, L):
+        x1, p1, gradLogPiX1 = body_func(i, jnp.array([x1, p1, gradLogPiX1]))
+    print("b")
 
     logPiX1 = logPi(x1)
     r1exponent = logPiX1 - jnp.sum(jnp.real(jnp.conj(p1) * p1))/2

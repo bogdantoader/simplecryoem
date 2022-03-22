@@ -331,6 +331,7 @@ def ab_initio_mcmc(
         # Sample the orientations
         logPi_angles_batch = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
 
+        @jax.jit
         def proposal_uniform_orientations_func(key, angles0):
             return proposal_uniform_orientations(key, angles0, logPi_angles_batch)
 
@@ -387,6 +388,26 @@ def ab_initio_mcmc(
         #M_iter = 1/jnp.max(sigma_noise_iter)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
         M_iter = 1/jnp.max(sigma_noise)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
 
+        #Q: should logPi_vol and gradLogPi_vol be jit compiled too?
+        #Q2: maybe all the parameters (e.g. logPi, L, M_iter)
+        # should just be passed in a dict (for all proposal funcs)
+        # including in the mcmc function, so that we don't
+        # need to recompile the proposal funcs at each iteration?
+        # This way the jit annotation goes directly in the
+        # proposal defintion, no need to redefine here
+        # Actually not sure that would work, as the output
+        # of the function depends on a param and jax doesnt
+        # handle that
+
+        # maybe put an if statement to only generate new
+        #proposal funcs (and compile them) when the dimension
+        # changed. Similarly, for all the other places
+        # where we create new _iter funcs - i think those
+        # get recompiled at each iteration, ooopss..
+
+        # There should be a way where there is no need to
+        # recompile - after all, if the dimensions stay the 
+        # same between iterations, it should be all good.
         @jax.jit
         def proposal_hmc_jit(key, x0):
             return proposal_hmc(key, x0, logPi_vol, gradLogPi_vol, jnp.array(dt_list), L, M_iter)
