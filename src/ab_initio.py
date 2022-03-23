@@ -361,7 +361,9 @@ def ab_initio_mcmc(
 
         @jax.jit
         def proposal_shifts_func(key, x0):
-            return proposal_gaussian_shifts(key, x0, logPi_shifts, B)
+            key, subkey =  random.split(key)
+            B0 = random.shuffle(subkey, B)[0]
+            return proposal_gaussian_shifts(key, x0, logPi_shifts, B0)
             #return proposal_uniform_shifts(key, x0, logPi_shifts, B)
 
         t0 = time.time()    
