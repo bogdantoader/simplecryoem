@@ -211,8 +211,7 @@ def proposal_hmc(key, x0, logPi, gradLogPi, dt_list, L = 1, M = 1):
     #print("dt =", dt) 
 
     p0 = random.normal(key, x0.shape) * M
-    logPiX0 = logPi(x0)
-    r0exponent = logPiX0 - jnp.sum(jnp.real(jnp.conj(p0) * p0))/2
+    r0exponent = logPi(x0) - jnp.sum(jnp.real(jnp.conj(p0) * p0))/2
 
     # Doing this so that we don't compute gradLogPi(x1) twice.
     gradLogPiX0 = gradLogPi(x0)
@@ -229,10 +228,9 @@ def proposal_hmc(key, x0, logPi, gradLogPi, dt_list, L = 1, M = 1):
     for i in range(0, L):
         x1, p1, gradLogPiX1 = body_func(i, jnp.array([x1, p1, gradLogPiX1]))
 
-    logPiX1 = logPi(x1)
-    r1exponent = logPiX1 - jnp.sum(jnp.real(jnp.conj(p1) * p1))/2
+    r1exponent = logPi(x1) - jnp.sum(jnp.real(jnp.conj(p1) * p1))/2
     r = jnp.exp(r1exponent - r0exponent)
-
+    
     return x1, r
 
 
@@ -273,27 +271,29 @@ def proposal_uniform_orientations(key, x0, logPi):
 
     N = x0.shape[0]
     x1 = generate_uniform_orientations_jax(key, N)
-    r = jnp.exp(logPi(x1) - logPi(x0))
 
+    logPix1x0 = jax.vmap(logPi)(jnp.array([x1,x0]))
+    r = jnp.exp(logPix1x0[0] - logPix1x0[1])
+    
     return x1, r
 
 
 def proposal_uniform_shifts(key, x0, logPi, B):
     """Same as the proposal_uniform_orientations function."""
-
     N = x0.shape[0]
     x1 = generate_uniform_shifts(key, N, B)
     r = jnp.exp(logPi(x1) - logPi(x0))
 
     return x1, r
 
-
 def proposal_gaussian_shifts(key, x0, logPi, B):
     """Same as the proposal_uniform_shifts function, but Guassian."""
 
     N = x0.shape[0]
     x1 = generate_gaussian_shifts(key, N, B)
-    r = jnp.exp(logPi(x1) - logPi(x0))
+
+    logPix1x0 = jax.vmap(logPi)(jnp.array([x1,x0]))
+    r = jnp.exp(logPix1x0[0] - logPix1x0[1])
 
     return x1, r
 

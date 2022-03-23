@@ -286,6 +286,7 @@ def ab_initio_mcmc(
     # at each iteration.
     sigma_noise = sigma_noise.reshape([1, nx, nx])
     nx_iter = 0
+    recompile = True
     for idx_iter in range(N_iter):
         #if nx_iter == nx and jnp.mod(idx_iter, 7)==0:
         #   N_samples_angles = 1000
@@ -294,42 +295,40 @@ def ab_initio_mcmc(
 
         if verbose:
             print("Iter ", idx_iter)
-   
-        # The nx of the volume at the current iteration        
-        mask3d = create_3d_mask(x_grid, (0,0,0), radius)
-        nx_iter = jnp.sum(mask3d[0,0,:]).astype(jnp.int64)
-        # Ensure that we work with even images so that all the masking stuff works
-        if jnp.mod(nx_iter,2) == 1:
-            nx_iter +=1
+  
+        if recompile:
+            # The nx of the volume at the current iteration        
+            mask3d = create_3d_mask(x_grid, (0,0,0), radius)
+            nx_iter = jnp.sum(mask3d[0,0,:]).astype(jnp.int64)
+            # Ensure that we work with even images so that all the masking stuff works
+            if jnp.mod(nx_iter,2) == 1:
+                nx_iter +=1
 
-        # At the first iteration, we reduce the size (from v0) while 
-        # afterwards, we increase it (frequency marching).
-        if idx_iter == 0:
-            v, _ = crop_fourier_volume(v, x_grid, nx_iter)
-        else:
-            v, _ = rescale_larger_grid(v, x_grid_iter, nx_iter) 
+            # At the first iteration, we reduce the size (from v0) while 
+            # afterwards, we increase it (frequency marching).
+            if idx_iter == 0:
+                v, _ = crop_fourier_volume(v, x_grid, nx_iter)
+            else:
+                v, _ = rescale_larger_grid(v, x_grid_iter, nx_iter) 
 
-        # Crop the images to the right size
-        imgs_iter, x_grid_iter = crop_fourier_images(imgs, x_grid, nx_iter)
-        imgs_iter = imgs_iter.reshape([N,nx_iter*nx_iter])
-        sigma_noise_iter, _ = crop_fourier_images(sigma_noise, x_grid, nx_iter)
-        sigma_noise_iter = sigma_noise_iter.reshape(-1)
-        mask3d = create_3d_mask(x_grid_iter, (0,0,0),  radius)
-        mask2d = mask3d[0].reshape(1,-1)
+            # Crop the images to the right size
+            imgs_iter, x_grid_iter = crop_fourier_images(imgs, x_grid, nx_iter)
+            imgs_iter = imgs_iter.reshape([N,nx_iter*nx_iter])
+            sigma_noise_iter, _ = crop_fourier_images(sigma_noise, x_grid, nx_iter)
+            sigma_noise_iter = sigma_noise_iter.reshape(-1)
+            mask3d = create_3d_mask(x_grid_iter, (0,0,0),  radius)
+            mask2d = mask3d[0].reshape(1,-1)
+            imgs_iter = imgs_iter*mask2d
+            #v = v * mask3d
 
-        v = v * mask3d
-
-        if use_sgd and P is not None:
-            P_iter, _ = crop_fourier_volume(P, x_grid, nx_iter)
-
-        # Get the operators for the dimensions at this iteration.
-        slice_func_array_angles_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter, loss_proj_func_batched0_iter, rotate_and_interpolate_iter = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid_iter, mask3d, alpha, interp_method)
+            # Get the operators for the dimensions at this iteration.
+            slice_func_array_angles_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter, loss_proj_func_batched0_iter, rotate_and_interpolate_iter = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid_iter, mask3d, alpha, interp_method)
 
 
         key, key_angles, key_shifts = random.split(key, 3)
 
         # Sample the orientations
-        logPi_angles_batch = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
+        logPi_angles_batch = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, sigma_noise_iter)
 
         @jax.jit
         def proposal_uniform_orientations_func(key, angles0):
@@ -354,17 +353,14 @@ def ab_initio_mcmc(
 
         print("Sampling shifts")
         proj = rotate_and_interpolate_iter(jnp.array(v), angles)
-
-        #logPi_shifts_batch = lambda sh : -loss_func_batched0_iter(v, angles, shifts_true, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
-
-        logPi_shifts = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
-
+        logPi_shifts = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs_iter, sigma_noise_iter)
+    
         @jax.jit
         def proposal_shifts_func(key, x0):
             key, subkey =  random.split(key)
             B0 = random.permutation(subkey, B_list)[0]
             return proposal_gaussian_shifts(key, x0, logPi_shifts, B0)
-            #return proposal_uniform_shifts(key, x0, logPi_shifts, B)
+            #return proposal_uniform_shifts(key, x0, logPi_shifts, B0)
 
         t0 = time.time()    
         _, r_samples_shifts, samples_shifts = mcmc(key_angles, proposal_shifts_func, shifts, N_samples_shifts, logPi_shifts, N, 1, verbose = True)
@@ -383,9 +379,9 @@ def ab_initio_mcmc(
         v0 = jnp.zeros([nx_iter,nx_iter,nx_iter])* 1j
         key, subkey = random.split(key)
         
-        logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
-        gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_sum_iter(v, angles, shifts, ctf_params, imgs_iter*mask2d, sigma_noise_iter))
-        #gradLogPi_vol = lambda v : gradLogPi_split(v, angles, shifts, ctf_params, imgs_iter*mask2d, sigma_noise_iter, grad_loss_volume_sum_iter, 20) 
+        logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter)
+        gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter))
+        #gradLogPi_vol = lambda v : gradLogPi_split(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter, grad_loss_volume_sum_iter, 20) 
     
         #M_iter = 1/jnp.max(sigma_noise_iter)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
         M_iter = 1/jnp.max(sigma_noise)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
@@ -410,7 +406,10 @@ def ab_initio_mcmc(
         # There should be a way where there is no need to
         # recompile - after all, if the dimensions stay the 
         # same between iterations, it should be all good.
-        @jax.jit
+
+        # For some reason, this is faster when not jitted 
+        #( at least in the first iterations, to see if true later too)
+        #@jax.jit
         def proposal_hmc_jit(key, x0):
             return proposal_hmc(key, x0, logPi_vol, gradLogPi_vol, jnp.array(dt_list), L, M_iter)
 
@@ -427,9 +426,9 @@ def ab_initio_mcmc(
 
             if diagnostics:
                 #ff ,lf =  get_diagnostics_funs_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
-                #fid = ff(v, angles, shifts, ctf_params, imgs_iter*mask2d, sigma_noise_iter)
+                #fid = ff(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter)
                 #reg = 1/2 * l2sq(v) * alpha
-                #loss = lf(v, angles, shifts,ctf_params, imgs_iter*mask2d,sigma_noise_iter)
+                #loss = lf(v, angles, shifts,ctf_params, imgs_iter,sigma_noise_iter)
                 #print("  fid =", fid)
                 #print("  reg =", reg)
                 #print("  loss =", loss)
@@ -466,9 +465,13 @@ def ab_initio_mcmc(
         # TODO: make this a parameter of the algorithm
         if jnp.mod(idx_iter, 8)==0:
             radius += dr
+            recompile = True
 
             if nx_iter == nx:
                 break
+
+        else:
+            recompile = False
 
 
     # At the end, take the mean 
@@ -559,6 +562,7 @@ def get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and
     _, loss_func_batched0, _, _ = get_loss_funcs(slice_func, alpha = 0)
     loss_proj_func_batched0 = get_loss_proj_funcs(apply_shifts_and_ctf_func, x_grid, alpha = 0)
 
+    @jax.jit
     def rotate_and_interpolate(v, angles):
         return jax.vmap(rotate_and_interpolate_func, in_axes=(None,0,None,None))(v*mask, angles, x_grid, x_grid)
 
