@@ -218,7 +218,7 @@ def ab_initio_mcmc(
         dr = None, 
         alpha = 0, 
         eps_vol = 1e-16, 
-        B = 1,
+        B_list = [1],
         interp_method = 'tri', 
         opt_vol_first = True, 
         verbose = True, 
@@ -271,7 +271,7 @@ def ab_initio_mcmc(
     if vol0 is None and opt_vol_first:
         N_vol_iter = 3000
         key, subkey = random.split(key)
-        v, angles, shifts = initialize_ab_initio_vol(key, project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, imgs, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, use_sgd, learning_rate, batch_size,  P, B, interp_method, verbose)
+        v, angles, shifts = initialize_ab_initio_vol(key, project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, imgs, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, use_sgd, learning_rate, batch_size,  P, B_list, interp_method, verbose)
     elif vol0 is None:    
         v = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
     else:
@@ -362,7 +362,7 @@ def ab_initio_mcmc(
         @jax.jit
         def proposal_shifts_func(key, x0):
             key, subkey =  random.split(key)
-            B0 = random.shuffle(subkey, B)[0]
+            B0 = random.permutation(subkey, B_list)[0]
             return proposal_gaussian_shifts(key, x0, logPi_shifts, B0)
             #return proposal_uniform_shifts(key, x0, logPi_shifts, B)
 
