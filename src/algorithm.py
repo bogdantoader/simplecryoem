@@ -225,13 +225,14 @@ def proposal_hmc(key, x0, logPi, gradLogPi, dt_list, L = 1, M = 1):
     x1 = x0
     p1 = p0
     gradLogPiX1 = gradLogPiX0
-    for i in range(0, L):
+    for i in jnp.arange(0, L):
         x1, p1, gradLogPiX1 = body_func(i, jnp.array([x1, p1, gradLogPiX1]))
 
-    r1exponent = logPi(x1) - jnp.sum(jnp.real(jnp.conj(p1) * p1))/2
+    logPiX1 = logPi(x1)
+    r1exponent = logPiX1 - jnp.sum(jnp.real(jnp.conj(p1) * p1))/2
     r = jnp.exp(r1exponent - r0exponent)
     
-    return x1, r
+    return x1, r, logPiX1
 
 
 def leapfrog_step(i, xpg0, dt, gradLogPi, M):
@@ -298,7 +299,7 @@ def proposal_gaussian_shifts(key, x0, logPi, B):
     return x1, r
 
 
-def mcmc(key, proposal_func, x0, N_samples, logPi, N_batch = 1, save_samples = -1, verbose = True):
+def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_samples = -1, verbose = True):
     """Generic code for MCMC sampling.
 
     Parameters:
@@ -354,7 +355,7 @@ def mcmc(key, proposal_func, x0, N_samples, logPi, N_batch = 1, save_samples = -
         #t0 = time.time()
 
         x0 = x1
-        x1, r = proposal_func(keys[2*i], x0)
+        x1, r, logPiX1 = proposal_func(keys[2*i], x0, **proposal_params)
         a = jnp.minimum(1, r)
         r_samples.append(a)
   
@@ -372,13 +373,13 @@ def mcmc(key, proposal_func, x0, N_samples, logPi, N_batch = 1, save_samples = -
 
         if verbose and jnp.mod(i, 100) == 0:
             if N_batch > 1:
-                loss_i = jnp.abs(jnp.mean(logPi(x1)))
+                loss_i = jnp.abs(jnp.mean(logPiX1))
                 #print("  Iter", i, ", a_mean = ", jnp.mean(a))
                 print("  MC sample", i, ", loss =", loss_i)
             else:
-                loss_i = jnp.abs(logPi(x_mean))
+                loss_i = jnp.abs(logPiX1)
                 print("  Iter", i, ", a = ", a)
-                print("  MC sample", i, ", loss (of mean) =", loss_i)
+                print("  MC sample", i, ", loss =", loss_i)
 
             #plt.imshow(jnp.fft.fftshift(jnp.abs(x_mean[0]))); plt.colorbar()
             #plt.show()

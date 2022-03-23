@@ -321,22 +321,23 @@ def ab_initio_mcmc(
             imgs_iter = imgs_iter*mask2d
             #v = v * mask3d
 
+            #M_iter = 1/jnp.max(sigma_noise_iter)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
+            M_iter = 1/jnp.max(sigma_noise)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
             # Get the operators for the dimensions at this iteration.
             slice_func_array_angles_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter, loss_proj_func_batched0_iter, rotate_and_interpolate_iter = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid_iter, mask3d, alpha, interp_method)
+
+            proposal_func_orientations, proposal_func_shifts, proposal_func_vol = get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, ctf_params, imgs_iter, sigma_noise_iter, B_list, dt_list, L, M_iter)
 
 
         key, key_angles, key_shifts = random.split(key, 3)
 
         # Sample the orientations
-        logPi_angles_batch = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, sigma_noise_iter)
-
-        @jax.jit
-        def proposal_uniform_orientations_func(key, angles0):
-            return proposal_uniform_orientations(key, angles0, logPi_angles_batch)
-
         print("Sampling orientations") 
+
+        params_orientations = {'v':v, 'shifts':shifts}
+
         t0 = time.time()    
-        _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_uniform_orientations_func, angles, N_samples_angles, logPi_angles_batch, N, 1, verbose = True)
+        _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_func_orientations, angles, N_samples_angles, params_orientations, N, 1, verbose = True)
         angles = samples_angles[N_samples_angles-2] 
          
         diagnostics = False 
@@ -353,17 +354,11 @@ def ab_initio_mcmc(
 
         print("Sampling shifts")
         proj = rotate_and_interpolate_iter(jnp.array(v), angles)
-        logPi_shifts = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs_iter, sigma_noise_iter)
-    
-        @jax.jit
-        def proposal_shifts_func(key, x0):
-            key, subkey =  random.split(key)
-            B0 = random.permutation(subkey, B_list)[0]
-            return proposal_gaussian_shifts(key, x0, logPi_shifts, B0)
-            #return proposal_uniform_shifts(key, x0, logPi_shifts, B0)
+
+        params_shifts = {'v':v, 'proj':proj}
 
         t0 = time.time()    
-        _, r_samples_shifts, samples_shifts = mcmc(key_angles, proposal_shifts_func, shifts, N_samples_shifts, logPi_shifts, N, 1, verbose = True)
+        _, r_samples_shifts, samples_shifts = mcmc(key_angles, proposal_func_shifts, shifts, N_samples_shifts, params_shifts, N, 1, verbose = True)
         shifts = samples_shifts[N_samples_shifts-2] 
        
         if verbose:
@@ -371,49 +366,14 @@ def ab_initio_mcmc(
             print("  mean(a_shifts) =", jnp.mean(r_samples_shifts))
 
 
-
         # Sample the volume
         print("Sampling the volume")
 
+
+        params_vol = {'angles':angles, 'shifts':shifts}
+
         t0 = time.time()
-        v0 = jnp.zeros([nx_iter,nx_iter,nx_iter])* 1j
-        key, subkey = random.split(key)
-        
-        logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter)
-        gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter))
-        #gradLogPi_vol = lambda v : gradLogPi_split(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter, grad_loss_volume_sum_iter, 20) 
-    
-        #M_iter = 1/jnp.max(sigma_noise_iter)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
-        M_iter = 1/jnp.max(sigma_noise)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
-
-        #Q: should logPi_vol and gradLogPi_vol be jit compiled too?
-        #Q2: maybe all the parameters (e.g. logPi, L, M_iter)
-        # should just be passed in a dict (for all proposal funcs)
-        # including in the mcmc function, so that we don't
-        # need to recompile the proposal funcs at each iteration?
-        # This way the jit annotation goes directly in the
-        # proposal defintion, no need to redefine here
-        # Actually not sure that would work, as the output
-        # of the function depends on a param and jax doesnt
-        # handle that
-
-        # maybe put an if statement to only generate new
-        #proposal funcs (and compile them) when the dimension
-        # changed. Similarly, for all the other places
-        # where we create new _iter funcs - i think those
-        # get recompiled at each iteration, ooopss..
-
-        # There should be a way where there is no need to
-        # recompile - after all, if the dimensions stay the 
-        # same between iterations, it should be all good.
-
-        # For some reason, this is faster when not jitted 
-        #( at least in the first iterations, to see if true later too)
-        #@jax.jit
-        def proposal_hmc_jit(key, x0):
-            return proposal_hmc(key, x0, logPi_vol, gradLogPi_vol, jnp.array(dt_list), L, M_iter)
-
-        v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, proposal_hmc_jit, v, N_samples_vol, logPi_vol, save_samples = -1)
+        v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, proposal_func_vol, v, N_samples_vol, params_vol, save_samples = -1)
         #v = v_hmc_mean 
         #v = v_hmc_samples[N_samples_vol-2] 
         v = v_hmc_samples[0] 
@@ -567,6 +527,60 @@ def get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and
         return jax.vmap(rotate_and_interpolate_func, in_axes=(None,0,None,None))(v*mask, angles, x_grid, x_grid)
 
     return slice_func_array_angles, grad_loss_volume_sum, loss_func_angles, loss_func_batched0, loss_func_sum, loss_proj_func_batched0, rotate_and_interpolate
+
+
+#TODO: the three functions can be separated, it would be neater
+def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, ctf_params, imgs_iter, sigma_noise_iter, B_list, dt_list, L, M_iter):
+
+
+    @jax.jit
+    def proposal_func_orientations(key, angles0, v, shifts):
+        logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, sigma_noise_iter)
+
+        N = angles0.shape[0]
+        angles1 = generate_uniform_orientations_jax(key, N)
+
+        logPia1a0 = jax.vmap(logPi)(jnp.array([angles1,angles0]))
+        r = jnp.exp(logPia1a0[0] - logPia1a0[1])
+        
+        return angles1, r, logPia1a0[0]
+    
+    @jax.jit
+    def proposal_func_shifts(key, shifts0, v, proj):
+        logPi = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs_iter, sigma_noise_iter)
+
+        key, subkey =  random.split(key)
+        B0 = random.permutation(subkey, B_list)[0]
+
+        
+        N = shifts0.shape[0]
+        shifts1 = generate_gaussian_shifts(key, N, B0)
+
+        logPis1s0 = jax.vmap(logPi)(jnp.array([shifts1, shifts0]))
+        r = jnp.exp(logPis1s0[0] - logPis1s0[1])
+
+        return shifts1, r, logPis1s0[0]
+    
+    @jax.jit
+    def proposal_func_vol(key, v0, angles, shifts):
+        key, subkey = random.split(key)
+        
+        logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter)
+        gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter))
+        #gradLogPi_vol = lambda v : gradLogPi_split(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter, grad_loss_volume_sum_iter, 20) 
+    
+
+        # For some reason, this is faster when not jitted 
+        #( at least in the first iterations, to see if true later too)
+        #@jax.jit
+        return proposal_hmc(key, v0, logPi_vol, gradLogPi_vol, dt_list, L, M_iter)
+
+
+    return proposal_func_orientations, proposal_func_shifts, proposal_func_vol 
+
+
+
+
 
 # Cached angles sampling
 
