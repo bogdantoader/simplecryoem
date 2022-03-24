@@ -1,5 +1,6 @@
 import time
 import datetime
+import pickle
 import jax
 import jax.numpy as jnp
 from jax import random
@@ -175,6 +176,15 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
                 with mrcfile.new(out_dir + '/rec_iter_' + str(idx_iter) + '.mrc', overwrite=True) as mrc:
                     vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
                     mrc.set_data(vr.astype(np.float32))
+
+                file = open(out_dir + '/rec_iter_' + str(idx_iter) + '_angles', 'wb')
+                pickle.dump(angles, file)
+                file.close()
+
+                file3 = open(out_dir + '/rec_iter_' + str(idx_iter) + '_shifts', 'wb')
+                pickle.dump(shifts, file3)
+                file3.close()
+
 
         # Increase radius
         # TODO: make this a parameter of the algorithm
@@ -420,6 +430,15 @@ def ab_initio_mcmc(
                 vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
                 mrc.set_data(vr.astype(np.float32))
 
+            #TODO: should probably print to a star file instead
+            file = open(out_dir + '/rec_iter_' + str(idx_iter) + '_angles', 'wb')
+            pickle.dump(angles, file)
+            file.close()
+
+            file3 = open(out_dir + '/rec_iter_' + str(idx_iter) + '_shifts', 'wb')
+            pickle.dump(shifts, file3)
+            file3.close()
+
 
         # Increase radius
         # TODO: make this a parameter of the algorithm
@@ -532,6 +551,8 @@ def get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and
 #TODO: the three functions can be separated, it would be neater
 def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, ctf_params, imgs_iter, sigma_noise_iter, B_list, dt_list, L, M_iter):
 
+    #TODO: maybe pass logPiX0 to the proposal function so that
+    # we only need to compute logPiX1 - should reduce the time/memory by half?
 
     @jax.jit
     def proposal_func_orientations(key, angles0, v, shifts):

@@ -352,13 +352,12 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
 
     x1 = x0
     for i in range(1, N_samples):
-        #t0 = time.time()
-
         x0 = x1
         x1, r, logPiX1 = proposal_func(keys[2*i], x0, **proposal_params)
+
         a = jnp.minimum(1, r)
         r_samples.append(a)
-  
+
         if N_batch > 1:
             unif_var = random.uniform(keys[2*i+1], (N_batch,)) 
             x1 = accept_reject_vmap(unif_var, a, x0, x1)
@@ -393,12 +392,12 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
 
     return x_mean, r_samples, samples 
 
-
+#@jax.jit
 def accept_reject_scalar(unif_var, a, x0, x1):
     return jax.lax.cond(unif_var <= a, 
         true_fun = lambda _ : x1,
         false_fun = lambda _ : x0,
         operand = None)
 
-accept_reject_vmap = jax.vmap(accept_reject_scalar, in_axes = (0, 0, 0, 0))
+accept_reject_vmap = jax.jit(jax.vmap(accept_reject_scalar, in_axes = (0, 0, 0, 0)))
 
