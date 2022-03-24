@@ -209,6 +209,8 @@ def proposal_hmc(key, x0, logPiX0, logPi, gradLogPi, dt_list, L = 1, M = 1):
     dt = random.permutation(subkey, dt_list)[0]
     #print("dt =", dt) 
 
+    #logPiX0 = logPi(x0)
+
     p0 = random.normal(key, x0.shape) * M
     r0exponent = logPiX0 - jnp.sum(jnp.real(jnp.conj(p0) * p0))/2
 
@@ -231,7 +233,7 @@ def proposal_hmc(key, x0, logPiX0, logPi, gradLogPi, dt_list, L = 1, M = 1):
     r1exponent = logPiX1 - jnp.sum(jnp.real(jnp.conj(p1) * p1))/2
     r = jnp.exp(r1exponent - r0exponent)
     
-    return x1, r, logPiX1
+    return x1, r, logPiX1, logPiX0
 
 
 def leapfrog_step(i, xpg0, dt, gradLogPi, M):
@@ -397,7 +399,7 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
 
     return x_mean, r_samples, samples 
 
-#@jax.jit
+@jax.jit
 def accept_reject_scalar(unif_var, a, x0, x1, logPiX0, logPiX1):
     x = jax.lax.cond(unif_var <= a, 
         true_fun = lambda _ : x1,

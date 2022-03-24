@@ -349,7 +349,7 @@ def ab_initio_mcmc(
         t0 = time.time()    
         _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_func_orientations, angles, N_samples_angles, params_orientations, N, 1, verbose = True)
         angles = samples_angles[N_samples_angles-2] 
-         
+
         diagnostics = False 
 
         if verbose:
@@ -370,7 +370,7 @@ def ab_initio_mcmc(
         t0 = time.time()    
         _, r_samples_shifts, samples_shifts = mcmc(key_angles, proposal_func_shifts, shifts, N_samples_shifts, params_shifts, N, 1, verbose = True)
         shifts = samples_shifts[N_samples_shifts-2] 
-       
+
         if verbose:
             print("  Time shifts sampling =", time.time()-t0)
             print("  mean(a_shifts) =", jnp.mean(r_samples_shifts))
@@ -378,7 +378,6 @@ def ab_initio_mcmc(
 
         # Sample the volume
         print("Sampling the volume")
-
 
         params_vol = {'angles':angles, 'shifts':shifts}
 
@@ -611,9 +610,8 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
             false_fun = lambda _ : logPiX0,
             operand = None)
 
-        v1, r, logPiX1 = proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, dt_list, L, M_iter)
+        return proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, dt_list, L, M_iter)
 
-        return v1, r, logPiX1, logPiX0
 
 
     return proposal_func_orientations, proposal_func_shifts, proposal_func_vol 
