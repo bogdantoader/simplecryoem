@@ -196,7 +196,6 @@ def proposal_mala(key, x0, logPi, gradLogPi, tau):
 
     return x1, r
 
-
 def proposal_hmc(key, x0, logPiX0, logPi, gradLogPi, dt_list, L = 1, M = 1):
     """ Hamiltonian Monte Carlo proposal function.
     For simplicity, the mass matrix M is an array of 
@@ -351,28 +350,32 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
     x_mean = jnp.zeros(x0.shape)
 
     x1 = x0
-    logPiX1 = jnp.inf 
+
+    if N_batch > 1:
+        logPiX1 = jnp.inf*jnp.ones(N_batch)
+    else:
+        logPiX1 = jnp.inf 
     for i in range(1, N_samples):
         x0 = x1
         logPiX0 = logPiX1
-        x1, r, logPiX1 = proposal_func(keys[2*i], x0, logPiX0, **proposal_params)
+        x1, r, logPiX1, logPiX0 = proposal_func(keys[2*i], x0, logPiX0, **proposal_params)
 
         a = jnp.minimum(1, r)
         r_samples.append(a)
 
         if N_batch > 1:
             unif_var = random.uniform(keys[2*i+1], (N_batch,)) 
-            x1 = accept_reject_vmap(unif_var, a, x0, x1)
+            x1, logPiX1 = accept_reject_vmap(unif_var, a, x0, x1, logPiX0, logPiX1)
         else:
             unif_var = random.uniform(keys[2*i+1]) 
-            x1 = accept_reject_scalar(unif_var, a, x0, x1)
+            x1, logPiX1 = accept_reject_scalar(unif_var, a, x0, x1, logPiX0, logPiX1)
 
         x_mean = (x_mean * (i-1) + x1) / i
         
         if save_samples > 0 and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
-        if verbose and jnp.mod(i, 10) == 0:
+        if verbose and jnp.mod(i, 100) == 0:
             if N_batch > 1:
                 loss_i = jnp.abs(jnp.mean(logPiX1))
                 #print("  Iter", i, ", a_mean = ", jnp.mean(a))
@@ -395,11 +398,18 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
     return x_mean, r_samples, samples 
 
 #@jax.jit
-def accept_reject_scalar(unif_var, a, x0, x1):
-    return jax.lax.cond(unif_var <= a, 
+def accept_reject_scalar(unif_var, a, x0, x1, logPiX0, logPiX1):
+    x = jax.lax.cond(unif_var <= a, 
         true_fun = lambda _ : x1,
         false_fun = lambda _ : x0,
         operand = None)
 
-accept_reject_vmap = jax.jit(jax.vmap(accept_reject_scalar, in_axes = (0, 0, 0, 0)))
+    logPiX = jax.lax.cond(unif_var <= a, 
+        true_fun = lambda _ : logPiX1,
+        false_fun = lambda _ : logPiX0,
+        operand = None)
+
+    return x, logPiX
+
+accept_reject_vmap = jax.jit(jax.vmap(accept_reject_scalar, in_axes = (0, 0, 0, 0, 0, 0)))
 
