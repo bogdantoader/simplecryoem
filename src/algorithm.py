@@ -197,7 +197,7 @@ def proposal_mala(key, x0, logPi, gradLogPi, tau):
     return x1, r
 
 
-def proposal_hmc(key, x0, logPi, gradLogPi, dt_list, L = 1, M = 1):
+def proposal_hmc(key, x0, logPiX0, logPi, gradLogPi, dt_list, L = 1, M = 1):
     """ Hamiltonian Monte Carlo proposal function.
     For simplicity, the mass matrix M is an array of 
     entry-wise scalings (i.e. a diagonal matrix).
@@ -211,7 +211,7 @@ def proposal_hmc(key, x0, logPi, gradLogPi, dt_list, L = 1, M = 1):
     #print("dt =", dt) 
 
     p0 = random.normal(key, x0.shape) * M
-    r0exponent = logPi(x0) - jnp.sum(jnp.real(jnp.conj(p0) * p0))/2
+    r0exponent = logPiX0 - jnp.sum(jnp.real(jnp.conj(p0) * p0))/2
 
     # Doing this so that we don't compute gradLogPi(x1) twice.
     gradLogPiX0 = gradLogPi(x0)
@@ -351,9 +351,11 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
     x_mean = jnp.zeros(x0.shape)
 
     x1 = x0
+    logPiX1 = jnp.inf 
     for i in range(1, N_samples):
         x0 = x1
-        x1, r, logPiX1 = proposal_func(keys[2*i], x0, **proposal_params)
+        logPiX0 = logPiX1
+        x1, r, logPiX1 = proposal_func(keys[2*i], x0, logPiX0, **proposal_params)
 
         a = jnp.minimum(1, r)
         r_samples.append(a)
@@ -370,7 +372,7 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
         if save_samples > 0 and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
-        if verbose and jnp.mod(i, 100) == 0:
+        if verbose and jnp.mod(i, 10) == 0:
             if N_batch > 1:
                 loss_i = jnp.abs(jnp.mean(logPiX1))
                 #print("  Iter", i, ", a_mean = ", jnp.mean(a))

@@ -548,53 +548,58 @@ def get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and
     return slice_func_array_angles, grad_loss_volume_sum, loss_func_angles, loss_func_batched0, loss_func_sum, loss_proj_func_batched0, rotate_and_interpolate
 
 
-#TODO: the three functions can be separated, it would be neater
 def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, ctf_params, imgs_iter, sigma_noise_iter, B_list, dt_list, L, M_iter):
 
     #TODO: maybe pass logPiX0 to the proposal function so that
     # we only need to compute logPiX1 - should reduce the time/memory by half?
 
     @jax.jit
-    def proposal_func_orientations(key, angles0, v, shifts):
+    def proposal_func_orientations(key, angles0, logPiX0, v, shifts):
         logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, sigma_noise_iter)
 
         N = angles0.shape[0]
         angles1 = generate_uniform_orientations_jax(key, N)
 
-        logPia1a0 = jax.vmap(logPi)(jnp.array([angles1,angles0]))
-        r = jnp.exp(logPia1a0[0] - logPia1a0[1])
+        logPiX1 = logPi(angles1)
+        r = jnp.exp(logPiX1 - logPiX0)
+
+        #logPia1a0 = jax.vmap(logPi)(jnp.array([angles1,angles0]))
+        #r = jnp.exp(logPia1a0[0] - logPia1a0[1])
         
-        return angles1, r, logPia1a0[0]
+        return angles1, r, logPiX1
     
     @jax.jit
-    def proposal_func_shifts(key, shifts0, v, proj):
+    def proposal_func_shifts(key, shifts0, logPiX0, v, proj):
         logPi = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs_iter, sigma_noise_iter)
 
         key, subkey =  random.split(key)
         B0 = random.permutation(subkey, B_list)[0]
 
-        
         N = shifts0.shape[0]
         shifts1 = generate_gaussian_shifts(key, N, B0)
 
-        logPis1s0 = jax.vmap(logPi)(jnp.array([shifts1, shifts0]))
-        r = jnp.exp(logPis1s0[0] - logPis1s0[1])
+        logPiX1 = logPi(shifts1)
+        r = jnp.exp(logPiX1 - logPiX0)
 
-        return shifts1, r, logPis1s0[0]
+        #logPis1s0 = jax.vmap(logPi)(jnp.array([shifts1, shifts0]))
+        #r = jnp.exp(logPis1s0[0] - logPis1s0[1])
+
+        return shifts1, r, logPiX1
     
     @jax.jit
-    def proposal_func_vol(key, v0, angles, shifts):
+    def proposal_func_vol(key, v0, logPiX0, angles, shifts):
         key, subkey = random.split(key)
         
         logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter)
         gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter))
         #gradLogPi_vol = lambda v : gradLogPi_split(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter, grad_loss_volume_sum_iter, 20) 
-    
+   
+        logPiX0 = jax.lax.cond(logPiX0 == jnp.inf,
+            true_fun = lambda _ : logPi_vol(v0),
+            false_fun = lambda _ : logPiX0,
+            operand = None)
 
-        # For some reason, this is faster when not jitted 
-        #( at least in the first iterations, to see if true later too)
-        #@jax.jit
-        return proposal_hmc(key, v0, logPi_vol, gradLogPi_vol, dt_list, L, M_iter)
+        return proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, dt_list, L, M_iter)
 
 
     return proposal_func_orientations, proposal_func_shifts, proposal_func_vol 
