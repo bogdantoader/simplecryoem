@@ -547,6 +547,10 @@ def get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and
     return slice_func_array_angles, grad_loss_volume_sum, loss_func_angles, loss_func_batched0, loss_func_sum, loss_proj_func_batched0, rotate_and_interpolate
 
 
+#TODO: also write a version of this function that returns the
+# jitted non batched version to work with small datasets
+# (e.g. relion tutorial or simulated), in which case it would
+# be faster
 def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, ctf_params, imgs_iter, sigma_noise_iter, B_list, dt_list, L, M_iter):
 
     #TODO: maybe pass logPiX0 to the proposal function so that
@@ -569,12 +573,9 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         logPiX1 = logPi(angles1)
         r = jnp.exp(logPiX1 - logPiX0)
 
-        #logPia1a0 = jax.vmap(logPi)(jnp.array([angles1,angles0]))
-        #r = jnp.exp(logPia1a0[0] - logPia1a0[1])
-        
         return angles1, r, logPiX1, logPiX0
     
-    @jax.jit
+    #@jax.jit
     def proposal_func_shifts(key, shifts0, logPiX0, v, proj):
         logPi = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs_iter, sigma_noise_iter)
 
@@ -592,23 +593,32 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         logPiX1 = logPi(shifts1)
         r = jnp.exp(logPiX1 - logPiX0)
 
-        #logPis1s0 = jax.vmap(logPi)(jnp.array([shifts1, shifts0]))
-        #r = jnp.exp(logPis1s0[0] - logPis1s0[1])
-
         return shifts1, r, logPiX1, logPiX0
-    
-    @jax.jit
+   
+
+    #@jax.jit
     def proposal_func_vol(key, v0, logPiX0, angles, shifts):
         key, subkey = random.split(key)
         
-        logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter)
-        gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter))
-        #gradLogPi_vol = lambda v : gradLogPi_split(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter, grad_loss_volume_sum_iter, 20) 
+        #logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter)
+        #gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter))
+    
+
+        def logPi_vol(v):
+            loss_i = [-loss_func_sum_iter(v, angles[i], shifts[i], ctf_params[i], imgs_iter[i], sigma_noise_iter) for i in jnp.arange(angles.shape[0])]
+            return jnp.mean(jnp.array(loss_i), axis=0)
+
+        def gradLogPi_vol(v): 
+            grad_i = [-jnp.conj(grad_loss_volume_sum_iter(v, angles[i], shifts[i], ctf_params[i], imgs_iter[i], sigma_noise_iter)) for i in jnp.arange(angles.shape[0])]
+            return jnp.mean(jnp.array(grad_i), axis=0)
   
-        logPiX0 = jax.lax.cond(logPiX0 == jnp.inf,
-            true_fun = lambda _ : logPi_vol(v0),
-            false_fun = lambda _ : logPiX0,
-            operand = None)
+        #logPiX0 = jax.lax.cond(logPiX0 == jnp.inf,
+        #    true_fun = lambda _ : logPi_vol(v0),
+        #    false_fun = lambda _ : logPiX0,
+        #    operand = None)
+        
+        if logPiX0 == jnp.inf:
+            logPiX0 = logPi_vol(v0)
 
         return proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, dt_list, L, M_iter)
 
