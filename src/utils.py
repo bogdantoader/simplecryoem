@@ -363,6 +363,11 @@ def generate_gaussian_shifts(key, N, B):
     
     return random.normal(key, (N,2)) * B 
 
+def generate_gaussian_shifts_batch(key, N1, N2, B):
+    """Generate normally sampled shifts around (0,0) 
+    with standard deviation B."""
+    
+    return random.normal(key, (N1, N2, 2)) * B 
 
 @jax.jit
 def l2sq(x, y = 0):

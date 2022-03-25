@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 import mrcfile
 
 from src.algorithm import *
-from src.utils import create_3d_mask, create_2d_mask, crop_fourier_volume, rescale_larger_grid, crop_fourier_images, generate_uniform_orientations, generate_gaussian_shifts
+from src.utils import create_3d_mask, create_2d_mask, crop_fourier_volume, rescale_larger_grid, crop_fourier_images, generate_uniform_orientations, generate_gaussian_shifts, generate_gaussian_shifts_batch
 from src.jaxops import *
 from src.fsc import plot_angles
 
@@ -577,18 +577,26 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
     
     #@jax.jit
     def proposal_func_shifts(key, shifts0, logPiX0, v, proj):
-        logPi = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs_iter, sigma_noise_iter)
+        #logPi = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs_iter, sigma_noise_iter)
 
-        logPiX0 = jax.lax.cond(jnp.sum(logPiX0) == jnp.inf,
-            true_fun = lambda _ : logPi(shifts0),
-            false_fun = lambda _ : logPiX0,
-            operand = None)
+        def logPi(sh):
+            sh_i = [-loss_proj_func_batched0_iter(v, proj[i], sh[i], ctf_params[i], imgs_iter[i], sigma_noise_iter) for i in jnp.arange(shifts0.shape[0])]
+            return jnp.array(sh_i)
+
+        #logPiX0 = jax.lax.cond(jnp.sum(logPiX0) == jnp.inf,
+        #    true_fun = lambda _ : logPi(shifts0),
+        #    false_fun = lambda _ : logPiX0,
+        #    operand = None)
+
+        if jnp.sum(logPiX0) == jnp.inf:
+            logPiX0 = logPi(shifts0)
 
         key, subkey =  random.split(key)
         B0 = random.permutation(subkey, B_list)[0]
 
-        N = shifts0.shape[0]
-        shifts1 = generate_gaussian_shifts(key, N, B0)
+        N1 = shifts0.shape[0]
+        N2 = shifts0.shape[1]
+        shifts1 = generate_gaussian_shifts_batch(key, N1, N2, B0)
 
         logPiX1 = logPi(shifts1)
         r = jnp.exp(logPiX1 - logPiX0)

@@ -353,7 +353,7 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
 
     x1 = x0
 
-    if N_batch > 1:
+    if jnp.sum(N_batch) > 1:
         logPiX1 = jnp.inf*jnp.ones(N_batch)
     else:
         logPiX1 = jnp.inf 
@@ -365,7 +365,11 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
         a = jnp.minimum(1, r)
         r_samples.append(a)
 
-        if N_batch > 1:
+        #if N_batch > 1:
+        if len(N_batch) > 1:
+            unif_var = random.uniform(keys[2*i+1], (N_batch[0], N_batch[1],)) 
+            x1, logPiX1 = accept_reject_batch(unif_var, a, x0, x1, logPiX0, logPiX1)
+        elif N_batch > 1:
             unif_var = random.uniform(keys[2*i+1], (N_batch,)) 
             x1, logPiX1 = accept_reject_vmap(unif_var, a, x0, x1, logPiX0, logPiX1)
         else:
@@ -377,8 +381,11 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
         if save_samples > 0 and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
-        if verbose and jnp.mod(i, 100) == 0:
-            if N_batch > 1:
+        if verbose and jnp.mod(i, 20) == 0:
+            if len(N_batch) > 1:
+                loss_i = jnp.abs(jnp.mean(logPiX1))
+                print("  MC sample", i, ", loss =", loss_i)
+            elif N_batch > 1:
                 loss_i = jnp.abs(jnp.mean(logPiX1))
                 #print("  Iter", i, ", a_mean = ", jnp.mean(a))
                 print("  MC sample", i, ", loss =", loss_i)
@@ -414,4 +421,17 @@ def accept_reject_scalar(unif_var, a, x0, x1, logPiX0, logPiX1):
     return x, logPiX
 
 accept_reject_vmap = jax.jit(jax.vmap(accept_reject_scalar, in_axes = (0, 0, 0, 0, 0, 0)))
+
+@jax.jit
+def accept_reject_batch(unif_var, a, x0, x1, logPiX0, logPiX1):
+    x1arr = []
+    logPiX1arr = []
+    for i in jnp.arange(unif_var.shape[0]):
+        x1_i, logPiX1_i = accept_reject_vmap(unif_var[i], a[i], x0[i], x1[i], logPiX0[i], logPiX1[i])
+        x1arr.append(x1_i)
+        logPiX1arr.append(logPiX1_i)
+
+    return jnp.array(x1arr), jnp.array(logPiX1arr)
+    
+    
 
