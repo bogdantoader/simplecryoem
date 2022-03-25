@@ -261,6 +261,8 @@ def rescale_larger_grid(v, x_grid, nx_new):
     
     return v_new, x_grid_new
 
+
+
 # TODO : write tests for this function and make with work with odd dimensions too.
 def crop_fourier_images(imgs, x_grid, nx_new):
     """Given an N x nx0 x nx0 array of N images of dimension nx0 x nx0 in the 
@@ -291,14 +293,29 @@ def crop_fourier_images(imgs, x_grid, nx_new):
     N = imgs.shape[0]
     mid = imgs.shape[-1]/2
 
-    idx = jnp.concatenate([jnp.arange(nx_new/2),jnp.arange(-nx_new/2,0)]).astype(jnp.int64)
-    imgs_cropped = imgs[jnp.ix_(jnp.arange(N),idx, idx)]
+    idx = np.concatenate([np.arange(nx_new/2),np.arange(-nx_new/2,0)]).astype(np.int64)
+    imgs_cropped = imgs[np.ix_(np.arange(N),idx, idx)]
 
     # <<< IMPORTANT!!!>>> 
     # The grid must not be a Jax object.
     x_grid_cropped = np.array([x_grid[0], nx_new])
 
     return imgs_cropped, x_grid_cropped
+
+
+def crop_fourier_images_batch(imgs, x_grid, nx_new):
+    """Here the images are in batches so 
+    imgs has dimension N1 x N2 x nx0 x nx0."""
+
+    imgs_c = []
+    for i in np.arange(imgs.shape[0]):
+        imgs_c_i, x_grid_cropped = crop_fourier_images(imgs[i], x_grid, nx_new)
+        imgs_c.append(imgs_c_i)
+
+    return np.array(imgs_c), x_grid_cropped
+
+
+
 
 def crop_fourier_volume(vol, x_grid, nx_new):
     """Same as above, but a volume."""
@@ -351,6 +368,17 @@ def generate_uniform_orientations_jax(key, N):
     z = random.uniform(key3, (N,)) *2 - 1
     beta = jnp.arccos(z)
     return jnp.array([alpha, beta, gamma]).transpose()
+
+
+def generate_uniform_orientations_jax_batch(key, N1, N2):
+    keys = random.split(key, N1)
+    angles = []
+    for i in jnp.arange(N1):
+        angles.append(generate_uniform_orientations_jax(keys[i], N2))
+
+    return jnp.array(angles)
+
+
 
 def generate_uniform_shifts(key, N, B):
     """Generate uniformly sampled shifts in [-B,B] x [-B,B]."""

@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 import mrcfile
 
 from src.algorithm import *
-from src.utils import create_3d_mask, create_2d_mask, crop_fourier_volume, rescale_larger_grid, crop_fourier_images, generate_uniform_orientations, generate_gaussian_shifts, generate_gaussian_shifts_batch
+from src.utils import *
 from src.jaxops import *
 from src.fsc import plot_angles
 
@@ -250,10 +250,12 @@ def ab_initio_mcmc(
     
     """
 
-    assert(imgs.ndim == 2)
+    assert(imgs.ndim == 3)
 
-    N = imgs.shape[0]
-    nx = jnp.sqrt(imgs.shape[1]).astype(jnp.int64)
+    N_batch_shape = jnp.array(imgs.shape[:2])
+    N1 = N_batch_shape[0]
+    N2 = N_batch_shape[1]
+    nx = jnp.sqrt(imgs.shape[2]).astype(jnp.int64)
 
     # Determine the frequency marching step size, if not given 
     if dr is None:
@@ -289,12 +291,13 @@ def ab_initio_mcmc(
         v = vol0
         angles = angles0
 
-    imgs = imgs.reshape([N, nx,nx])
+    imgs = imgs.reshape([N1, N2, nx,nx])
     radius = radius0
 
     # Reshaping sigma_noise this way so that we can apply crop_fourier_images 
     # at each iteration.
     sigma_noise = sigma_noise.reshape([1, nx, nx])
+
     nx_iter = 0
     recompile = True
     for idx_iter in range(N_iter):
@@ -322,8 +325,8 @@ def ab_initio_mcmc(
                 v, _ = rescale_larger_grid(v, x_grid_iter, nx_iter) 
 
             # Crop the images to the right size
-            imgs_iter, x_grid_iter = crop_fourier_images(imgs, x_grid, nx_iter)
-            imgs_iter = imgs_iter.reshape([N,nx_iter*nx_iter])
+            imgs_iter, x_grid_iter = crop_fourier_images_batch(imgs, x_grid, nx_iter)
+            imgs_iter = imgs_iter.reshape([N1, N2 ,nx_iter*nx_iter])
             sigma_noise_iter, _ = crop_fourier_images(sigma_noise, x_grid, nx_iter)
             sigma_noise_iter = sigma_noise_iter.reshape(-1)
             mask3d = create_3d_mask(x_grid_iter, (0,0,0),  radius)
@@ -347,7 +350,7 @@ def ab_initio_mcmc(
         params_orientations = {'v':v, 'shifts':shifts}
 
         t0 = time.time()    
-        _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_func_orientations, angles, N_samples_angles, params_orientations, N, 1, verbose = True)
+        _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_func_orientations, angles, N_samples_angles, params_orientations, N_batch_shape, 1, verbose = True)
         angles = samples_angles[N_samples_angles-2] 
 
         diagnostics = False 
@@ -363,12 +366,13 @@ def ab_initio_mcmc(
         # Sample the shifts 
 
         print("Sampling shifts")
-        proj = rotate_and_interpolate_iter(jnp.array(v), angles)
+        #proj = rotate_and_interpolate_iter(jnp.array(v), angles)
+        proj = jnp.array([rotate_and_interpolate_iter(v, angles[i]) for i in jnp.arange(angles.shape[0])])
 
         params_shifts = {'v':v, 'proj':proj}
 
         t0 = time.time()    
-        _, r_samples_shifts, samples_shifts = mcmc(key_angles, proposal_func_shifts, shifts, N_samples_shifts, params_shifts, N, 1, verbose = True)
+        _, r_samples_shifts, samples_shifts = mcmc(key_angles, proposal_func_shifts, shifts, N_samples_shifts, params_shifts, N_batch_shape, 1, verbose = True)
         shifts = samples_shifts[N_samples_shifts-2] 
 
         if verbose:
@@ -386,7 +390,7 @@ def ab_initio_mcmc(
         #v = v_hmc_mean 
         #v = v_hmc_samples[N_samples_vol-2] 
         v = v_hmc_samples[0] 
-        v = v*mask3d
+        v = jnp.array(v*mask3d)
 
 
         if verbose:
@@ -421,7 +425,7 @@ def ab_initio_mcmc(
             #plt.colorbar()
             #plt.show()
 
-            plot_angles(angles[:500])
+            plot_angles(angles[0, :500])
             plt.show()
 
         if jnp.mod(idx_iter, 1)==0 and save_to_file:
@@ -489,9 +493,10 @@ def initialize_ab_initio_vol(key,
         verbose = True):
     if verbose:
         print("Initialitsing volume")
-
-    N = imgs.shape[0]
-    nx = jnp.sqrt(imgs.shape[1]).astype(jnp.int64)
+    
+    N1 = imgs.shape[0]
+    N2 = imgs.shape[1]
+    nx = jnp.sqrt(imgs.shape[2]).astype(jnp.int64)
 
     v0 = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
     mask3d = jnp.ones([nx,nx,nx])
@@ -500,16 +505,16 @@ def initialize_ab_initio_vol(key,
 
     key1, key2 = random.split(key)
 
-    angles = generate_uniform_orientations_jax(key, N)
-    shifts = jnp.zeros([N, 2]) #generate_uniform_shifts(key, N, B)
+    angles = generate_uniform_orientations_jax_batch(key, N1, N2)
+    shifts = jnp.zeros([N1, N2, 2]) #generate_uniform_shifts(key, N, B)
     #shifts = generate_gaussian_shifts(key, N, B)
 
 
     #grad_loss_volume_batched_sum = lambda v, a, s, c, imgs, sig : grad_loss_volume_batched(v, a, s, c, imgs, sig) / a.shape[0]
 
     if use_sgd:
-        sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs, sigma_noise)
-        v = sgd(sgd_grad_func, N, v0, learning_rate, N_vol_iter, batch_size, P, eps_vol, verbose = verbose)
+        sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_sum, angles[0], shifts[0], ctf_params[0], imgs[0], sigma_noise)
+        v = sgd(sgd_grad_func, N2, v0, learning_rate, N_vol_iter, batch_size, P, eps_vol, verbose = verbose)
     else:
         AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs*mask2d, v0.shape, sigma_noise)
         v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_vol, verbose = verbose)
@@ -525,8 +530,8 @@ def initialize_ab_initio_vol(key,
 
 def get_diagnostics_funs_iter(project_func, x_grid, mask, alpha = 0, interp_method = 'tri'):
     slice_func,slice_func_array, slice_func_array_angles = get_slice_funcs(project_func, x_grid, mask, interp_method)
-    loss_func, loss_func_batched, loss_func_sum, _ = get_loss_funcs(slice_func, alpha = alpha)
-    fid_func, fid_func_batched, fid_func_sum, _ = get_loss_funcs(slice_func, alpha = 0)
+    loss_func, loss_func_batched, loss_func_sum = get_loss_funcs(slice_func, alpha = alpha)
+    fid_func, fid_func_batched, fid_func_sum = get_loss_funcs(slice_func, alpha = 0)
 
     return fid_func_sum, loss_func_sum
 
@@ -534,10 +539,10 @@ def get_diagnostics_funs_iter(project_func, x_grid, mask, alpha = 0, interp_meth
 
 def get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid, mask, alpha = 0, interp_method = 'tri'):
     slice_func,slice_func_array, slice_func_array_angles = get_slice_funcs(project_func, x_grid, mask, interp_method)
-    loss_func, loss_func_batched, loss_func_sum, _ = get_loss_funcs(slice_func, alpha = alpha)
+    loss_func, loss_func_batched, loss_func_sum  = get_loss_funcs(slice_func, alpha = alpha)
     grad_loss_volume, grad_loss_volume_sum = get_grad_v_funcs(loss_func, loss_func_sum)
     loss_func_angles = get_loss_func_angles(loss_func)
-    _, loss_func_batched0, _, _ = get_loss_funcs(slice_func, alpha = 0)
+    _, loss_func_batched0, _ = get_loss_funcs(slice_func, alpha = 0)
     loss_proj_func_batched0 = get_loss_proj_funcs(apply_shifts_and_ctf_func, x_grid, alpha = 0)
 
     @jax.jit
@@ -556,19 +561,24 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
     #TODO: maybe pass logPiX0 to the proposal function so that
     # we only need to compute logPiX1 - should reduce the time/memory by half?
 
-    @jax.jit
     def proposal_func_orientations(key, angles0, logPiX0, v, shifts):
-        logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, sigma_noise_iter)
-        #print(logPi(angles0).shape)
-        #print(logPiX0)
+        #logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, sigma_noise_iter)
 
-        logPiX0 = jax.lax.cond(jnp.sum(logPiX0) == jnp.inf,
-            true_fun = lambda _ : logPi(angles0),
-            false_fun = lambda _ : logPiX0,
-            operand = None)
+        def logPi(a):
+            a_i = [-loss_func_batched0_iter(v, a[i], shifts[i], ctf_params[i], imgs_iter[i], sigma_noise_iter) for i in jnp.arange(angles0.shape[0])]
+            return jnp.array(a_i)
 
-        N = angles0.shape[0]
-        angles1 = generate_uniform_orientations_jax(key, N)
+        #logPiX0 = jax.lax.cond(jnp.sum(logPiX0) == jnp.inf,
+        #    true_fun = lambda _ : logPi(angles0),
+        #    false_fun = lambda _ : logPiX0,
+        #    operand = None)
+
+        if jnp.sum(logPiX0) == jnp.inf:
+            logPiX0 = logPi(angles0)
+
+        N1 = angles0.shape[0]
+        N2 = angles0.shape[1]
+        angles1 = generate_uniform_orientations_jax_batch(key, N1, N2)
 
         logPiX1 = logPi(angles1)
         r = jnp.exp(logPiX1 - logPiX0)
