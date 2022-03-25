@@ -353,7 +353,7 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
 
     x1 = x0
 
-    if jnp.sum(N_batch) > 1:
+    if N_batch > 1:
         logPiX1 = jnp.inf*jnp.ones(N_batch)
     else:
         logPiX1 = jnp.inf 
@@ -365,11 +365,7 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
         a = jnp.minimum(1, r)
         r_samples.append(a)
 
-        #if N_batch > 1:
-        if isinstance(N_batch, jnp.ndarray):
-            unif_var = random.uniform(keys[2*i+1], (N_batch[0], N_batch[1],)) 
-            x1, logPiX1 = accept_reject_batch(unif_var, a, x0, x1, logPiX0, logPiX1)
-        elif N_batch > 1:
+        if N_batch > 1:
             unif_var = random.uniform(keys[2*i+1], (N_batch,)) 
             x1, logPiX1 = accept_reject_vmap(unif_var, a, x0, x1, logPiX0, logPiX1)
         else:
@@ -381,7 +377,7 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
         if save_samples > 0 and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
-        if verbose and jnp.mod(i, 50) == 0:
+        if verbose and jnp.mod(i, 100) == 0:
             if isinstance(N_batch, jnp.ndarray):
                 loss_i = jnp.abs(jnp.mean(logPiX1))
                 print("  MC sample", i, ", loss =", loss_i)
