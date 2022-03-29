@@ -127,6 +127,7 @@ def main(args):
     sigma_noise_estimated = estimate_noise_imgs(imgs0[:N_imgs_noise], nx_empty = N_px_noise, nx_final = nx).reshape([nx,nx])
     sigma_noise_avg = average_radially(sigma_noise_estimated, x_grid)
     sigma_noise = sigma_noise_avg.reshape(-1)
+    print(f"done. Time: {time.time()-t0} seconds.", flush=True) 
    
     # Delete the initial large images.
     del(imgs0)
@@ -191,7 +192,7 @@ def main(args):
     with mrcfile.new(args.out_dir + '/rec_final_nx0.mrc', overwrite=True) as mrc:
         mrc.set_data(v_rec_rl.astype(np.float32))
 
-    #TODO: print the parameters in the folder too
+    #TODO: save the parameters to the folder too
 
 
 if __name__ == "__main__":

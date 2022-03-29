@@ -366,7 +366,7 @@ def ab_initio_mcmc(
 
             if verbose:
                 print("  Time orientations sampling =", time.time()-t0)
-                print("  mean(a_angles) =", jnp.mean(r_samples_angles))
+                print("  mean(a_angles) =", jnp.mean(r_samples_angles), flush=True)
                 
                 if diagnostics:
                     plot_angles(angles[:500])
@@ -387,7 +387,7 @@ def ab_initio_mcmc(
 
             if verbose:
                 print("  Time shifts sampling =", time.time()-t0)
-                print("  mean(a_shifts) =", jnp.mean(r_samples_shifts))
+                print("  mean(a_shifts) =", jnp.mean(r_samples_shifts), flush=True)
 
 
         # Sample the volume
@@ -409,7 +409,7 @@ def ab_initio_mcmc(
 
         if verbose:
             print("  Time volume sampling =", time.time()-t0)
-            print("  mean(a_vol) =", jnp.mean(r_hmc))
+            print("  mean(a_vol) =", jnp.mean(r_hmc), flush=True)
 
             if diagnostics:
                 #ff ,lf =  get_diagnostics_funs_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
@@ -428,7 +428,7 @@ def ab_initio_mcmc(
         
         if jnp.mod(idx_iter, 8)==0 and verbose:
             print(datetime.datetime.now())
-            print("  nx =", nx_iter)
+            print("  nx =", nx_iter, flush=True)
 
             if diagnostics:
                 plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0]*mask3d[:,:,0])))
