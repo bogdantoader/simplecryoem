@@ -377,18 +377,17 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
         if save_samples > 0 and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
-        if verbose and jnp.mod(i, 100) == 0:
+        if verbose and jnp.mod(i, 1) == 0:
             if isinstance(N_batch, jnp.ndarray):
                 loss_i = jnp.abs(jnp.mean(logPiX1))
-                print("  MC sample", i, ", loss =", loss_i)
+                print("  MCMC sample", i, ", loss =", loss_i)
             elif N_batch > 1:
                 loss_i = jnp.abs(jnp.mean(logPiX1))
                 #print("  Iter", i, ", a_mean = ", jnp.mean(a))
-                print("  MC sample", i, ", loss =", loss_i)
+                print("  MCMC sample", i, ", loss =", loss_i)
             else:
                 loss_i = jnp.abs(logPiX1)
-                print("  Iter", i, ", a = ", a)
-                print("  MC sample", i, ", loss =", loss_i)
+                print(f"  MCMC sample {i}, loss = {loss_i}, a = {a}")
 
             #plt.imshow(jnp.fft.fftshift(jnp.abs(x_mean[0]))); plt.colorbar()
             #plt.show()

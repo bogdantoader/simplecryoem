@@ -7,26 +7,40 @@ from src.projection import rotate_z0
 from src.interpolate import find_nearest_one_grid_point_idx
 
 
-def get_volume_residual(v, angles, shifts, ctf_params, imgs, sigma_noise, x_grid, slice_func_array, N_batches):
+def get_volume_residual(imgs, angles, sigma_noise, x_grid, slice_func_array, N_batches):
 
-    coords, resid =  voxel_wise_resid_fun(v, angles, shifts, ctf_params, imgs, sigma_noise, x_grid, slice_func_array)
+    #coords, resid =  voxel_wise_resid_fun(v, angles, shifts, ctf_params, imgs, sigma_noise, x_grid, slice_func_array)
 
-     
+    #coords, resid =  voxel_wise_resid_from2d_fun(imgs, angles, sigma_noise, x_grid, slice_func_array)
+
+    N_batch_small=10 
+
+    angles_batches = np.array_split(angles, N_batch_small)
+    imgs_batches = np.array_split(imgs, N_batch_small)
+
+    coords = []
+    resid = []
+    for i in tqdm(range(N_batch_small)):
+        coords_i, resid_i =  voxel_wise_resid_from2d_fun(imgs_batches[i], angles_batches[i], sigma_noise, x_grid, slice_func_array)
+        coords.append(coords_i)
+        resid.append(resid_i)
+
+    coords = jnp.concatenate(coords, axis=0)
+    resid = jnp.concatenate(resid, axis=0)
+
     find_nearest_one_grid_point_idx_vmap = jax.vmap(find_nearest_one_grid_point_idx, in_axes=(0,None,None,None))
 
     # The N_batch here should be much smaller, as there is enough memory (and otherwise it's too slow with the same N_batch)
-    def find_nearest_one_grid_point_idx_batch(coords, x_grid, N_batches):
-        coords_batches = np.array_split(coords, N_batches)
-       
-        nn_vol_idx = []
-        for i in tqdm(range(N_batches)):
-            nn_vol_idx_b = find_nearest_one_grid_point_idx_vmap(coords_batches[i], x_grid, x_grid, x_grid)
-            nn_vol_idx.append(nn_vol_idx_b)
+    N_batch_small = N_batch_small * 10
+    coords_batches = np.array_split(coords, N_batch_small)
+  
+    nn_vol_idx = []
+    for i in tqdm(range(N_batch_small)):
+        nn_vol_idx_b = find_nearest_one_grid_point_idx_vmap(coords_batches[i], x_grid, x_grid, x_grid)
+        nn_vol_idx.append(nn_vol_idx_b)
 
-        return np.concatenate(nn_vol_idx, axis=0)
+    nn_vol_idx = np.concatenate(nn_vol_idx, axis=0)
 
-    nn_vol_idx = find_nearest_one_grid_point_idx_batch(coords, x_grid, 10) 
-    #nn_vol_idx = jax.vmap(find_nearest_one_grid_point_idx, in_axes = (0, None, None, None))(coords, x_grid, x_grid, x_grid) 
     nx = x_grid[1].astype(jnp.int32)
 
     @jax.jit
@@ -34,12 +48,18 @@ def get_volume_residual(v, angles, shifts, ctf_params, imgs, sigma_noise, x_grid
         v_resid_sum = jnp.zeros([nx,nx,nx])
         v_resid_counts = jnp.zeros([nx,nx,nx])
     
-        #TODO: replace with jax.fori_loop, it should reduce the 
-        # compilation time
-        for i in jnp.arange(v_idx.shape[0]):
+        #for i in jnp.arange(v_idx.shape[0]):
+        #    v_resid_sum = v_resid_sum.at[tuple(v_idx[i])].add(resid[i])
+        #    v_resid_counts = v_resid_counts.at[tuple(v_idx[i])].add(1)
+
+        def body_fun(i, rsc):
+            v_resid_sum, v_resid_counts = rsc
             v_resid_sum = v_resid_sum.at[tuple(v_idx[i])].add(resid[i])
             v_resid_counts = v_resid_counts.at[tuple(v_idx[i])].add(1)
+            return (v_resid_sum, v_resid_counts) 
 
+        v_resid_sum, v_resid_counts = jax.lax.fori_loop(0, v_idx.shape[0], body_fun, (v_resid_sum, v_resid_counts))
+        
         return v_resid_sum, v_resid_counts
 
     def get_v_resid_batch(vol_idx, resid, N_batches, get_v_resid):
@@ -75,3 +95,13 @@ def voxel_wise_resid_fun(v, angles, shifts, ctf_params, imgs, sigma_noise, x_gri
     proj_coords = proj_coords.swapaxes(0,1).reshape(3,-1).transpose()
 
     return proj_coords, resid
+
+def voxel_wise_resid_from2d_fun(imgs, angles, sigma_noise, x_grid, slice_func_array):
+    resid = jnp.abs(imgs)/sigma_noise
+    resid = resid.reshape(-1)   
+
+    proj_coords = jax.vmap(rotate_z0, in_axes = (None, 0))(x_grid, angles)
+    proj_coords = proj_coords.swapaxes(0,1).reshape(3,-1).transpose()
+
+    return proj_coords, resid
+

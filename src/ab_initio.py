@@ -227,9 +227,11 @@ def ab_initio_mcmc(
         alpha = 0, 
         eps_vol = 1e-16, 
         B_list = [1],
+        freq_marching_step_iters = 1,
         interp_method = 'tri', 
         opt_vol_first = True, 
-        verbose = True, 
+        verbose = True,
+        diagnostics = False,
         save_to_file = True, 
         out_dir = './'):
     """Ab initio reconstruction using MCMC.
@@ -275,19 +277,21 @@ def ab_initio_mcmc(
     if sgd_batch_size == -1:
         sgd_batch_size = N
 
+    key, subkey = random.split(key)
     if vol0 is None and opt_vol_first:
         N_vol_iter = 3000
-        key, subkey = random.split(key)
         v, angles, shifts = initialize_ab_initio_vol(key, project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, imgs, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, True, learning_rate, sgd_batch_size,  None, B_list, interp_method, verbose)
     elif vol0 is None:    
         v = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
     else:
-        print("cool")
         v = vol0
-        angles = angles0
 
+    #TODO: should have separate options to indicate that we don't want to estimate angles/shifts
+    # or that we want to estimate them but start from shifts0, angles0. Same for vol0
     if shifts0 is not None:
         shifts = shifts0
+    if angles0 is not None:
+        angles = angles0
 
     imgs = imgs.reshape([N1, N2, nx,nx])
     radius = radius0
@@ -350,27 +354,32 @@ def ab_initio_mcmc(
 
 
         t0 = time.time()    
-      
-        #TODO: do the same for shifts
-        if idx_iter < 64 or jnp.mod(idx_iter, 8) == 4:
-            angles_new = []
-            for i in jnp.arange(N1):
+     
+        if angles0 is None:
+            #TODO: do the same for shifts
+            if idx_iter < 64 or jnp.mod(idx_iter, 8) == 4:
+                angles_new = []
+                for i in jnp.arange(N1):
+                    if verbose:
+                        print("batch ", i)
+                    params_orientations = {'v':v, 'shifts':shifts[i], 'ctf_params':ctf_params[i], 'imgs_iter' : imgs_iter[i]}
+                    _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_func_orientations, angles[i], N_samples_angles, params_orientations, N2, 1, verbose = True)
+                    angles_new.append(samples_angles[N_samples_angles-2])
+                angles = jnp.array(angles_new)
+
+
                 if verbose:
-                    print("batch ", i)
-                params_orientations = {'v':v, 'shifts':shifts[i], 'ctf_params':ctf_params[i], 'imgs_iter' : imgs_iter[i]}
-                _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_func_orientations, angles[i], N_samples_angles, params_orientations, N2, 1, verbose = True)
-                angles_new.append(samples_angles[N_samples_angles-2])
-            angles = jnp.array(angles_new)
+                    print("  Time orientations sampling =", time.time()-t0)
+                    print("  mean(a_angles) =", jnp.mean(r_samples_angles), flush=True)
+                    
+                    if diagnostics:
+                        plot_angles(angles[:500])
+                        plt.show()
 
-            diagnostics = False 
 
-            if verbose:
-                print("  Time orientations sampling =", time.time()-t0)
-                print("  mean(a_angles) =", jnp.mean(r_samples_angles), flush=True)
-                
-                if diagnostics:
-                    plot_angles(angles[:500])
-                    plt.show()
+
+
+
 
         #TODO: make this similar to the orientations batch sampling 
         # Sample the shifts - not working right now
@@ -426,7 +435,7 @@ def ab_initio_mcmc(
                 plt.show()
 
         
-        if jnp.mod(idx_iter, 8)==0 and verbose:
+        if jnp.mod(idx_iter, freq_marching_step_iters)==0 and verbose:
             print(datetime.datetime.now())
             print("  nx =", nx_iter, flush=True)
 
@@ -454,8 +463,7 @@ def ab_initio_mcmc(
 
 
         # Increase radius
-        # TODO: make this a parameter of the algorithm
-        if jnp.mod(idx_iter, 8)==0:
+        if jnp.mod(idx_iter,  freq_marching_step_iters)==0:
             radius += dr
             recompile = True
 
@@ -612,6 +620,12 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         r = jnp.exp(logPiX1 - logPiX0)
 
         return angles1, r, logPiX1, logPiX0 
+
+
+    #def proposal_func_os(key, as0, logPiX0, v, ctf_params, imgs_iter):
+    #    N = as0.shape[0]
+        
+        
 
 
     #@jax.jit
