@@ -40,7 +40,12 @@ def get_volume_residual(imgs, angles, sigma_noise, nx, N_batches):
     v_resid_sum = np.zeros([nx,nx,nx])
     v_resid_counts = np.zeros([nx,nx,nx])
 
-    for i in tqdm(range(N_batches)):
+    #for i in tqdm(range(N_batches)):
+    t0 = time.time()
+    for i in range(N_batches):
+        if np.mod(i, 10) == 0:
+            print(f"Batch {i}, {time.time()-t0} seconds.", flush=True)
+
         vrs, vrc = get_v_resid(coords_batches[i], resid_batches[i], np.zeros([nx,nx,nx]))
 
         v_resid_sum += vrs

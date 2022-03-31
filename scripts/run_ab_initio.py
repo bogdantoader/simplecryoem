@@ -1,7 +1,6 @@
 import argparse
 import time
 import pickle
-from jax.config import config
 
 import numpy as np
 import jax.numpy as jnp
