@@ -11,8 +11,15 @@ from src.interpolate import find_nearest_one_grid_point_idx
 
 def get_volume_residual(imgs, angles, sigma_noise, x_grid, radius, N_batches):
 
-    ### First rotate each residual img and return the list of coordinates and coordinate-based residuals
+    # Some jitted functions
     nx = int(x_grid[1])
+
+    voxel_wise_resid_from2d_jit = jax.jit(lambda i,a : voxel_wise_resid_from2d_fun(i, a, radius, sigma_noise, x_grid))
+    find_nearest_one_grid_point_idx_partial = lambda c : find_nearest_one_grid_point_idx(c, x_grid, x_grid, x_grid)
+    find_nearest_one_grid_point_vmap = jax.jit(jax.vmap(find_nearest_one_grid_point_idx_partial))
+    get_v_resid_jit = jax.jit(lambda i, r : get_v_resid(i, r, nx))
+
+    ### First rotate each residual img and return the list of coordinates and coordinate-based residuals
     N_batch_small=10 
 
     imgs_batches = np.array_split(imgs, N_batch_small)
@@ -20,20 +27,21 @@ def get_volume_residual(imgs, angles, sigma_noise, x_grid, radius, N_batches):
 
     print(f"Rotate each image and get list of coords. {imgs.shape[0]} images in {N_batch_small} batches...", end="", flush=True)
     t0 = time.time()
-    coords_resid =  [voxel_wise_resid_from2d_fun(img, ang, sigma_noise, x_grid) 
+    coords_resid =  [voxel_wise_resid_from2d_jit(img, ang)  
             for img, ang in zip(imgs_batches, angles_batches)]
-    coords, resid = zip(*coords_resid)
+    coords, resid, idx = zip(*coords_resid)
 
     coords = np.concatenate(coords, axis=0)
     resid = np.concatenate(resid, axis=0)
+    idx = np.concatenate(idx, axis=0)
 
-    ### Filter the coords and residuals that fall outside the mask
-    idx = jnp.array([x**2 + y**2 + z**2 <= radius**2 for x,y,z in coords])
-    if idx.size > 0:
-        coords = coords[idx]
-        resid = resid[idx]
+    ### Filter the coords and residuals that fall outside the mask radius
+    coords = coords[idx]
+    resid = resid[idx]
+    
     print(f"done in {time.time()-t0} seconds.", flush=True)
 
+    return
     ### Then find the nearest voxel for each coordinate 
     ### and average all the residuals in each voxel
     
@@ -44,10 +52,6 @@ def get_volume_residual(imgs, angles, sigma_noise, x_grid, radius, N_batches):
     print(f"Average residuals in each voxel. {coords.shape[0]} residuals in {N_batches} batches.", flush=True)
     t0 = time.time()
 
-    # Some jitted functions
-    find_nearest_one_grid_point_idx_partial = lambda c : find_nearest_one_grid_point_idx(c, x_grid, x_grid, x_grid)
-    find_nearest_one_grid_point_vmap = jax.jit(jax.vmap(find_nearest_one_grid_point_idx_partial))
-    get_v_resid_jit = jax.jit(lambda i, r : get_v_resid(i, r, nx))
 
     v_resid_sum = np.zeros([nx,nx,nx])
     v_resid_counts = np.zeros([nx,nx,nx])
@@ -83,8 +87,7 @@ def voxel_wise_resid_fun(v, angles, shifts, ctf_params, imgs, sigma_noise, x_gri
 
     return proj_coords, resid
 
-
-def voxel_wise_resid_from2d_fun(imgs, angles, sigma_noise, x_grid):
+def voxel_wise_resid_from2d_fun(imgs, angles, radius, sigma_noise, x_grid):
     #resid = jnp.abs(imgs)/sigma_noise
     resid = imgs/sigma_noise
     resid = resid.reshape(-1)   
@@ -92,7 +95,8 @@ def voxel_wise_resid_from2d_fun(imgs, angles, sigma_noise, x_grid):
     proj_coords = jax.vmap(rotate_z0, in_axes = (None, 0))(x_grid, angles)
     proj_coords = proj_coords.swapaxes(0,1).reshape(3,-1).transpose()
 
-    return proj_coords, resid
+    idx = jnp.apply_along_axis(lambda x : x[0]**2 + x[1]**2 + x[2]**2 <= radius**2 , arr=proj_coords, axis=1) 
+    return proj_coords, resid, idx
 
 
 def get_v_resid(v_idx, resid, nx):
