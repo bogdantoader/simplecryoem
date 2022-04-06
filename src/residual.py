@@ -12,13 +12,12 @@ from src.interpolate import find_nearest_one_grid_point_idx
 
 def get_volume_residual(imgs, angles, sigma_noise, x_grid, radius, N_batches):
 
-    # Some jitted functions
     nx = int(x_grid[1])
 
+    # Some jitted functions
     vol_coords_from2d_jit = jax.jit(lambda a : vol_coords_from2d_fun(a, radius, x_grid))
     find_nearest_one_grid_point_idx_partial = lambda c : find_nearest_one_grid_point_idx(c, x_grid, x_grid, x_grid)
     find_nearest_one_grid_point_vmap = jax.jit(jax.vmap(find_nearest_one_grid_point_idx_partial))
-    vol_from_coords_jit = jax.jit(lambda i, r, s : vol_from_coords(i, r, s, nx))
 
     ### First rotate each img and return the list of coordinates and coordinate-based residuals
     N_batch_small=10 
@@ -35,7 +34,6 @@ def get_volume_residual(imgs, angles, sigma_noise, x_grid, radius, N_batches):
     # Make imgs and sigma have the same shape as coords.
     imgs_arr = imgs.reshape(-1)   
     sigma_arr = np.tile(sigma_noise, reps=(imgs.shape[0], 1)).reshape(-1)
-
 
     ### Filter the coords, imgs and sigma that fall outside the mask radius
     coords = coords[idx]
@@ -58,47 +56,28 @@ def get_volume_residual(imgs, angles, sigma_noise, x_grid, radius, N_batches):
     vol_sum = np.zeros([nx,nx,nx])
     vol_counts = np.zeros([nx,nx,nx])
     vol_sigma = jnp.zeros([nx,nx,nx])
-    #vol_sigma = []
     #for i in tqdm(range(N_batches)):
     for i in range(N_batches):
+        t0 = time.time()
 
         v_idx = find_nearest_one_grid_point_vmap(coords_batches[i])
-        v_sum, v_sigma, v_counts = vol_from_coords_jit(v_idx, imgs_arr_batches[i], sigma_arr_batches[i])
-
+        v_sum, v_sigma, v_counts = vol_from_coords(v_idx, imgs_arr_batches[i], sigma_arr_batches[i], nx)
+        
         vol_sum += v_sum
         vol_counts += v_counts
-    
 
         vol_sigma = merge_sigma_vols(vol_sigma, v_sigma)
-        #vol_sigma.append(v_sigma)
-        
+       
         if np.mod(i, 10) == 0:
             print(f"Batch {i}, {time.time()-t0} seconds.", flush=True)
-            #plt.imshow(jnp.max(jnp.fft.fftshift(v_sigma), axis=1), vmin=300, vmax=700);plt.colorbar()
-            #plt.imshow(jnp.max(jnp.abs(jnp.fft.fftshift(v_sum)), axis=1), vmin=0, vmax=1500);plt.colorbar()
-            #plt.show()
-                
 
-    # Add 1e-16 to avoid NaN when counts=0 (and where vol_sum=0 toss).
+    # Add 1e-16 to avoid NaN when counts=0 (and where vol_sum=0 too).
     vol = vol_sum/(vol_counts+1e-16)
     
     print(f"done in {time.time()-t0} seconds.", flush=True)
 
     return vol, vol_sigma, vol_counts 
 
-
-def voxel_wise_resid_fun(v, angles, shifts, ctf_params, imgs, sigma_noise, x_grid, slice_func_array):
-    # Here, need to swap axes (x,y,z) to (z, y, x) so it agrees with the img residuals
-    x_grid = jnp.array([1, nx])
-
-    #resid = jnp.abs(slice_func_array(v, angles, shifts, ctf_params) - imgs)/sigma_noise
-    resid = (slice_func_array(v, angles, shifts, ctf_params) - imgs)/sigma_noise
-    resid = resid.reshape(-1)   
-
-    proj_coords = jax.vmap(rotate_z0, in_axes = (None, 0))(x_grid, angles)
-    proj_coords = proj_coords.swapaxes(0,1).reshape(3,-1).transpose()
-
-    return proj_coords, resid
 
 def vol_coords_from2d_fun(angles, radius, x_grid):
     proj_coords = jax.vmap(rotate_z0, in_axes = (None, 0))(x_grid, angles)
@@ -109,21 +88,16 @@ def vol_coords_from2d_fun(angles, radius, x_grid):
 
 
 def vol_from_coords(v_idx, imgs_arr, sigma, nx):
-    v_sum = jnp.zeros([nx,nx,nx], dtype=jnp.complex128)
-    v_counts = jnp.zeros([nx,nx,nx])
-    v_sigma = jnp.zeros([nx,nx,nx])
+    v_sum = jnp.zeros(nx**3, dtype=jnp.complex64)
+    v_counts = jnp.zeros(nx**3)
+    v_sigma = jnp.zeros(nx**3)
 
-    def body_fun(i, rsc):
-        v_sum, v_sigma, v_counts = rsc
+    x, y, z = v_idx.transpose()
+    linear_idx = jnp.ravel_multi_index((x,y,z), dims = [nx,nx,nx])
 
-        v_sum = v_sum.at[tuple(v_idx[i])].add(imgs_arr[i])
-        v_counts = v_counts.at[tuple(v_idx[i])].add(1)
-
-        v_sigma = v_sigma.at[tuple(v_idx[i])].set(sigma[i])
-
-        return (v_sum, v_sigma, v_counts) 
-
-    v_sum, v_sigma, v_counts = jax.lax.fori_loop(0, v_idx.shape[0], body_fun, (v_sum, v_sigma, v_counts))
+    v_sum = v_sum.at[linear_idx].add(imgs_arr).reshape([nx,nx,nx])
+    v_counts = v_counts.at[linear_idx].add(jnp.ones(imgs_arr.shape)).reshape([nx,nx,nx])
+    v_sigma = v_sigma.at[linear_idx].set(sigma).reshape([nx,nx,nx])
     
     return v_sum, v_sigma, v_counts
 
