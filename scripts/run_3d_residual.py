@@ -54,6 +54,9 @@ def main(args):
     print(f'shifts0.shape = {shifts0.shape}')
     print(f'ctf_params0.shape = {ctf_params0.shape}')
 
+    # Save the noisy images in a separate variable for noise estimation
+    imgs_noisy = imgs0
+
     # Only keep the first N images
     if args.N_imgs:
         assert (args.N_imgs <= imgs0.shape[0]), 'N cannot be smaller than the number of particles.'
@@ -64,6 +67,8 @@ def main(args):
         idxrand = jnp.arange(N)
         
     print(f'N = {N}')
+
+
 
     imgs = imgs[idxrand]
     imgs0 = imgs0[idxrand]  
@@ -125,12 +130,15 @@ def main(args):
         print(f"Estimating the noise using the {N_px_noise} x {N_px_noise} corners of the first {N_imgs_noise} images...", end="", flush=True)
 
         t0 = time.time()
-        sigma_noise_estimated = estimate_noise_imgs(imgs0[:N_imgs_noise], nx_empty = N_px_noise, nx_final = nx).reshape([nx,nx])
+        sigma_noise_estimated = estimate_noise_imgs(imgs_noisy[:N_imgs_noise], nx_empty = N_px_noise, nx_final = nx).reshape([nx,nx])
         sigma_noise_avg = average_radially(sigma_noise_estimated, x_grid)
         sigma_noise = sigma_noise_avg.reshape(-1)
         print(f"done. Time: {time.time()-t0} seconds.", flush=True) 
     else: 
         sigma_noise = np.ones(imgs0.shape[1])
+
+    # No need to keep the noisy images in the memory now.
+    del(imgs_noisy)
 
     # Mask for the result
     mask = create_3d_mask(x_grid, (0,0,0), args.radius)
