@@ -88,14 +88,16 @@ def vol_coords_from2d_fun(angles, radius, x_grid):
 
 
 def vol_from_coords(v_idx, imgs_arr, sigma, nx):
-    v_sum = jnp.zeros(nx**3, dtype=jnp.complex64)
+    v_sum = jnp.zeros(nx**3)
     v_counts = jnp.zeros(nx**3)
     v_sigma = jnp.zeros(nx**3)
 
     x, y, z = v_idx.transpose()
     linear_idx = jnp.ravel_multi_index((x,y,z), dims = [nx,nx,nx])
 
-    v_sum = v_sum.at[linear_idx].add(imgs_arr).reshape([nx,nx,nx])
+    resid_arr = jnp.real(jnp.conj(imgs_arr)*imgs_arr)
+
+    v_sum = v_sum.at[linear_idx].add(resid_arr).reshape([nx,nx,nx])
     v_counts = v_counts.at[linear_idx].add(jnp.ones(imgs_arr.shape)).reshape([nx,nx,nx])
     v_sigma = v_sigma.at[linear_idx].set(sigma).reshape([nx,nx,nx])
     

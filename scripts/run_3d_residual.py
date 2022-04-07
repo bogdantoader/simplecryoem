@@ -20,7 +20,8 @@ import mrcfile
 
 def parse_args(parser):
     parser.add_argument("data_dir", help="Location of the star and mrcs files.")
-    parser.add_argument("star_file", help="Name of the star file, relative to data_dir.")
+    parser.add_argument("star_file_proj", help="Name of the star file for the projections, relative to data_dir.")
+    parser.add_argument("star_file_img", help="Name of the star file for the images, relative to data_dir.")
     parser.add_argument("out_dir", help="Directory to save the output.")
     parser.add_argument("out_file", help="File name for the residual.")
     parser.add_argument("-N", "--N_imgs", type=int, help="Only keep N particle images.")
@@ -37,13 +38,16 @@ def parse_args(parser):
 
 
 def main(args):
-    
-    params0, imgs0 = load_data(args.data_dir, args.star_file, load_imgs = True, fourier = False)
+   
+    # Assume that params are the same for both sets.
+    _, imgs = load_data(args.data_dir, args.star_file_proj, load_imgs = True, fourier = False)
+    params0, imgs0 = load_data(args.data_dir, args.star_file_img, load_imgs = True, fourier = False)
     ctf_params0 = params0["ctf_params"]
     pixel_size0 = params0["pixel_size"]
     angles0 = params0["angles"]
     shifts0 = params0["shifts"]
 
+    print(f'imgs.shape = {imgs.shape}')
     print(f'imgs0.shape = {imgs0.shape}')
     print(f'pixel_size0 = {pixel_size0.shape}')
     print(f'angles0.shape = {angles0.shape}')
@@ -61,6 +65,7 @@ def main(args):
         
     print(f'N = {N}')
 
+    imgs = imgs[idxrand]
     imgs0 = imgs0[idxrand]  
     pixel_size = pixel_size0[idxrand]
     angles = angles0[idxrand]
@@ -73,12 +78,12 @@ def main(args):
 
     if args.spatial:
         print("--spatial flag used, NOT taking the Fourier transform of the images.")
-        imgs = imgs0
     else:
         # Take the FFT of the images
         print("Taking FFT of the images...", end="", flush=True)
         t0 = time.time()
-        imgs = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs0])
+        imgs = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs])
+        imgs0 = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs0])
         print(f"done. Time: {time.time()-t0} seconds.") 
 
     # Assume the pixel size is the same for all images
@@ -95,12 +100,14 @@ def main(args):
     if args.nx_crop:
         nx = args.nx_crop
         imgs, x_grid = crop_fourier_images(imgs, x_grid, nx)
+        imgs0, x_grid = crop_fourier_images(imgs0, x_grid, nx)
         y_grid = x_grid
         z_grid = x_grid
         print(f"new x_grid = {x_grid}")
 
     # Vectorise images
     imgs = imgs.reshape(N, -1)
+    imgs0 = imgs0.reshape(N, -1)
     print(f"imgs.shape = {imgs.shape}")
 
     if args.sigma_noise:
@@ -123,28 +130,28 @@ def main(args):
         sigma_noise = sigma_noise_avg.reshape(-1)
         print(f"done. Time: {time.time()-t0} seconds.", flush=True) 
     else: 
-        sigma_noise = np.ones(imgs.shape[1])
-
-    # Delete the initial large images.
-    del(imgs0)
+        sigma_noise = np.ones(imgs0.shape[1])
 
     # Mask for the result
     mask = create_3d_mask(x_grid, (0,0,0), args.radius)
 
-    # The heavy lifting
-    vol, vol_sigma, vol_counts = get_volume_residual(imgs, angles, sigma_noise, x_grid, args.radius, args.N_batches)
+    # The (not that) heavy lifting
+    vol, _, _ = get_volume_residual(imgs-imgs0, angles, sigma_noise, x_grid, args.radius, args.N_batches)
+    vol0, vol_sigma, vol_counts = get_volume_residual(imgs0, angles, sigma_noise, x_grid, args.radius, args.N_batches)
 
     # And print to file
-    file = open(f"{args.out_dir}/{args.out_file}_{nx}", "wb")
-    pickle.dump(vol, file)
-    file.close()
+    with mrcfile.new(f"{args.out_dir}/{args.out_file}_{nx}_resid.mrc", overwrite=True) as mrc:
+        mrc.set_data(jnp.fft.fftshift(vol).astype(np.float32))
    
-    if args.sigma_noise:
-        with mrcfile.new(f"{args.out_dir}/{args.out_file}_{nx}_sigma.mrc", overwrite=True) as mrc:
-            mrc.set_data(jnp.fft.fftshift(vol_sigma).astype(np.float32))
+    with mrcfile.new(f"{args.out_dir}/{args.out_file}_{nx}_imgs.mrc", overwrite=True) as mrc:
+        mrc.set_data(jnp.fft.fftshift(vol0).astype(np.float32))
 
     with mrcfile.new(f"{args.out_dir}/{args.out_file}_{nx}_counts.mrc", overwrite=True) as mrc:
         mrc.set_data(jnp.fft.fftshift(vol_counts).astype(np.float32))
+
+    if args.sigma_noise:
+        with mrcfile.new(f"{args.out_dir}/{args.out_file}_{nx}_sigma.mrc", overwrite=True) as mrc:
+            mrc.set_data(jnp.fft.fftshift(vol_sigma).astype(np.float32))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
