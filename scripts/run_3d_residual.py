@@ -140,7 +140,7 @@ def main(args):
     file.close()
    
     if args.sigma_noise:
-        with mrc.new(f"{args.out_dir}/{args.out_file}_{nx}_sigma.mrc", overwrite=True) as mrc:
+        with mrcfile.new(f"{args.out_dir}/{args.out_file}_{nx}_sigma.mrc", overwrite=True) as mrc:
             mrc.set_data(jnp.fft.fftshift(vol_sigma).astype(np.float32))
 
     with mrcfile.new(f"{args.out_dir}/{args.out_file}_{nx}_counts.mrc", overwrite=True) as mrc:
