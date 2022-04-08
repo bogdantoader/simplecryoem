@@ -208,8 +208,14 @@ def proposal_hmc(key, x0, logPiX0, logPi, gradLogPi, dt_list, L = 1, M = 1):
     key, subkey = random.split(key)
     dt = random.permutation(subkey, dt_list)[0]
     #print("dt =", dt) 
-
-    #logPiX0 = logPi(x0)
+    
+    #logPiX0 = jax.lax.cond(logPiX0 == jnp.inf,
+    #        true_fun = lambda _ : logPi(x0),
+    #        false_fun = lambda _ : logPiX0,
+    #        operand = None)
+    # For some reason the above fails when evaluating logPi(x0), 
+    # but the below works. Leaving like that at a small cost.
+    logPiX0 = logPi(x0)
 
     p0 = random.normal(key, x0.shape) * M
     r0exponent = logPiX0 - jnp.sum(jnp.real(jnp.conj(p0) * p0))/2
@@ -377,7 +383,7 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
         if save_samples > 0 and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
-        if verbose and jnp.mod(i, 10) == 0:
+        if verbose and jnp.mod(i, 1) == 0:
             if isinstance(N_batch, jnp.ndarray):
                 loss_i = jnp.abs(jnp.mean(logPiX1))
                 print("  MCMC sample", i, ", loss =", loss_i)

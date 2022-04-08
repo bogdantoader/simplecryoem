@@ -665,9 +665,10 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         def gradLogPi_vol(v): 
             grad_i = [-jnp.conj(grad_loss_volume_sum_iter(v, angles[i], shifts[i], ctf_params[i], imgs_iter[i], sigma_noise_iter)) for i in jnp.arange(angles.shape[0])]
             return jnp.mean(jnp.array(grad_i), axis=0)
-  
-        if logPiX0 == jnp.inf:
-            logPiX0 = logPi_vol(v0)
+ 
+        # Moved this to the proposal_hmc function
+        #if logPiX0 == jnp.inf:
+        #    logPiX0 = logPi_vol(v0)
 
         return proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, dt_list_hmc, L_hmc, M_iter)
 
@@ -677,10 +678,11 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter)
         gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter))
 
-        logPiX0 = jax.lax.cond(logPiX0 == jnp.inf,
-            true_fun = lambda _ : logPi_vol(v0),
-            false_fun = lambda _ : logPiX0,
-            operand = None)
+        # Moved the below to the proposal_hmc function for generality.
+        #logPiX0 = jax.lax.cond(logPiX0 == jnp.inf,
+        #    true_fun = lambda _ : logPi_vol(v0),
+        #    false_fun = lambda _ : logPiX0,
+        #    operand = None)
         
         return proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, dt_list_hmc, L_hmc, M_iter)
 

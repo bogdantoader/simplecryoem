@@ -91,7 +91,7 @@ def apply_shifts_and_ctf(proj, shifts, ctf_params, grid_proj):
     shift = get_shift_term(grid_proj, grid_proj, shifts)
     proj *= shift
 
-    if ctf_params is not None:
+    if ctf_params is not None and ctf_params.ndim > 0 :
         x_freq = jnp.fft.fftfreq(int(grid_proj[1]), 1/(grid_proj[0]*grid_proj[1]))
         X,Y = jnp.meshgrid(x_freq,x_freq)
         r = jnp.sqrt(X**2 + Y**2)
