@@ -281,6 +281,12 @@ def ab_initio_mcmc(
     if vol0 is None and opt_vol_first:
         N_vol_iter = 3000
         v, angles, shifts = initialize_ab_initio_vol(key, project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, imgs, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, True, learning_rate, sgd_batch_size,  None, B_list, interp_method, verbose)
+
+        if diagnostics:
+            #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
+            plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
+            plt.colorbar()
+            plt.show()
     elif vol0 is None:    
         v = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
     else:
@@ -371,14 +377,9 @@ def ab_initio_mcmc(
                 if verbose:
                     print("  Time orientations sampling =", time.time()-t0)
                     print("  mean(a_angles) =", jnp.mean(r_samples_angles), flush=True)
-                    
-                    if diagnostics:
-                        plot_angles(angles[:500])
-                        plt.show()
 
-
-
-
+                    #plot_angles(angles[:500])
+                    #plt.show()
 
 
         #TODO: make this similar to the orientations batch sampling 
@@ -420,7 +421,7 @@ def ab_initio_mcmc(
             print("  Time volume sampling =", time.time()-t0)
             print("  mean(a_vol) =", jnp.mean(r_hmc), flush=True)
 
-            if diagnostics:
+            #if diagnostics:
                 #ff ,lf =  get_diagnostics_funs_iter(project_func, x_grid_iter, mask3d, alpha, interp_method)
                 #fid = ff(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter)
                 #reg = 1/2 * l2sq(v) * alpha
@@ -429,10 +430,12 @@ def ab_initio_mcmc(
                 #print("  reg =", reg)
                 #print("  loss =", loss)
 
-                plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
+                #plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
                 #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
-                plt.colorbar()
-                plt.show()
+                #plt.colorbar()
+                #plt.show()
+
+
 
         
         if jnp.mod(idx_iter, freq_marching_step_iters)==0 and verbose:
@@ -537,11 +540,6 @@ def initialize_ab_initio_vol(key,
         AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs*mask2d, v0.shape, sigma_noise)
         v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_vol, verbose = verbose)
 
-    #if verbose:
-    #    #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
-    #    plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
-    #    plt.colorbar()
-    #    plt.show()
 
     return v, angles, shifts
 
