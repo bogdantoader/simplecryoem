@@ -458,8 +458,9 @@ def estimate_noise_imgs(imgs, nx_empty = 48, nx_final = 32):
     corners = imgs[:, :nx_empty, :nx_empty]
 
     # Take padded FFT so that the result has the same dimensions as the 
-    # initial images.
-    f_corners = jnp.fft.fft2(corners, s = [nx0, nx0])
+    # initial images. If need to do on many images, apply fft2 to smaller
+    # bathces of images.
+    f_corners = np.fft.fft2(corners, s = [nx0, nx0])
 
     # Crop the FFT of the empty corner in the same way that we will crop 
     # the particle images
@@ -471,7 +472,7 @@ def estimate_noise_imgs(imgs, nx_empty = 48, nx_final = 32):
     # Compute the standard deviation of the noise, with the appropriate 
     # scaling due to taking Fourier transforms 
     # (scaling empirically determined, to check on paper).
-    stddev = jnp.std(f_corners, axis=0)/nx_empty * nx0
+    stddev = np.std(f_corners, axis=0)/nx_empty * nx0
     
     return stddev.reshape(-1)
 
