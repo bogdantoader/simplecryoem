@@ -218,9 +218,11 @@ def ab_initio_mcmc(
         learning_rate = 1, 
         sgd_batch_size = -1, 
         N_samples_vol = 100, 
-        N_samples_angles = 1000, 
+        N_samples_angles_global = 1000, 
+        N_samples_angles_local = 100, 
         N_samples_shifts = 1000,
         dt_list_hmc = [0.5], 
+        sigma_perturb_list = jnp.array([1, 0.1, 0.01, 0.001]),
         L_hmc = 10, 
         radius0 = 0.1, 
         dr = None, 
@@ -347,7 +349,7 @@ def ab_initio_mcmc(
             # Get the operators for the dimensions at this iteration.
             slice_func_array_angles_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter, loss_proj_func_batched0_iter, rotate_and_interpolate_iter = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid_iter, mask3d, alpha, interp_method)
 
-            proposal_func_orientations, proposal_func_shifts, proposal_func_vol, proposal_func_vol_batch = get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, sigma_noise_iter, B_list, dt_list_hmc, L_hmc, M_iter)
+            proposal_func_orientations_unif, proposal_func_orientations_pert, proposal_func_shifts, proposal_func_vol, proposal_func_vol_batch = get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, sigma_noise_iter, B_list, dt_list_hmc, L_hmc, M_iter)
 
             if N1 > 1:
                 proposal_func_vol = proposal_func_vol_batch
@@ -362,25 +364,44 @@ def ab_initio_mcmc(
         t0 = time.time()    
      
         if angles0 is None:
+            # First, sample orientations uniformly on the sphere.
+
             #TODO: do the same for shifts
-            if idx_iter < 64 or jnp.mod(idx_iter, 8) == 4:
+            if idx_iter < 48 or jnp.mod(idx_iter, 8) == 4:
                 angles_new = []
                 for i in jnp.arange(N1):
                     if verbose and N1 > 1:
                         print("batch ", i)
                     params_orientations = {'v':v, 'shifts':shifts[i], 'ctf_params':ctf_params[i], 'imgs_iter' : imgs_iter[i]}
-                    _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_func_orientations, angles[i], N_samples_angles, params_orientations, N2, 1, verbose = True)
-                    angles_new.append(samples_angles[N_samples_angles-2])
+                    _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_func_orientations_unif, angles[i], N_samples_angles_global, params_orientations, N2, 1, verbose = True)
+                    angles_new.append(samples_angles[N_samples_angles_global-2])
                 angles = jnp.array(angles_new)
 
 
                 if verbose:
-                    print("  Time orientations sampling =", time.time()-t0)
+                    print("  Time global orientations sampling =", time.time()-t0)
                     print("  mean(a_angles) =", jnp.mean(r_samples_angles), flush=True)
 
                     #plot_angles(angles[:500])
                     #plt.show()
 
+            # And now sample local perturbations of the orientations.
+            angles_new = []
+            for i in jnp.arange(N1):
+                if verbose and N1 > 1:
+                    print("batch ", i)
+                params_orientations = {'v':v, 'shifts':shifts[i], 'ctf_params':ctf_params[i], 'imgs_iter' : imgs_iter[i], 'sigma_perturb': sigma_perturb_list}
+                _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_func_orientations_pert, angles[i], N_samples_angles_local, params_orientations, N2, 1, verbose = True)
+                angles_new.append(samples_angles[N_samples_angles_local-2])
+            angles = jnp.array(angles_new)
+
+
+            if verbose:
+                print("  Time local orientations sampling =", time.time()-t0)
+                print("  mean(a_angles) =", jnp.mean(r_samples_angles), flush=True)
+
+                #plot_angles(angles[:500])
+                #plt.show()
 
         #TODO: make this similar to the orientations batch sampling 
         # Sample the shifts - not working right now
