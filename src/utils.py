@@ -361,20 +361,27 @@ def generate_uniform_orientations(N):
     angles = np.concatenate([alpha, beta, gamma], axis = 1)
     return jnp.array(angles)
 
-def generate_uniform_orientations_jax(key, N):
+def generate_uniform_orientations_jax(key, a0):
     key1, key2, key3 = random.split(key, 3)
+    N = a0.shape[0]
+
     alpha = random.uniform(key1, (N,)) * 2 * jnp.pi 
     gamma = random.uniform(key2, (N,)) * 2 * jnp.pi 
     z = random.uniform(key3, (N,)) *2 - 1
     beta = jnp.arccos(z)
     return jnp.array([alpha, beta, gamma]).transpose()
 
+def generate_perturbed_orientations(key, a0, sig):
+    return a0 + sig * random.normal(key, a0.shape)
+
 
 def generate_uniform_orientations_jax_batch(key, N1, N2):
     keys = random.split(key, N1)
     angles = []
+    a0 = jnp.zeros(N2)
+
     for i in jnp.arange(N1):
-        angles.append(generate_uniform_orientations_jax(keys[i], N2))
+        angles.append(generate_uniform_orientations_jax(keys[i], a0))
 
     return jnp.array(angles)
 
@@ -496,8 +503,8 @@ def average_radially(img, x_grid):
     return jnp.array(img_avg)
 
 
-def compare_orientations(angles1, angles2):
-    """Get the angular distances between the orientations
+def err_orientations(angles1, angles2):
+    """Calculate the angular distances between the orientations
     a1_i and a2_i from the N x 3 arrays angles1 and angles2."""
 
     # Making get_rotation_matrix function vmap friendly
@@ -508,12 +515,12 @@ def compare_orientations(angles1, angles2):
     M2 = jax.vmap(get_rot_mat, in_axes=0)(angles2)
 
     # The chordal distance (Frobenium norm error between matrices)
-    err0 = jnp.sqrt(jnp.sum((M-M_rec)**2, axis=(1,2)))
+    err = jnp.sqrt(jnp.sum((M1-M2)**2, axis=(1,2)))
 
     # The actual angular distance
     theta = 2*jnp.arcsin(err/(2*jnp.sqrt(2)))
 
-    return theta
+    return theta, err
 
 @jax.jit
 def wrap_around_distance_2d(x1, x2, B):

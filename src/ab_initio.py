@@ -366,7 +366,7 @@ def ab_initio_mcmc(
             if idx_iter < 64 or jnp.mod(idx_iter, 8) == 4:
                 angles_new = []
                 for i in jnp.arange(N1):
-                    if verbose:
+                    if verbose and N1 > 1:
                         print("batch ", i)
                     params_orientations = {'v':v, 'shifts':shifts[i], 'ctf_params':ctf_params[i], 'imgs_iter' : imgs_iter[i]}
                     _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_func_orientations, angles[i], N_samples_angles, params_orientations, N2, 1, verbose = True)
@@ -574,9 +574,7 @@ def get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and
 # be faster
 def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, sigma_noise_iter, B_list, dt_list_hmc, L_hmc, M_iter):
 
-    #TODO: maybe pass logPiX0 to the proposal function so that
-    # we only need to compute logPiX1 - should reduce the time/memory by half?
-
+    
     def proposal_func_orientations_batch(key, angles0, logPiX0, v, shifts):
         #logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, sigma_noise_iter)
 
@@ -602,12 +600,10 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         return angles1, r, logPiX1, logPiX0
   
     #TODO: do this thing for shifts too and delete the the batch proposal func for orientations and shifts
-    @jax.jit
-    def proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter):
+    def proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, generate_orientations_func, params_orientations):
         logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, sigma_noise_iter)
 
-        N = angles0.shape[0]
-        angles1 = generate_uniform_orientations_jax(key, N)
+        angles1 = generate_orientations_func(key, angles0, **params_orientations)
 
         logPiX0 = jax.lax.cond(jnp.sum(logPiX0) == jnp.inf,
             true_fun = lambda _ : logPi(angles0),
@@ -619,12 +615,18 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
 
         return angles1, r, logPiX1, logPiX0 
 
+    @jax.jit
+    def proposal_func_orientations_uniform(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter):
+        empty_params = {}
+        return proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, generate_uniform_orientations_jax, empty_params)
 
-    #def proposal_func_os(key, as0, logPiX0, v, ctf_params, imgs_iter):
-    #    N = as0.shape[0]
-        
-        
+    @jax.jit
+    def proposal_func_orientations_perturb(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, sigma_perturb):
+        key, subkey = random.split(key)
+        sig_p = random.permutation(subkey, sigma_perturb)[0]
+        orient_params = {'sig' : sig_p}
 
+        return proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, generate_perturbed_orientations, orient_params)
 
     #@jax.jit
     def proposal_func_shifts(key, shifts0, logPiX0, v, proj):
@@ -685,7 +687,7 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         return proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, dt_list_hmc, L_hmc, M_iter)
 
 
-    return proposal_func_orientations, proposal_func_shifts, proposal_func_vol, proposal_func_vol_batch
+    return proposal_func_orientations_uniform, proposal_func_orientations_perturb, proposal_func_shifts, proposal_func_vol, proposal_func_vol_batch
 
 
 
