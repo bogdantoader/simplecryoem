@@ -508,11 +508,11 @@ def err_orientations(angles1, angles2):
     a1_i and a2_i from the N x 3 arrays angles1 and angles2."""
 
     # Making get_rotation_matrix function vmap friendly
-    get_rot_mat = lambda a : get_rotation_matrix(a[0], a[1], a[2])    
+    get_rot_mats = jax.vmap(lambda a : get_rotation_matrix(a[0], a[1], a[2]), in_axes=0)    
     
     # Get the matrix for each orientation
-    M1 = jax.vmap(get_rot_mat, in_axes=0)(angles1)
-    M2 = jax.vmap(get_rot_mat, in_axes=0)(angles2)
+    M1 = get_rot_mats(angles1)
+    M2 = get_rot_mats(angles2)
 
     # The chordal distance (Frobenium norm error between matrices)
     err = jnp.sqrt(jnp.sum((M1-M2)**2, axis=(1,2)))

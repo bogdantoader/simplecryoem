@@ -361,13 +361,13 @@ def ab_initio_mcmc(
         print("Sampling orientations") 
 
 
-        t0 = time.time()    
      
         if angles0 is None:
             # First, sample orientations uniformly on the sphere.
 
             #TODO: do the same for shifts
-            if idx_iter < 48 or jnp.mod(idx_iter, 8) == 4:
+            t0 = time.time()    
+            if idx_iter < 64 or jnp.mod(idx_iter, 8) == 4:
                 angles_new = []
                 for i in jnp.arange(N1):
                     if verbose and N1 > 1:
@@ -386,6 +386,7 @@ def ab_initio_mcmc(
                     #plt.show()
 
             # And now sample local perturbations of the orientations.
+            t0 = time.time()    
             angles_new = []
             for i in jnp.arange(N1):
                 if verbose and N1 > 1:
