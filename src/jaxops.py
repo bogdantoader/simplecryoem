@@ -42,19 +42,19 @@ def get_loss_funcs(slice_func, err_func = wl2sq, alpha = 0):
 
 
     @jax.jit
-    def loss_func(v, angles, shifts, ctf_params, img, sigma):
+    def loss_func(v, angles, shifts, ctf_params, img, z = 0, sigma = 1):
         """L2 squared error with L2 regularization, where alpha is the
         regularization parameter and sigma is the pixel-wise standard 
         deviation of the noise."""
-        return 1/2 * (alpha * l2sq(v) + err_func(slice_func(v, angles, shifts, ctf_params), img, 1/sigma**2))
+        return 1/2 * (alpha * l2sq(v[z]) + err_func(slice_func(v[z], angles, shifts, ctf_params), img, 1/sigma**2))
 
     @jax.jit 
-    def loss_func_batched(v, angles, shifts, ctf_params, imgs, sigma):
-        return jax.vmap(loss_func, in_axes = (None, 0, 0, 0, 0, None))(v, angles, shifts, ctf_params, imgs, sigma)
+    def loss_func_batched(v, angles, shifts, ctf_params, imgs, z, sigma):
+        return jax.vmap(loss_func, in_axes = (None, 0, 0, 0, 0, 0, None))(v, angles, shifts, ctf_params, imgs, z, sigma)
 
     @jax.jit
-    def loss_func_sum(v, angles, shifts, ctf_params, imgs, sigma):
-        return jnp.mean(loss_func_batched(v, angles, shifts, ctf_params, imgs, sigma))
+    def loss_func_sum(v, angles, shifts, ctf_params, imgs, z, sigma):
+        return jnp.mean(loss_func_batched(v, angles, shifts, ctf_params, imgs, z, sigma))
 
     return loss_func, loss_func_batched, loss_func_sum
 
