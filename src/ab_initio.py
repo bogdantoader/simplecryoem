@@ -214,6 +214,7 @@ def ab_initio_mcmc(
         vol0 = None, 
         angles0 = None, 
         shifts0 = None,
+        z0 = None,
         N_iter = 100, 
         learning_rate = 1, 
         sgd_batch_size = -1, 
@@ -221,6 +222,7 @@ def ab_initio_mcmc(
         N_samples_angles_global = 1000, 
         N_samples_angles_local = 100, 
         N_samples_shifts = 1000,
+        N_samples_z = 100,
         dt_list_hmc = [0.5], 
         sigma_perturb_list = jnp.array([1, 0.1, 0.01, 0.001]),
         L_hmc = 10, 
@@ -404,7 +406,8 @@ def ab_initio_mcmc(
                 #plot_angles(angles[:500])
                 #plt.show()
 
-        #TODO: make this similar to the orientations batch sampling 
+        # SAMPLING SHIFTS IS NOT CURRENTLY WORKING
+        #TODO: make this similar to the orientations batch sampling  
         # Sample the shifts - not working right now
         if shifts0 is None:
             print("Sampling shifts")
@@ -420,6 +423,24 @@ def ab_initio_mcmc(
             if verbose:
                 print("  Time shifts sampling =", time.time()-t0)
                 print("  mean(a_shifts) =", jnp.mean(r_samples_shifts), flush=True)
+
+
+
+        # Sample the class assignments
+        if z0 is None:
+            print("Sampling z")
+            t0 = time.time()
+
+            params_z = {'v' : v,
+                'angles': angles, 
+                'shifts': shifts, 
+                'ctf_params': ctf_params, 
+                'imgs': imgs_iter}
+             
+            key, subkey = random.split(key)
+                     
+            _, r_samples_z, samples_z = mcmc(subkey, proposal_z_batch_correct, z, N_samples_z, params_z, 1, save_samples = True)
+            z = z_samples[N_samples_z - 2]
 
 
         # Sample the volume
@@ -622,8 +643,8 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         return angles1, r, logPiX1, logPiX0
   
     #TODO: do this thing for shifts too and delete the the batch proposal func for orientations and shifts
-    def proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, generate_orientations_func, params_orientations):
-        logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, sigma_noise_iter)
+    def proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, z, generate_orientations_func, params_orientations):
+        logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, z, sigma_noise_iter)
 
         angles1 = generate_orientations_func(key, angles0, **params_orientations)
 
@@ -638,9 +659,9 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         return angles1, r, logPiX1, logPiX0 
 
     @jax.jit
-    def proposal_func_orientations_uniform(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter):
+    def proposal_func_orientations_uniform(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, z):
         empty_params = {}
-        return proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, generate_uniform_orientations_jax, empty_params)
+        return proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, z, generate_uniform_orientations_jax, empty_params)
 
     @jax.jit
     def proposal_func_orientations_perturb(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, sigma_perturb):

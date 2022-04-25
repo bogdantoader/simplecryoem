@@ -50,7 +50,7 @@ def get_loss_funcs(slice_func, err_func = wl2sq, alpha = 0):
 
     @jax.jit 
     def loss_func_batched(v, angles, shifts, ctf_params, imgs, sigma):
-        return jax.vmap(loss_func, in_axes = (None, 0, 0, 0, 0, 0, None))(v, angles, shifts, ctf_params, imgs, sigma)
+        return jax.vmap(loss_func, in_axes = (None, 0, 0, 0, 0,  None))(v, angles, shifts, ctf_params, imgs, sigma)
 
     @jax.jit
     def loss_func_sum(v, angles, shifts, ctf_params, imgs, sigma):
