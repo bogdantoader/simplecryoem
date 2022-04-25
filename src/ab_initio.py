@@ -696,9 +696,9 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
 
 
     @jax.jit
-    def proposal_func_vol(key, v0, logPiX0, angles, shifts, ctf_params, imgs_iter):
-        logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter)
-        gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_sum_iter(v, angles, shifts, ctf_params, imgs_iter, sigma_noise_iter))
+    def proposal_func_vol(key, v0, logPiX0, angles, shifts, ctf_params, imgs_iter, z):
+        logPi_vol = lambda v : -loss_func_sum_iter(v, angles, shifts, ctf_params, imgs_iter, z, sigma_noise_iter)
+        gradLogPi_vol = lambda v : -jnp.conj(grad_loss_volume_sum_iter(v, angles, shifts, ctf_params, imgs_iter, z, sigma_noise_iter))
 
         # Moved the below to the proposal_hmc function for generality.
         #logPiX0 = jax.lax.cond(logPiX0 == jnp.inf,
