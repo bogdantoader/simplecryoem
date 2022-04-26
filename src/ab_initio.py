@@ -580,7 +580,7 @@ def ab_initio_mcmc(
     if save_to_file:
         for class_idx in jnp.arange(K):
             vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[class_idx])))
-            with mrcfile.new(f"{out_dir}/rec_iter__class{class_idx}.mrc", overwrite=True) as mrc:
+            with mrcfile.new(f"{out_dir}/rec_final_class{class_idx}.mrc", overwrite=True) as mrc:
                 mrc.set_data(vr.astype(np.float32))
 
     #return v, angles, shifts, samples_angles, r_samples_angles,  v_hmc_samples , r_hmc
@@ -840,13 +840,31 @@ def get_class_proposal_func(loss_func_batched, loss_func_sum, sigma_noise, alpha
         params_z = {"v" : v, "angles" : angles, "shifts" : shifts, "ctf_params" : ctf_params, "imgs" : imgs}
 
         logPiZ0 = logPi_local(z0)
+
         # TODO: Use lax.for_i loop to speedup compilation time.
+        logPiX0 = logPiZ0
         for i in jnp.arange(N_samples_z_local):
-            z1, r, logPiX1, logPiX0 = proposal_z_batch(keys[2*i], z0, logPiZ0, **params_z)
+            z1, r, logPiX1, logPiX0 = proposal_z_batch(keys[2*i], z0, logPiX0, **params_z)
             a = jnp.minimum(1, r)
 
             unif_var = random.uniform(keys[2*i+1], (N,))
             z1, logPiX1 = accept_reject_vmap(unif_var, a, z0, z1, logPiX0, logPiX1)
+
+            z0 = z1
+            logPiX0 = logPiX1
+
+
+
+        #def body_fun(i, z0, logPiZ0):
+        #    z1, r, logPiX1, logPiX0 = proposal_z_batch(keys[2*i], z0, logPiZ0, **params_z)
+        #    a = jnp.minimum(1, r)
+        #    
+        #    unif_var = random.uniform(keys[2*i+1], (N,))
+        #    z1, logPiX1 = accept_reject_vmap(unif_var, a, z0, z1, logPiX0, logPiX1)
+
+        #    return z1, logPiX1
+
+        #z1, logPiX1 = jax.lax.fori_loop(0, N_samples_z_local, body_fun, (z0, logPiZ0)) 
 
         logPiZ1 = logPi_local(z1)
 
