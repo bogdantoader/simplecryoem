@@ -63,7 +63,7 @@ def ab_initio(project_func, imgs, sigma_noise, shifts_true, ctf_params, x_grid, 
             P = jnp.ones([nx,nx,nx])
 
     if opt_vol_first:
-        v, _ = initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, use_sgd, learning_rate, batch_size,  P, interp_method, verbose)
+        v, _ = initialize_ab_initio_vol(project_func, imgs, shifts_true, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, learning_rate, batch_size,  P, interp_method, verbose)
     else:    
         v = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
 
@@ -290,7 +290,7 @@ def ab_initio_mcmc(
     if vol0 is None and opt_vol_first:
         N_vol_iter = 3000
 
-        v, angles, shifts = initialize_ab_initio_vol(key, project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, imgs, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, True, learning_rate, sgd_batch_size,  None, B_list, K, interp_method, verbose)
+        v, angles, shifts, z = initialize_ab_initio_vol(key, project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, imgs, ctf_params, x_grid, N_vol_iter, eps_vol, sigma_noise, learning_rate, sgd_batch_size,  B_list, K, interp_method, verbose)
 
         if diagnostics:
             #plt.imshow(jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[0,:,:]))))
@@ -316,10 +316,6 @@ def ab_initio_mcmc(
 
     if z0 is not None:
         z = z0
-    else:
-        key, subkey = random.split(key)
-        #z = random.randint(subkey, [N1, N2], 0, K) 
-        z = random.randint(subkey, (N2,), 0, K) 
 
 
     imgs = imgs.reshape([N1, N2, nx,nx])
@@ -331,7 +327,7 @@ def ab_initio_mcmc(
 
     nx_iter = 0
     recompile = True
-    for idx_iter in range(N_iter):
+    for idx_iter in range(1, N_iter+1):
         #if nx_iter == nx and jnp.mod(idx_iter, 7)==0:
         #   N_samples_angles = 1000
         #   N_samples_vol = 100
@@ -350,7 +346,7 @@ def ab_initio_mcmc(
 
             # At the first iteration, we reduce the size (from v0) while 
             # afterwards, we increase it (frequency marching).
-            if idx_iter == 0:
+            if idx_iter == 1:
                 if K == 1:
                     v, _ = crop_fourier_volume(v, x_grid, nx_iter)
                 else:
@@ -397,12 +393,10 @@ def ab_initio_mcmc(
 
         key, key_angles, key_shifts, key_z = random.split(key, 4)
 
+
         # Sample the orientations
-        print("Sampling orientations") 
-
-
-     
         if angles0 is None:
+            print("Sampling orientations") 
             # First, sample orientations uniformly on the sphere.
 
             #TODO: do the same for shifts
@@ -598,10 +592,8 @@ def initialize_ab_initio_vol(key,
         N_vol_iter, 
         eps_vol, 
         sigma_noise = 1, 
-        use_sgd = True, 
         learning_rate = 1, 
         batch_size = -1,  
-        P = None, 
         B = 1, 
         K = 1,
         interp_method = 'tri', 
@@ -613,10 +605,10 @@ def initialize_ab_initio_vol(key,
     N2 = imgs.shape[1]
     nx = jnp.sqrt(imgs.shape[2]).astype(jnp.int64)
 
-    v0 = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
+    v0 = jnp.array(np.random.randn(K, nx,nx,nx) + np.random.randn(K, nx,nx,nx)*1j)
     mask3d = jnp.ones([nx,nx,nx])
 
-    _, grad_loss_volume_sum, _, _, _,_,_, _,_ = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid, mask3d, 0, interp_method)
+    _, _, grad_loss_volume_sum_z, _, _,_,_, _,_ = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid, mask3d, 0, interp_method)
 
     key1, key2, key3 = random.split(key, 3)
 
@@ -624,20 +616,19 @@ def initialize_ab_initio_vol(key,
     shifts = jnp.zeros([N1, N2, 2]) #generate_uniform_shifts(key, N, B)
     #shifts = generate_gaussian_shifts(key, N, B)
 
+    #z = random.randint(subkey, [N1, N2], 0, K) 
+    z = random.randint(key3, (N2,), 0, K) 
+
     #grad_loss_volume_batched_sum = lambda v, a, s, c, imgs, sig : grad_loss_volume_batched(v, a, s, c, imgs, sig) / a.shape[0]
 
-    if use_sgd:
-        sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_sum, angles[0], shifts[0], ctf_params[0], imgs[0], sigma_noise)
-        v = sgd(sgd_grad_func, N2, v0, learning_rate, N_vol_iter, batch_size, P, eps_vol, verbose = verbose)
-    else:
-        AA, Ab = get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs*mask2d, v0.shape, sigma_noise)
-        v, _ = conjugate_gradient(AA, Ab, v0, N_vol_iter, eps_vol, verbose = verbose)
+    sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_sum_z, angles[0], shifts[0], ctf_params[0], imgs[0], z, sigma_noise)
+    v = sgd(sgd_grad_func, N2, v0, learning_rate, N_vol_iter, batch_size, None, eps_vol, verbose = verbose)
 
-    if K > 1:
-        v = jnp.repeat(v[jnp.newaxis, :, :], K, axis=0) 
-        v += jnp.array(np.random.randn(K, nx,nx,nx) + np.random.randn(K, nx,nx,nx)*1j)
+    #if K > 1:
+    #    v = jnp.repeat(v[jnp.newaxis, :, :], K, axis=0) 
+    #    v += jnp.array(np.random.randn(K, nx,nx,nx) + np.random.randn(K, nx,nx,nx)*1j)
 
-    return v, angles, shifts
+    return v, angles, shifts, z
 
 
 def get_diagnostics_funs_iter(project_func, x_grid, mask, alpha = 0, interp_method = 'tri'):
