@@ -386,7 +386,7 @@ def ab_initio_mcmc(
             # Get the operators for the dimensions at this iteration.
             slice_func_array_angles_iter, _, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter, loss_func_batched_iter, loss_proj_func_batched0_iter, rotate_and_interpolate_iter = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid_iter, mask3d, alpha, interp_method)
 
-            proposal_func_orientations_unif, proposal_func_orientations_pert, proposal_func_shifts, proposal_func_vol, proposal_func_vol_batch = get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, sigma_noise_iter, B_list, dt_list_hmc, L_hmc, M_iter)
+            proposal_func_orientations_unif, proposal_func_orientations_pert, proposal_func_shifts, proposal_func_vol, proposal_func_vol_batch = get_jax_proposal_funcs(loss_func_batched_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, sigma_noise_iter, B_list, dt_list_hmc, L_hmc, M_iter)
 
 
             proposal_z = get_class_proposal_func(loss_func_batched_iter, loss_func_sum_iter, sigma_noise_iter, alpha_d, K)
@@ -395,7 +395,7 @@ def ab_initio_mcmc(
                 proposal_func_vol = proposal_func_vol_batch
 
 
-        key, key_angles, key_shifts = random.split(key, 3)
+        key, key_angles, key_shifts, key_z = random.split(key, 4)
 
         # Sample the orientations
         print("Sampling orientations") 
@@ -412,7 +412,7 @@ def ab_initio_mcmc(
                 for i in jnp.arange(N1):
                     if verbose and N1 > 1:
                         print("batch ", i)
-                    params_orientations = {'v':v, 'shifts':shifts[i], 'ctf_params':ctf_params[i], 'imgs_iter' : imgs_iter[i]}
+                    params_orientations = {'v':v, 'shifts':shifts[i], 'ctf_params':ctf_params[i], 'imgs_iter' : imgs_iter[i], 'z': z }
                     _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_func_orientations_unif, angles[i], N_samples_angles_global, params_orientations, N2, 1, verbose = True)
                     angles_new.append(samples_angles[N_samples_angles_global-2])
                 angles = jnp.array(angles_new)
@@ -431,7 +431,7 @@ def ab_initio_mcmc(
             for i in jnp.arange(N1):
                 if verbose and N1 > 1:
                     print("batch ", i)
-                params_orientations = {'v':v, 'shifts':shifts[i], 'ctf_params':ctf_params[i], 'imgs_iter' : imgs_iter[i], 'sigma_perturb': sigma_perturb_list}
+                params_orientations = {'v':v, 'shifts':shifts[i], 'ctf_params':ctf_params[i], 'imgs_iter' : imgs_iter[i], 'sigma_perturb': sigma_perturb_list, 'z': z}
                 _, r_samples_angles, samples_angles = mcmc(key_angles, proposal_func_orientations_pert, angles[i], N_samples_angles_local, params_orientations, N2, 1, verbose = True)
                 angles_new.append(samples_angles[N_samples_angles_local-2])
             angles = jnp.array(angles_new)
@@ -468,7 +468,6 @@ def ab_initio_mcmc(
         # Not working with multiple batches now
         if z0 is None:
             print("Sampling z")
-            t0 = time.time()
 
             params_z = {'v' : v,
                 'angles': angles[0], 
@@ -476,11 +475,14 @@ def ab_initio_mcmc(
                 'ctf_params': ctf_params[0], 
                 'imgs': imgs_iter[0]}
              
-            key, subkey = random.split(key)
                      
-            _, r_samples_z, samples_z = mcmc(subkey, proposal_z, z, N_samples_z, params_z, 1, save_samples = True)
+            t0 = time.time()
+            _, r_samples_z, samples_z = mcmc(key_z, proposal_z, z, N_samples_z, params_z, 1, save_samples = True)
             z = samples_z[N_samples_z - 2]
 
+            if verbose:
+                print("  Time z sampling =", time.time()-t0)
+                print("  mean(a_z) =", jnp.mean(r_samples_z), flush=True)
 
         # Sample the volume
         print("Sampling the volume")
@@ -571,17 +573,18 @@ def ab_initio_mcmc(
     # A bit tricky because they have different dimensions. Should be able
     # to just same each Iter's mean, enlarge to full size, and then average 
     # all
-    v = v_hmc_mean 
+    #v = v_hmc_mean 
     #v = v*mask3d
     v = jnp.array([vi*mask3d for vi in v])
 
-    vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
     if save_to_file:
-        with mrcfile.new(out_dir + '/rec_final.mrc', overwrite=True) as mrc:
+        for class_idx in jnp.arange(K):
+            vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v[class_idx])))
+            with mrcfile.new(f"{out_dir}/rec_iter__class{class_idx}.mrc", overwrite=True) as mrc:
                 mrc.set_data(vr.astype(np.float32))
 
     #return v, angles, shifts, samples_angles, r_samples_angles,  v_hmc_samples , r_hmc
-    return v, angles, shifts
+    return v, angles, shifts, z
 
 
 
@@ -719,12 +722,12 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         return proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, z, generate_uniform_orientations_jax, empty_params)
 
     @jax.jit
-    def proposal_func_orientations_perturb(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, sigma_perturb):
+    def proposal_func_orientations_perturb(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, z, sigma_perturb):
         key, subkey = random.split(key)
         sig_p = random.permutation(subkey, sigma_perturb)[0]
         orient_params = {'sig' : sig_p}
 
-        return proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, generate_perturbed_orientations, orient_params)
+        return proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, z, generate_perturbed_orientations, orient_params)
 
     #@jax.jit
     def proposal_func_shifts(key, shifts0, logPiX0, v, proj):
