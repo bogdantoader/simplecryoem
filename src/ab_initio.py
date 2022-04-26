@@ -841,33 +841,32 @@ def get_class_proposal_func(loss_func_batched, loss_func_sum, sigma_noise, alpha
 
         logPiZ0 = logPi_local(z0)
 
-        # TODO: Use lax.for_i loop to speedup compilation time.
-        logPiX0 = logPiZ0
-        for i in jnp.arange(N_samples_z_local):
+        #logPiX0 = logPiZ0
+        #for i in jnp.arange(N_samples_z_local):
+        #    z1, r, logPiX1, logPiX0 = proposal_z_batch(keys[2*i], z0, logPiX0, **params_z)
+        #    a = jnp.minimum(1, r)
+        #
+        #    unif_var = random.uniform(keys[2*i+1], (N,))
+        #    z1, logPiX1 = accept_reject_vmap(unif_var, a, z0, z1, logPiX0, logPiX1)
+        #
+        #    z0 = z1
+        #    logPiX0 = logPiX1
+
+        # The fori_loop version of the above for loop to save compilation time.
+        def body_fun(i, z0logPiX0):
+            z0, logPiX0 = z0logPiX0
+
             z1, r, logPiX1, logPiX0 = proposal_z_batch(keys[2*i], z0, logPiX0, **params_z)
             a = jnp.minimum(1, r)
 
             unif_var = random.uniform(keys[2*i+1], (N,))
             z1, logPiX1 = accept_reject_vmap(unif_var, a, z0, z1, logPiX0, logPiX1)
 
-            z0 = z1
-            logPiX0 = logPiX1
+            return z1, logPiX1
 
-
-
-        #def body_fun(i, z0, logPiZ0):
-        #    z1, r, logPiX1, logPiX0 = proposal_z_batch(keys[2*i], z0, logPiZ0, **params_z)
-        #    a = jnp.minimum(1, r)
-        #    
-        #    unif_var = random.uniform(keys[2*i+1], (N,))
-        #    z1, logPiX1 = accept_reject_vmap(unif_var, a, z0, z1, logPiX0, logPiX1)
-
-        #    return z1, logPiX1
-
-        #z1, logPiX1 = jax.lax.fori_loop(0, N_samples_z_local, body_fun, (z0, logPiZ0)) 
+        z1, _ = jax.lax.fori_loop(0, N_samples_z_local, body_fun, (z0, logPiZ0*jnp.ones((N,))))
 
         logPiZ1 = logPi_local(z1)
-
         r = jnp.exp(logPiZ1 - logPiZ0)       
 
         return z1, r, logPiZ1, logPiZ0
