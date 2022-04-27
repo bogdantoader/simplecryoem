@@ -605,10 +605,11 @@ def initialize_ab_initio_vol(key,
     N2 = imgs.shape[1]
     nx = jnp.sqrt(imgs.shape[2]).astype(jnp.int64)
 
-    v0 = jnp.array(np.random.randn(K, nx,nx,nx) + np.random.randn(K, nx,nx,nx)*1j)
+    #v0 = jnp.array(np.random.randn(K, nx,nx,nx) + np.random.randn(K, nx,nx,nx)*1j)
+    v0 = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
     mask3d = jnp.ones([nx,nx,nx])
 
-    _, _, grad_loss_volume_sum_z, _, _,_,_, _,_ = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid, mask3d, 0, interp_method)
+    _, grad_loss_volume_sum, grad_loss_volume_sum_z, _, _,_,_, _,_ = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid, mask3d, 0, interp_method)
 
     key1, key2, key3 = random.split(key, 3)
 
@@ -620,13 +621,15 @@ def initialize_ab_initio_vol(key,
     z = random.randint(key3, (N2,), 0, K) 
 
     #grad_loss_volume_batched_sum = lambda v, a, s, c, imgs, sig : grad_loss_volume_batched(v, a, s, c, imgs, sig) / a.shape[0]
+    #TODO: should move the contents of get_sgd_vol_ops here (it's only one line), as it's not used anywhere else anyway.
 
-    sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_sum_z, angles[0], shifts[0], ctf_params[0], imgs[0], z, sigma_noise)
+    #sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_sum_z, angles[0], shifts[0], ctf_params[0], imgs[0], z, sigma_noise)
+    sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_sum, angles[0], shifts[0], ctf_params[0], imgs[0], sigma_noise)
     v = sgd(sgd_grad_func, N2, v0, learning_rate, N_vol_iter, batch_size, None, eps_vol, verbose = verbose)
 
-    #if K > 1:
-    #    v = jnp.repeat(v[jnp.newaxis, :, :], K, axis=0) 
-    #    v += jnp.array(np.random.randn(K, nx,nx,nx) + np.random.randn(K, nx,nx,nx)*1j)
+    if K > 1:
+        v = jnp.repeat(v[jnp.newaxis, :, :], K, axis=0) 
+        v += jnp.array(np.random.randn(K, nx,nx,nx) + np.random.randn(K, nx,nx,nx)*1j)
 
     return v, angles, shifts, z
 
