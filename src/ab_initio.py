@@ -424,15 +424,17 @@ def ab_initio_mcmc(
                         angles_new.append(samples_angles[N_samples_angles_global-2])
                 angles = jnp.array(angles_new)
 
+                #print(r_samples_angles)
                 if verbose:
-                    print("  Time global orientations sampling =", time.time()-t0)
-                    print("  mean(a_angles) =", jnp.mean(r_samples_angles), flush=True)
+                    print(f"  Time global orientations sampling = {time.time()-t0}")
+                    print(f"  mean(a_angles) = {jnp.mean(r_samples_angles[r_samples_angles != jnp.nan])} ({jnp.sum(r_samples_angles==jnp.nan)} nans)", flush=True)
+                    print(f"  max(a_angles) = {jnp.max(r_samples_angles)}, min(a_angles) = {jnp.min(r_samples_angles)}")
 
                     #plot_angles(angles[:500])
                     #plt.show()
 
             # And now sample local perturbations of the orientations.
-            if idx_iter >= 64:
+            if idx_iter >= 32:
                 t0 = time.time()    
                 angles_new = []
                 for i in jnp.arange(N1):
@@ -445,8 +447,8 @@ def ab_initio_mcmc(
 
 
                 if verbose:
-                    print("  Time local orientations sampling =", time.time()-t0)
-                    print("  mean(a_angles) =", jnp.mean(r_samples_angles), flush=True)
+                    print(f"  Time local orientations sampling = {time.time()-t0}")
+                    print(f"  mean(a_angles) = {jnp.mean(r_samples_angles)}", flush=True)
 
                     #plot_angles(angles[:500])
                     #plt.show()
@@ -470,28 +472,6 @@ def ab_initio_mcmc(
                 print("  mean(a_shifts) =", jnp.mean(r_samples_shifts), flush=True)
 
 
-
-        # Sample the class assignments
-        # Not working with multiple batches now
-        #if z0 is None:
-        if False:
-            print("Sampling z")
-
-            params_z = {'v' : v,
-                'angles': angles[0], 
-                'shifts': shifts[0], 
-                'ctf_params': ctf_params[0], 
-                'imgs': imgs_iter[0]}
-             
-                     
-            t0 = time.time()
-            _, r_samples_z, samples_z = mcmc(key_z, proposal_z, z, N_samples_z, params_z, 1, save_samples = True)
-            z = samples_z[N_samples_z - 2]
-
-            if verbose:
-                print("  Time z sampling =", time.time()-t0)
-                print("  mean(a_z) =", jnp.mean(r_samples_z), flush=True)
-
         # Sample the volume
         
         t0 = time.time()
@@ -504,10 +484,11 @@ def ab_initio_mcmc(
             #else:
             #    params_vol = {'angles':angles, 'shifts':shifts, 'ctf_params':ctf_params, 'imgs_iter':imgs_iter}
 
+            zkidx = (z[:,0] == k)
             if N1 == 1:
-                params_vol = {'angles':angles[0,z==k], 'shifts':shifts[0,z==k], 'ctf_params':ctf_params[0,z==k], 'imgs_iter':imgs_iter[0,z==k]}
+                params_vol = {'angles':angles[0,zkidx], 'shifts':shifts[0,zkidx], 'ctf_params':ctf_params[0,zkidx], 'imgs_iter':imgs_iter[0,zkidx]}
             else:
-                params_vol = {'angles':angles[z==k], 'shifts':shifts[z==k], 'ctf_params':ctf_params[z==k], 'imgs_iter':imgs_iter[z==k]}
+                params_vol = {'angles':angles[:,zkidx], 'shifts':shiftsl[:,zkidx], 'ctf_params':ctf_params[:,zkidx], 'imgs_iter':imgs_iter[:,zkidx]}
 
             v_hmc_mean, r_hmc, v_hmc_samples = mcmc(subkey, proposal_func_vol, v[k], N_samples_vol, params_vol, save_samples = -1)
             #v = v_hmc_mean 
@@ -989,7 +970,7 @@ def get_class_proposal_func(loss_func_batched, loss_func_sum, sigma_noise, alpha
         logPi_local = lambda z : logPi(v, angles, shifts, ctf_params, imgs, z, sigma_noise)
 
         N = angles.shape[0]
-        N_samples_z_local = 10
+        N_samples_z_local = 200
         keys = random.split(key, 2*N_samples_z_local)
         params_z = {"v" : v, "angles" : angles, "shifts" : shifts, "ctf_params" : ctf_params, "imgs" : imgs}
 
