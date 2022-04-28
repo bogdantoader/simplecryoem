@@ -365,11 +365,16 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
     else:
         logPiX1 = jnp.inf 
     for i in range(1, N_samples):
+        #print(f"sample {i}")
         x0 = x1
         logPiX0 = logPiX1
+        #print(f"before prop logPiX0 = {jnp.mean(logPiX0)}")
         x1, r, logPiX1, logPiX0 = proposal_func(keys[2*i], x0, logPiX0, **proposal_params)
+        #print("after prop logPiX0 =", jnp.mean(logPiX0))
+        #print("after prop logPiX1 =", jnp.mean(logPiX1))
 
         a = jnp.minimum(1, r)
+        #print("a = ", jnp.mean(a))
         r_samples.append(a)
 
         if N_batch > 1:
@@ -381,6 +386,9 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
 
         x_mean = (x_mean * (i-1) + x1) / i
         
+        #print("after accept logPiX0 = ", jnp.mean(logPiX0))
+        #print("after accept logPiX1 = ", jnp.mean(logPiX1))
+
         if save_samples > 0 and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
