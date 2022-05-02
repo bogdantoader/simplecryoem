@@ -141,6 +141,23 @@ def rotate_z0(grid_proj, angles):
 
     return rotated_coords
 
+def rotate_full_grid(grid_proj, angles):
+    """The same as rotate_z0, but rotate the full grid instead of
+    only the z0 plane."""
+
+    x_freq = jnp.fft.fftfreq(int(grid_proj[1]), 1/(grid_proj[0]*grid_proj[1]))
+
+    X,Y,Z = jnp.meshgrid(x_freq,x_freq,x_freq)
+    coords = jnp.array([X.ravel(), Y.ravel(), Z.ravel()])
+    
+    angles = -jnp.array(angles)
+
+    # And finally rotate
+    rotated_coords = get_rotation_matrix(*angles) @ coords
+
+    return rotated_coords
+
+
 def get_shift_term(x_grid, y_grid, shifts):
     """Generate the phase term corresponding to the shifts in 
     units (e.g. Angstroms)."""

@@ -427,14 +427,14 @@ def ab_initio_mcmc(
                 #print(r_samples_angles)
                 if verbose:
                     print(f"  Time global orientations sampling = {time.time()-t0}")
-                    print(f"  mean(a_angles) = {jnp.mean(r_samples_angles[r_samples_angles != jnp.nan])} ({jnp.sum(r_samples_angles==jnp.nan)} nans)", flush=True)
+                    print(f"  mean(a_angles) = {jnp.mean(r_samples_angles[~jnp.isnan(r_samples_angles)])} ({jnp.sum(jnp.isnan(r_samples_angles))} nans)", flush=True)
                     print(f"  max(a_angles) = {jnp.max(r_samples_angles)}, min(a_angles) = {jnp.min(r_samples_angles)}")
 
                     #plot_angles(angles[:500])
                     #plt.show()
 
             # And now sample local perturbations of the orientations.
-            if idx_iter >= 32:
+            if idx_iter >= 64:
                 t0 = time.time()    
                 angles_new = []
                 for i in jnp.arange(N1):
@@ -849,7 +849,7 @@ def get_class_proposal_func(loss_func_batched, loss_func_sum, sigma_noise, alpha
         #print(f"  proposal start logPiX0 = {jnp.mean(logPiX0)}")
 
 
-        N_class_samples = 200
+        N_class_samples = 2 
 
         N = az0.shape[0]
         angles0 = az0[:,:3]
@@ -970,7 +970,7 @@ def get_class_proposal_func(loss_func_batched, loss_func_sum, sigma_noise, alpha
         logPi_local = lambda z : logPi(v, angles, shifts, ctf_params, imgs, z, sigma_noise)
 
         N = angles.shape[0]
-        N_samples_z_local = 200
+        N_samples_z_local = 20
         keys = random.split(key, 2*N_samples_z_local)
         params_z = {"v" : v, "angles" : angles, "shifts" : shifts, "ctf_params" : ctf_params, "imgs" : imgs}
 
