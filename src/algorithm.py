@@ -206,6 +206,8 @@ def proposal_hmc(key, x0, logPiX0, logPi, gradLogPi, dt_list, L = 1, M = 1):
     M = 1/max(sigma_noise)**2 * ones.
     """
 
+
+
     key, subkey = random.split(key)
     dt = random.permutation(subkey, dt_list)[0]
     #print("dt =", dt) 
@@ -392,7 +394,7 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
         if save_samples > 0 and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
-        if verbose and jnp.mod(i, 50) == 0:
+        if verbose and jnp.mod(i, 1) == 0:
             if isinstance(N_batch, jnp.ndarray):
                 loss_i = jnp.mean(logPiX1)
                 print("  MCMC sample", i, ", posterior val =", loss_i)
