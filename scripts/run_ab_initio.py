@@ -32,13 +32,15 @@ def parse_args(parser):
     parser.add_argument("-r0", "--radius0", type=float, help="Starting radius for frequency marching.")
     parser.add_argument("-a", "--alpha", type=float, help="Regularisation parameter.", default=1e-9)
     parser.add_argument("-sgdbs", "--sgd_batch_size", type=int, help="Batch size for initialisation SGD run.", default=300)
-    parser.add_argument("-sgdlr", "--sgd_learning_rate", type=int, help="Learning rate for initialisation SGD run.", default=1e6)
-    parser.add_argument("-ei", "--eps_init", type=float, help="Stopping criterion episilon for initialisation SGD run.", default=2e-7)
+    parser.add_argument("-sgdlr", "--sgd_learning_rate", type=float, help="Learning rate for initialisation SGD run.", default=1e6)
+    parser.add_argument("-ei", "--eps_init", type=float, help="Stopping criterion epsilon for initialisation SGD run.", default=2e-7)
     parser.add_argument("-Nsv", "--N_samples_vol", type=int, help="Number of MCMC samples of the volume at each iteration.", default=101)
-    parser.add_argument("-Nsa", "--N_samples_angles", type=int, help="Number of MCMC samples of the orientations at each iteration.", default=1000)
+    parser.add_argument("-Nsag", "--N_samples_angles_global", type=int, help="Number of global MCMC samples of the orientations at each iteration.", default=1000)
+    parser.add_argument("-Nsal", "--N_samples_angles_local", type=int, help="Number of local MCMC samples of the orientations at each iteration.", default=201)
     parser.add_argument("-Nss", "--N_samples_shifts", type=int, help="Number of MCMC samples of the shifts at each iteration.", default=101)
     parser.add_argument("-L", "--L_hmc", type=int, help="Number of step sizes for HMC integration.", default=5)
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("-nf", "--noise_free", action="store_true")
 
     args = parser.parse_args()
     return args
@@ -55,7 +57,7 @@ def main(args):
     print(f'pixel_size0 = {pixel_size0.shape}')
     print(f'angles0.shape = {angles0.shape}')
     print(f'shifts0.shape = {shifts0.shape}')
-    print(f'ctf_params0.shape = {ctf_params0.shape}')
+    print(f'ctf_params0.shape = {ctf_params0.shape}', flush = True)
 
 
     # Only keep the first N images
@@ -67,7 +69,7 @@ def main(args):
         N = imgs0.shape[0]
         idxrand = jnp.arange(N)
         
-    print(f'N = {N}')
+    print(f'N = {N}', flush = True)
 
     imgs0 = imgs0[idxrand]
     pixel_size = pixel_size0[idxrand]
@@ -83,7 +85,7 @@ def main(args):
     print("Taking FFT of the images...", end="", flush=True)
     t0 = time.time()
     imgs_f = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs0])
-    print(f"done. Time: {time.time()-t0} seconds.") 
+    print(f"done. Time: {time.time()-t0} seconds.", flush = True) 
 
     # Create the grids
     # Assume the pixel size is the same for all images
@@ -94,7 +96,7 @@ def main(args):
     x_grid = create_grid(nx, px)
     y_grid = x_grid
     z_grid = x_grid
-    print(f"x_grid = {x_grid}")
+    print(f"x_grid = {x_grid}", flush = True)
 
 
     # Crop the images
@@ -103,30 +105,35 @@ def main(args):
         imgs_f, x_grid = crop_fourier_images(imgs_f, x_grid, nx)
         y_grid = x_grid
         z_grid = x_grid
-        print(f"new x_grid = {x_grid}")
+        print(f"new x_grid = {x_grid}", flush = True)
 
     # Vectorise images
     imgs_f = imgs_f.reshape(N, -1)
-    print(f"imgs_f.shape = {imgs_f.shape}")
+    print(f"imgs_f.shape = {imgs_f.shape}", flush = True)
 
     # Estimate the noise   
-    if args.N_px_noise:
-        N_px_noise = args.N_px_noise
-    else:
-        N_px_noise = nx 
+    if args.noise_free:
+        print(f"Noise free - setting sigma_noise = 1", flush=True)
 
-    if args.N_imgs_noise:
-        N_imgs_noise = args.N_imgs_noise
-    else:
-        N_imgs_noise = N
-    
-    print(f"Estimating the noise using the {N_px_noise} x {N_px_noise} corners of the first {N_imgs_noise} images...", end="", flush=True)
+        sigma_noise = np.ones((nx*nx,))
+    else:    
+        if args.N_px_noise:
+            N_px_noise = args.N_px_noise
+        else:
+            N_px_noise = nx 
 
-    t0 = time.time()
-    sigma_noise_estimated = estimate_noise_imgs(imgs0[:N_imgs_noise], nx_empty = N_px_noise, nx_final = nx).reshape([nx,nx])
-    sigma_noise_avg = average_radially(sigma_noise_estimated, x_grid)
-    sigma_noise = sigma_noise_avg.reshape(-1)
-    print(f"done. Time: {time.time()-t0} seconds.", flush=True) 
+        if args.N_imgs_noise:
+            N_imgs_noise = args.N_imgs_noise
+        else:
+            N_imgs_noise = N
+        
+        print(f"Estimating the noise using the {N_px_noise} x {N_px_noise} corners of the first {N_imgs_noise} images...", end="", flush=True)
+
+        t0 = time.time()
+        sigma_noise_estimated = estimate_noise_imgs(imgs0[:N_imgs_noise], nx_empty = N_px_noise, nx_final = nx).reshape([nx,nx])
+        sigma_noise_avg = average_radially(sigma_noise_estimated, x_grid)
+        sigma_noise = sigma_noise_avg.reshape(-1)
+        print(f"done. Time: {time.time()-t0} seconds.", flush=True) 
    
     # Delete the initial large images.
     del(imgs0)
@@ -148,13 +155,14 @@ def main(args):
     pixel_size_crop = pixel_size[0] * nx0/nx
     B = pixel_size_crop * nx/15
     B_list = jnp.array([B, B/2, B/4, B/8])
+    freq_marching_steps_iters = 8                               
+    sigma_perturb_list = jnp.array([1, 0.1, 0.01, 0.001])
 
     vol0 = None
     angles0 = None
     shifts0 = shifts_batch
     
     key = random.PRNGKey(int(jnp.floor(np.random.rand()*1000)))
-    
     v_rec, angles_rec, shifts_rec = ab_initio_mcmc(key, 
                                    project, 
                                    rotate_and_interpolate,
@@ -170,19 +178,23 @@ def main(args):
                                    args.sgd_learning_rate, 
                                    args.sgd_batch_size, 
                                    args.N_samples_vol,
-                                   args.N_samples_angles, 
+                                   args.N_samples_angles_global, 
+                                   args.N_samples_angles_local, 
                                    args.N_samples_shifts,
-                                   dt_list_hmc, 
+                                   dt_list_hmc,
+                                   sigma_perturb_list, 
                                    args.L_hmc, 
                                    radius0, 
                                    None, 
                                    args.alpha, 
                                    args.eps_init,
                                    B_list,
+                                   freq_marching_steps_iters,
                                    'tri', 
                                    True, 
                                    args.verbose, 
-                                   True, 
+                                   False,
+                                   True,
                                    args.out_dir)
 
     v_rec_l, x_grid_l = rescale_larger_grid(v_rec, x_grid, nx0)
