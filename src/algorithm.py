@@ -29,7 +29,7 @@ def conjugate_gradient(op, b, x0, iterations, eps = 1e-16, verbose = False):
 
         norm_r = jnp.linalg.norm(r.ravel(),2)
         if norm_r < eps:
-            print("  cg iter", k, "||r|| =", norm_r)
+            #print("  cg iter", k, "||r|| =", norm_r)
             return x, k
 
         beta = jnp.sum(jnp.conj(r) * r) / rkTrk
