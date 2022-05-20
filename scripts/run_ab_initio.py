@@ -11,7 +11,7 @@ from src.interpolate import *
 from src.jaxops import *
 from src.fsc import *
 from src.algorithm import *
-from src.ab_initio import ab_initio, ab_initio_mcmc
+from src.ab_initio import ab_initio_mcmc
 from src.residual import get_volume_residual
 import jax
 
@@ -39,6 +39,8 @@ def parse_args(parser):
     parser.add_argument("-Nsal", "--N_samples_angles_local", type=int, help="Number of local MCMC samples of the orientations at each iteration.", default=201)
     parser.add_argument("-Nss", "--N_samples_shifts", type=int, help="Number of MCMC samples of the shifts at each iteration.", default=101)
     parser.add_argument("-L", "--L_hmc", type=int, help="Number of step sizes for HMC integration.", default=5)
+    parser.add_argument("-FM", "--freq_marching_steps", type=int, help="Number of iterations before increasing the Fourier radius.", default=8)
+    parser.add_argument("-Mbs", "--minibatch_size", type=int, help="Size of minibatch to work with at each iteration", default=None)
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("-nf", "--noise_free", action="store_true")
 
@@ -155,7 +157,7 @@ def main(args):
     pixel_size_crop = pixel_size[0] * nx0/nx
     B = pixel_size_crop * nx/15
     B_list = jnp.array([B, B/2, B/4, B/8])
-    freq_marching_steps_iters = 8                               
+    #freq_marching_steps = 8                               
     sigma_perturb_list = jnp.array([1, 0.1, 0.01, 0.001])
 
     vol0 = None
@@ -189,7 +191,8 @@ def main(args):
                                    args.alpha, 
                                    args.eps_init,
                                    B_list,
-                                   freq_marching_steps_iters,
+                                   args.minibatch_size,
+                                   args.freq_marching_steps,
                                    'tri', 
                                    True, 
                                    args.verbose, 
