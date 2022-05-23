@@ -132,7 +132,7 @@ def ab_initio_mcmc(
 
 
         if verbose:
-            print("Iter ", idx_iter)
+            print(f"Iter {idx_iter}")
 
   
         if recompile:
@@ -173,7 +173,7 @@ def ab_initio_mcmc(
         #TODO: this should be done in a way that ensures we sample each image at least once (e.g. use np.split)
         if minibatch_size is not None and N1 == 1:
             minibatch = True
-            minibatch_size = nx_iter * 100
+            minibatch_size = nx_iter * 50
             key, subkey = random.split(key)
             idx_img = random.permutation(subkey, N2)[:minibatch_size]
 
@@ -189,32 +189,34 @@ def ab_initio_mcmc(
         key, key_volume, key_angles_unif, key_angles_pert, key_shifts = random.split(key, 5)
 
         # Sample the orientations
-        print("Sampling orientations") 
      
         if angles0 is None:
             # First, sample orientations uniformly on the sphere.
 
             #TODO: do the same for shifts
             t0 = time.time()    
-            #if idx_iter < 64 or jnp.mod(idx_iter, 8) == 4:
-            angles_new = []
-            for i in jnp.arange(N1):
-                if verbose and N1 > 1:
-                    print("batch ", i)
-                params_orientations = {'v':v, 'shifts':shifts_iter[i], 'ctf_params':ctf_params_iter[i], 'imgs_iter' : imgs_iter[i]}
-                _, r_samples_angles, samples_angles = mcmc(key_angles_unif, proposal_func_orientations_unif, angles_iter[i], N_samples_angles_global, params_orientations, imgs_iter.shape[1], 1, verbose = True)
-                angles_new.append(samples_angles[N_samples_angles_global-2])
-            angles_iter = jnp.array(angles_new)
+            if idx_iter < 64: # or jnp.mod(idx_iter, 8) == 4:
+                print("Sampling global orientations") 
 
+                angles_new = []
+                for i in jnp.arange(N1):
+                    if verbose and N1 > 1:
+                        print("batch ", i)
+                    params_orientations = {'v':v, 'shifts':shifts_iter[i], 'ctf_params':ctf_params_iter[i], 'imgs_iter' : imgs_iter[i]}
+                    _, r_samples_angles, samples_angles = mcmc(key_angles_unif, proposal_func_orientations_unif, angles_iter[i], N_samples_angles_global, params_orientations, imgs_iter.shape[1], 1, verbose = True)
+                    angles_new.append(samples_angles[N_samples_angles_global-2])
+                angles_iter = jnp.array(angles_new)
 
-            if verbose:
-                print("  Time global orientations sampling =", time.time()-t0)
-                print("  mean(a_angles) =", jnp.mean(r_samples_angles), flush=True)
+                if verbose:
+                    print("  Time global orientations sampling =", time.time()-t0)
+                    print("  mean(a_angles) =", jnp.mean(r_samples_angles), flush=True)
 
-                #plot_angles(angles[:500])
-                #plt.show()
+                    #plot_angles(angles[:500])
+                    #plt.show()
 
             # And now sample local perturbations of the orientations.
+            print("Sampling local orientations") 
+
             t0 = time.time()    
             angles_new = []
             for i in jnp.arange(N1):
@@ -254,7 +256,6 @@ def ab_initio_mcmc(
         # Sample the volume
         print("Sampling the volume")
 
-
         if N1 == 1:
             params_vol = {'angles':angles_iter[0], 'shifts':shifts_iter[0], 'ctf_params':ctf_params_iter[0], 'imgs_iter':imgs_iter[0]}
         else:
@@ -267,12 +268,10 @@ def ab_initio_mcmc(
         v = v_hmc_samples[0] 
         v = jnp.array(v*mask3d)
 
-
         # Update the full arrays of angles, shifts etc with the values computed at the current iteration.
         if minibatch:
             angles = angles.at[:,idx_img].set(angles_iter)
             shifts = shifts.at[:,idx_img].set(shifts_iter)
-
 
         if verbose:
             print("  Time volume sampling =", time.time()-t0)
@@ -292,9 +291,6 @@ def ab_initio_mcmc(
                 #plt.colorbar()
                 #plt.show()
 
-
-
-        
         if jnp.mod(idx_iter, freq_marching_step_iters)==0 and verbose:
             print(datetime.datetime.now())
             print("  nx =", nx_iter, flush=True)
@@ -321,7 +317,6 @@ def ab_initio_mcmc(
             pickle.dump(shifts, file3)
             file3.close()
 
-
         # Increase radius
         if jnp.mod(idx_iter,  freq_marching_step_iters)==0:
             radius += dr
@@ -329,16 +324,10 @@ def ab_initio_mcmc(
 
             if nx_iter == nx:
                 break
-
         else:
             recompile = False
 
-
     # At the end, take the mean 
-    # TODO: take the mean over all samples, not only the last run
-    # A bit tricky because they have different dimensions. Should be able
-    # to just same each Iter's mean, enlarge to full size, and then average 
-    # all
     v = v_hmc_mean 
     v = v*mask3d
 

@@ -35,7 +35,7 @@ def parse_args(parser):
     parser.add_argument("-sgdlr", "--sgd_learning_rate", type=float, help="Learning rate for initialisation SGD run.", default=1e6)
     parser.add_argument("-ei", "--eps_init", type=float, help="Stopping criterion epsilon for initialisation SGD run.", default=2e-7)
     parser.add_argument("-Nsv", "--N_samples_vol", type=int, help="Number of MCMC samples of the volume at each iteration.", default=101)
-    parser.add_argument("-Nsag", "--N_samples_angles_global", type=int, help="Number of global MCMC samples of the orientations at each iteration.", default=1000)
+    parser.add_argument("-Nsag", "--N_samples_angles_global", type=int, help="Number of global MCMC samples of the orientations at each iteration.", default=1001)
     parser.add_argument("-Nsal", "--N_samples_angles_local", type=int, help="Number of local MCMC samples of the orientations at each iteration.", default=201)
     parser.add_argument("-Nss", "--N_samples_shifts", type=int, help="Number of MCMC samples of the shifts at each iteration.", default=101)
     parser.add_argument("-L", "--L_hmc", type=int, help="Number of step sizes for HMC integration.", default=5)
