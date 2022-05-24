@@ -165,7 +165,7 @@ def ab_initio_mcmc(
             # Get the operators for the dimensions at this iteration.
             slice_func_array_angles_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter, loss_proj_func_batched0_iter, rotate_and_interpolate_iter = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid_iter, mask3d, alpha, interp_method)
 
-            proposal_func_orientations_unif, proposal_func_orientations_pert, proposal_func_shifts, proposal_func_vol, proposal_func_vol_batch = get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, sigma_noise_iter, B_list, dt_list_hmc, L_hmc, M_iter)
+            proposal_func_orientations_unif, proposal_func_orientations_pert, proposal_func_shifts, proposal_func_vol, proposal_func_vol_batch = get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, rotate_and_interpolate_iter, sigma_noise_iter, B_list, dt_list_hmc, L_hmc, M_iter)
 
             if N1 > 1:
                 proposal_func_vol = proposal_func_vol_batch
@@ -418,7 +418,7 @@ def get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and
 # jitted non batched version to work with small datasets
 # (e.g. relion tutorial or simulated), in which case it would
 # be faster
-def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, sigma_noise_iter, B_list, dt_list_hmc, L_hmc, M_iter):
+def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, rotate_and_interpolate_iter, sigma_noise_iter, B_list, dt_list_hmc, L_hmc, M_iter):
 
     
     def proposal_func_orientations_batch(key, angles0, logPiX0, v, shifts):
@@ -473,6 +473,54 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         orient_params = {'sig' : sig_p}
 
         return proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, generate_perturbed_orientations, orient_params)
+
+    @jax.jit 
+    def proposal_func_mtm_orientations_shifts(key, as0, logPiX0, v, ctf_params, imgs_iter):
+        key, *keys = random.split(key, 4)
+        
+        angles0 = as0[:,:3]
+        shifts0 = as0[:,3:]
+
+        angles1 = generate_uniform_orientations_jax(keys[0], angles0)
+        proj = rotate_and_interpolate_iter(v, angles1)
+
+        N_samples_shifts = 100
+        N = angles0.shape[0]
+        B0 = random.permutation(keys[1], B_list)[0]
+        shifts1_states = random.normal(keys[2], (N,N_samples_shifts,2))*B0
+       
+        # weights has shape [N, N_samples_shifts], w(y_i) = logPi(y_i)
+        weights = -jax.vmap(loss_proj_func_batched0_iter, in_axes=(None,None,1,None,None,None))(v, proj, shifts1_states, ctf_params, imgs_iter, sigma_noise_iter).transpose()
+        
+        # Select the proposed state with probability proportional
+        # to weights, batch mode (all images in parallel).
+        keys = random.split(key, N) 
+        sh1idx = jax.vmap(jax.random.categorical, in_axes=(0,0))(keys, weights) 
+        shifts1 = jax.vmap(lambda s1_states_i, sh1idx_i : s1_states_i[sh1idx_i], in_axes=(0,0))(shifts1_states, sh1idx)
+        # The weights corresponding to proposed state (angles1,shifts1) (i.e. logPiX1)
+        weights1 = jax.vmap(lambda weights_i, sh1idx_i : weights_i[sh1idx_i], in_axes=(0,0))(weights, sh1idx)
+
+        weights0 = -loss_func_batched0_iter(v,angles0,shifts0,ctf_params,imgs_iter,sigma_noise_iter)
+        weights_reference = jax.vmap(lambda weights_i, sh1idx_i, w0_i : weights_i.at[sh1idx_i].set(w0_i), in_axes = (0,0,0))(weights, sh1idx, weights0)
+
+        r = jax.vmap(ratio_sum_exp, in_axes=(0,0))(weights, weights_reference)
+
+        as1 = jnp.concatenate([angles1,shifts1], axis=1)
+
+        return as1, r, weights1, weights0 
+
+         
+    @jax.jit
+    def ratio_sum_exp(a, b):
+        """Given two arrays a=[A1, ..., An], b=[B1,..., Bn],
+        compute the ratio sum(exp(a1)) / sum(exp(a2)) in a way
+        that doesn't lead to nan's."""
+
+        log_ratio = a[0] - b[0] \
+            + jnp.log(jnp.sum(jnp.exp(a-a[0]))) \
+            - jnp.log(jnp.sum(jnp.exp(b-b[0])))
+
+        return jnp.exp(log_ratio)                
 
     #@jax.jit
     def proposal_func_shifts(key, shifts0, logPiX0, v, proj):
@@ -541,7 +589,8 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         return proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, dt_list_hmc, L_hmc, M_iter)
 
 
-    return proposal_func_orientations_uniform, proposal_func_orientations_perturb, proposal_func_shifts, proposal_func_vol, proposal_func_vol_batch
+
+    return proposal_func_orientations_uniform, proposal_func_orientations_perturb, proposal_func_shifts, proposal_func_vol, proposal_func_vol_batch, proposal_func_mtm_orientations_shifts
 
 
 
