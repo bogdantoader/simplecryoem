@@ -41,6 +41,7 @@ def ab_initio_mcmc(
         dr = None, 
         alpha = 0, 
         eps_vol = 1e-16, 
+        B = 1,
         B_list = [1],
         minibatch_size = None,
         freq_marching_step_iters = 1,
@@ -165,12 +166,11 @@ def ab_initio_mcmc(
             # Get the operators for the dimensions at this iteration.
             slice_func_array_angles_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter, loss_proj_func_batched0_iter, rotate_and_interpolate_iter = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid_iter, mask3d, alpha, interp_method)
 
-            proposal_func_orientations_unif, proposal_func_orientations_pert, proposal_func_shifts, proposal_func_vol, proposal_func_vol_batch = get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, rotate_and_interpolate_iter, sigma_noise_iter, B_list, dt_list_hmc, L_hmc, M_iter)
+            proposal_func_orientations_unif, proposal_func_orientations_pert, proposal_func_shifts_local, proposal_func_vol, proposal_func_vol_batch, proposal_func_mtm_orientations_shifts = get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, rotate_and_interpolate_iter, sigma_noise_iter, B, B_list, dt_list_hmc, L_hmc, M_iter)
 
             if N1 > 1:
                 proposal_func_vol = proposal_func_vol_batch
 
-        #TODO: this should be done in a way that ensures we sample each image at least once (e.g. use np.split)
         if minibatch_size is not None and N1 == 1:
             minibatch = True
             minibatch_size = nx_iter * 50
@@ -191,25 +191,32 @@ def ab_initio_mcmc(
         # Sample the orientations
      
         if angles0 is None:
-            # First, sample orientations uniformly on the sphere.
-
-            #TODO: do the same for shifts
+            # First, sample orientations and shifts uniformly and at the same time using multiple-try Monte Carlo
+            
             t0 = time.time()    
             if idx_iter < 64: # or jnp.mod(idx_iter, 8) == 4:
-                print("Sampling global orientations") 
+                print("Sampling global orientations and shifts") 
 
                 angles_new = []
+                shifts_new = []
                 for i in jnp.arange(N1):
                     if verbose and N1 > 1:
                         print("batch ", i)
-                    params_orientations = {'v':v, 'shifts':shifts_iter[i], 'ctf_params':ctf_params_iter[i], 'imgs_iter' : imgs_iter[i]}
-                    _, r_samples_angles, samples_angles = mcmc(key_angles_unif, proposal_func_orientations_unif, angles_iter[i], N_samples_angles_global, params_orientations, imgs_iter.shape[1], 1, verbose = True)
-                    angles_new.append(samples_angles[N_samples_angles_global-2])
+                    params_mtm = {'v':v, 'ctf_params':ctf_params_iter[i], 'imgs_iter' : imgs_iter[i]}
+                    #_, r_samples_angles, samples_angles = mcmc(key_angles_unif, proposal_func_orientations_unif, angles_iter[i], N_samples_angles_global, params_orientations, imgs_iter.shape[1], 1, verbose = True)
+
+                    as0 = jnp.concatenate([angles_iter[i], shifts_iter[i]], axis=1)
+                    _, r_samples_as, samples_as = mcmc(key_angles_unif, proposal_func_mtm_orientations_shifts, as0, N_samples_angles_global, params_mtm, imgs_iter.shape[1], 1, verbose = True)
+                    as1 = samples_as[N_samples_angles_global-2]
+
+                    angles_new.append(as1[:,:3])
+                    shifts_new.append(as1[:,3:])
                 angles_iter = jnp.array(angles_new)
+                shifts_iter = jnp.array(shifts_new)
 
                 if verbose:
                     print("  Time global orientations sampling =", time.time()-t0)
-                    print("  mean(a_angles) =", jnp.mean(r_samples_angles), flush=True)
+                    print("  mean(a_angles) =", jnp.mean(r_samples_as), flush=True)
 
                     #plot_angles(angles[:500])
                     #plt.show()
@@ -221,7 +228,7 @@ def ab_initio_mcmc(
             angles_new = []
             for i in jnp.arange(N1):
                 if verbose and N1 > 1:
-                    print("batch ", i)
+                    print(f"batch {i}")
                 params_orientations = {'v':v, 'shifts':shifts_iter[i], 'ctf_params':ctf_params_iter[i], 'imgs_iter' : imgs_iter[i], 'sigma_perturb': sigma_perturb_list}
                 _, r_samples_angles, samples_angles = mcmc(key_angles_pert, proposal_func_orientations_pert, angles_iter[i], N_samples_angles_local, params_orientations, imgs_iter.shape[1], 1, verbose = True)
                 angles_new.append(samples_angles[N_samples_angles_local-2])
@@ -235,18 +242,22 @@ def ab_initio_mcmc(
                 #plot_angles(angles[:500])
                 #plt.show()
 
-        #TODO: make this similar to the orientations batch sampling 
-        # Sample the shifts - not working right now
+        # Sample the shifts locally
         if shifts0 is None:
-            print("Sampling shifts")
+            print("Sampling local shifts")
             #proj = rotate_and_interpolate_iter(jnp.array(v), angles)
             proj = jnp.array([rotate_and_interpolate_iter(v, angles_iter[i]) for i in jnp.arange(angles_iter.shape[0])])
 
-            params_shifts = {'v':v, 'proj':proj}
+            t0 = time.time()   
+            shifts_new = []
+            for i in jnp.arange(N1):
+                if verbose and N1 > 1:
+                    print(f"batch {i}")
 
-            t0 = time.time()    
-            _, r_samples_shifts, samples_shifts = mcmc(key_angles, proposal_func_shifts, shifts_iter, N_samples_shifts, params_shifts, N_batch_shape, 1, verbose = True)
-            shifts_iter = samples_shifts[N_samples_shifts-2] 
+                params_shifts = {'v':v, 'proj':proj[i], 'ctf_params' : ctf_params_iter[i], 'imgs_iter' : imgs_iter[i]}
+                _, r_samples_shifts, samples_shifts = mcmc(key_shifts, proposal_func_shifts_local, shifts_iter[i], N_samples_shifts, params_shifts, imgs_iter.shape[1], 1, verbose = True)
+                shifts_new.append(samples_shifts[N_samples_shifts-2])
+            shifts_iter = jnp.array(shifts_new)
 
             if verbose:
                 print("  Time shifts sampling =", time.time()-t0)
@@ -308,7 +319,6 @@ def ab_initio_mcmc(
                 vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
                 mrc.set_data(vr.astype(np.float32))
 
-            #TODO: should probably print to a star file instead
             file = open(out_dir + '/rec_iter_' + str(idx_iter) + '_angles', 'wb')
             pickle.dump(angles, file)
             file.close()
@@ -418,34 +428,10 @@ def get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and
 # jitted non batched version to work with small datasets
 # (e.g. relion tutorial or simulated), in which case it would
 # be faster
-def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, rotate_and_interpolate_iter, sigma_noise_iter, B_list, dt_list_hmc, L_hmc, M_iter):
+def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, rotate_and_interpolate_iter, sigma_noise_iter, B, B_list, dt_list_hmc, L_hmc, M_iter):
 
-    
-    def proposal_func_orientations_batch(key, angles0, logPiX0, v, shifts):
-        #logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, sigma_noise_iter)
-
-        def logPi(a):
-            a_i = [-loss_func_batched0_iter(v, a[i], shifts[i], ctf_params[i], imgs_iter[i], sigma_noise_iter) for i in jnp.arange(angles0.shape[0])]
-            return jnp.array(a_i)
-
-        #logPiX0 = jax.lax.cond(jnp.sum(logPiX0) == jnp.inf,
-        #    true_fun = lambda _ : logPi(angles0),
-        #    false_fun = lambda _ : logPiX0,
-        #    operand = None)
-
-        if jnp.sum(logPiX0) == jnp.inf:
-            logPiX0 = logPi(angles0)
-
-        N1 = angles0.shape[0]
-        N2 = angles0.shape[1]
-        angles1 = generate_uniform_orientations_jax_batch(key, N1, N2)
-
-        logPiX1 = logPi(angles1)
-        r = jnp.exp(logPiX1 - logPiX0)
-
-        return angles1, r, logPiX1, logPiX0
   
-    #TODO: do this thing for shifts too and delete the the batch proposal func for orientations and shifts
+    #TODO: do this thing for shifts too 
     def proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, generate_orientations_func, params_orientations):
         logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, sigma_noise_iter)
 
@@ -474,6 +460,31 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
 
         return proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, generate_perturbed_orientations, orient_params)
 
+
+    @jax.jit
+    def proposal_func_shifts_local(key, shifts0, logPiX0, v, proj, ctf_params, imgs_iter):
+        logPi = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs_iter, sigma_noise_iter)
+
+        logPiX0 = jax.lax.cond(jnp.sum(logPiX0) == jnp.inf,
+            true_fun = lambda _ : logPi(shifts0),
+            false_fun = lambda _ : logPiX0,
+            operand = None)
+
+        #if jnp.sum(logPiX0) == jnp.inf:
+        #    logPiX0 = logPi(shifts0)
+
+        key, subkey =  random.split(key)
+        B0 = random.permutation(subkey, B_list)[0]
+
+        N = shifts0.shape[0]
+        shifts1 = random.normal(key, (N, 2)) * B0 + shifts0
+
+        logPiX1 = logPi(shifts1)
+        r = jnp.exp(logPiX1 - logPiX0)
+
+        return shifts1, r, logPiX1, logPiX0
+
+
     @jax.jit 
     def proposal_func_mtm_orientations_shifts(key, as0, logPiX0, v, ctf_params, imgs_iter):
         key, *keys = random.split(key, 4)
@@ -486,8 +497,9 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
 
         N_samples_shifts = 100
         N = angles0.shape[0]
-        B0 = random.permutation(keys[1], B_list)[0]
-        shifts1_states = random.normal(keys[2], (N,N_samples_shifts,2))*B0
+        #B0 = random.permutation(keys[1], B_list)[0]
+        #shifts1_states = random.normal(keys[2], (N,N_samples_shifts,2)) * B0
+        shifts1_states = random.uniform(keys[2], (N, N_samples_shifts,2)) * 2 * B - B
        
         # weights has shape [N, N_samples_shifts], w(y_i) = logPi(y_i)
         weights = -jax.vmap(loss_proj_func_batched0_iter, in_axes=(None,None,1,None,None,None))(v, proj, shifts1_states, ctf_params, imgs_iter, sigma_noise_iter).transpose()
@@ -522,33 +534,6 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
 
         return jnp.exp(log_ratio)                
 
-    #@jax.jit
-    def proposal_func_shifts(key, shifts0, logPiX0, v, proj):
-        #logPi = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs_iter, sigma_noise_iter)
-
-        def logPi(sh):
-            sh_i = [-loss_proj_func_batched0_iter(v, proj[i], sh[i], ctf_params[i], imgs_iter[i], sigma_noise_iter) for i in jnp.arange(shifts0.shape[0])]
-            return jnp.array(sh_i)
-
-        #logPiX0 = jax.lax.cond(jnp.sum(logPiX0) == jnp.inf,
-        #    true_fun = lambda _ : logPi(shifts0),
-        #    false_fun = lambda _ : logPiX0,
-        #    operand = None)
-
-        if jnp.sum(logPiX0) == jnp.inf:
-            logPiX0 = logPi(shifts0)
-
-        key, subkey =  random.split(key)
-        B0 = random.permutation(subkey, B_list)[0]
-
-        N1 = shifts0.shape[0]
-        N2 = shifts0.shape[1]
-        shifts1 = generate_gaussian_shifts_batch(key, N1, N2, B0)
-
-        logPiX1 = logPi(shifts1)
-        r = jnp.exp(logPiX1 - logPiX0)
-
-        return shifts1, r, logPiX1, logPiX0
    
 
     def proposal_func_vol_batch(key, v0, logPiX0, angles, shifts, ctf_params, imgs_iter):
@@ -590,7 +575,7 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
 
 
 
-    return proposal_func_orientations_uniform, proposal_func_orientations_perturb, proposal_func_shifts, proposal_func_vol, proposal_func_vol_batch, proposal_func_mtm_orientations_shifts
+    return proposal_func_orientations_uniform, proposal_func_orientations_perturb, proposal_func_shifts_local, proposal_func_vol, proposal_func_vol_batch, proposal_func_mtm_orientations_shifts
 
 
 
