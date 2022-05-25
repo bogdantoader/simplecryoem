@@ -173,7 +173,7 @@ def ab_initio_mcmc(
 
         if minibatch_size is not None and N1 == 1:
             minibatch = True
-            minibatch_size = nx_iter * 50
+            minibatch_size = nx_iter * 200
             key, subkey = random.split(key)
             idx_img = random.permutation(subkey, N2)[:minibatch_size]
 
@@ -215,8 +215,8 @@ def ab_initio_mcmc(
                 shifts_iter = jnp.array(shifts_new)
 
                 if verbose:
-                    print("  Time global orientations sampling =", time.time()-t0)
-                    print("  mean(a_angles) =", jnp.mean(r_samples_as), flush=True)
+                    print("  Time global orientations and shifts sampling =", time.time()-t0)
+                    print("  mean(a_angles_shifts) =", jnp.mean(r_samples_as), flush=True)
 
                     #plot_angles(angles[:500])
                     #plt.show()

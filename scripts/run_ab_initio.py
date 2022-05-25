@@ -155,14 +155,14 @@ def main(args):
     dt_list_hmc = jnp.array([0.1, 0.5, 1, 5, 10])
 
     pixel_size_crop = pixel_size[0] * nx0/nx
-    B = pixel_size_crop * nx/15
-    B_list = jnp.array([B, B/2, B/4, B/8])
+    B = pixel_size[0] * nx0/8
+    B_list = jnp.array([B/2, B/4, B/8, B/16])
     #freq_marching_steps = 8                               
     sigma_perturb_list = jnp.array([1, 0.1, 0.01, 0.001])
 
     vol0 = None
     angles0 = None
-    shifts0 = shifts_batch
+    shifts0 = None 
     
     key = random.PRNGKey(int(jnp.floor(np.random.rand()*1000)))
     v_rec, angles_rec, shifts_rec = ab_initio_mcmc(key, 
@@ -190,6 +190,7 @@ def main(args):
                                    None, 
                                    args.alpha, 
                                    args.eps_init,
+                                   B,
                                    B_list,
                                    args.minibatch_size,
                                    args.freq_marching_steps,
