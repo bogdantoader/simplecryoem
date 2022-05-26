@@ -89,7 +89,7 @@ def ab_initio_mcmc(
         print(f"Starting radius: {radius0}")
         print(f"Frequency marching step size: {dr}")
         print(f"Number of frequency marching steps: {n_steps}")
-        print(f"Number of iterations: {n_steps * freq_marching_step_iter}")
+        print(f"Number of iterations: {n_steps * freq_marching_step_iters}")
         print("------------------------------------\n", flush = True)
 
 
