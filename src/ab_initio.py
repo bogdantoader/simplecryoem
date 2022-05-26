@@ -43,8 +43,8 @@ def ab_initio_mcmc(
         eps_vol = 1e-16, 
         B = 1,
         B_list = [1],
-        minibatch_size = None,
-        freq_marching_step_iters = 1,
+        minibatch_factor = None,
+        freq_marching_step_iters = 8,
         interp_method = 'tri', 
         opt_vol_first = True, 
         verbose = True,
@@ -85,10 +85,11 @@ def ab_initio_mcmc(
         n_steps = (jnp.floor((max_radius-radius0)/dr) + 1).astype(jnp.int64)
 
         print(f"Fourier radius: {max_radius}")
-        print(f"Minibatch size: {minibatch_size}")
+        print(f"Minibatch factor: {minibatch_factor}")
         print(f"Starting radius: {radius0}")
         print(f"Frequency marching step size: {dr}")
         print(f"Number of frequency marching steps: {n_steps}")
+        print(f"Number of iterations: {n_steps * freq_marching_step_iter}")
         print("------------------------------------\n", flush = True)
 
 
@@ -171,9 +172,9 @@ def ab_initio_mcmc(
             if N1 > 1:
                 proposal_func_vol = proposal_func_vol_batch
 
-        if minibatch_size is not None and N1 == 1:
+        if minibatch_factor is not None and N1 == 1:
             minibatch = True
-            minibatch_size = nx_iter * 200
+            minibatch_size = nx_iter * minibatch_factor
             key, subkey = random.split(key)
             idx_img = random.permutation(subkey, N2)[:minibatch_size]
 
@@ -194,7 +195,7 @@ def ab_initio_mcmc(
             # First, sample orientations and shifts uniformly and at the same time using multiple-try Monte Carlo
             
             t0 = time.time()    
-            if idx_iter < 64: # or jnp.mod(idx_iter, 8) == 4:
+            if idx_iter < 8 * freq_marching_step_iters: # or jnp.mod(idx_iter, 8) == 4:
                 print("Sampling global orientations and shifts") 
 
                 angles_new = []
@@ -431,7 +432,6 @@ def get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and
 def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, rotate_and_interpolate_iter, sigma_noise_iter, B, B_list, dt_list_hmc, L_hmc, M_iter):
 
   
-    #TODO: do this thing for shifts too 
     def proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs_iter, generate_orientations_func, params_orientations):
         logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs_iter, sigma_noise_iter)
 

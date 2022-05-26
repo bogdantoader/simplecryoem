@@ -40,7 +40,7 @@ def parse_args(parser):
     parser.add_argument("-Nss", "--N_samples_shifts", type=int, help="Number of MCMC samples of the shifts at each iteration.", default=101)
     parser.add_argument("-L", "--L_hmc", type=int, help="Number of step sizes for HMC integration.", default=5)
     parser.add_argument("-FM", "--freq_marching_steps", type=int, help="Number of iterations before increasing the Fourier radius.", default=8)
-    parser.add_argument("-Mbs", "--minibatch_size", type=int, help="Size of minibatch to work with at each iteration", default=None)
+    parser.add_argument("-Mbs", "--minibatch_factor", type=int, help="Size of minibatch to work with at each iteration is nx_iter * minibatch_factor", default = 50)
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("-nf", "--noise_free", action="store_true")
 
@@ -192,7 +192,7 @@ def main(args):
                                    args.eps_init,
                                    B,
                                    B_list,
-                                   args.minibatch_size,
+                                   args.minibatch_factor,
                                    args.freq_marching_steps,
                                    'tri', 
                                    True, 

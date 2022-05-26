@@ -354,7 +354,7 @@ def proposal_gaussian_shifts(key, x0, logPi, B):
     return x1, r
 
 
-def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_samples = -1, verbose = True):
+def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_samples = -1, verbose = True, iter_display = 50):
     """Generic code for MCMC sampling.
 
     Parameters:
@@ -385,6 +385,10 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
         Save and return all the samples with index i such that
         mod(i, save_samples) = 0. If save_samples = -1, only return 
         the last sample.
+
+    iter_display : int
+        Show the value of the distribution at the current sample 
+        every iter_display iterations.
 
     Returns:
     -------
@@ -439,7 +443,7 @@ def mcmc(key, proposal_func, x0, N_samples, proposal_params, N_batch = 1, save_s
         if save_samples > 0 and jnp.mod(i, save_samples) == 0:
             samples.append(x1)
 
-        if verbose and jnp.mod(i, 50) == 0:
+        if verbose and jnp.mod(i, iter_display) == 0:
             if isinstance(N_batch, jnp.ndarray):
                 loss_i = jnp.mean(logPiX1)
                 print(f"  MCMC sample {i}, posterior val = {loss_i}")
