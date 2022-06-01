@@ -61,6 +61,8 @@ def main(args):
     print(f'shifts0.shape = {shifts0.shape}')
     print(f'ctf_params0.shape = {ctf_params0.shape}', flush = True)
 
+    print(f"min(shifts) = {jnp.min(shifts0){")
+    print(f"max(shifts) = {jnp.max(shifts0){")
 
     # Only keep the first N images
     if args.N_imgs:
@@ -155,9 +157,8 @@ def main(args):
     dt_list_hmc = jnp.array([0.1, 0.5, 1, 5, 10])
 
     pixel_size_crop = pixel_size[0] * nx0/nx
-    B = pixel_size[0] * nx0/8
-    B_list = jnp.array([B/2, B/4, B/8, B/16])
-    #freq_marching_steps = 8                               
+    B = pixel_size[0] * nx0/4
+    B_list = jnp.array([B/16])
     sigma_perturb_list = jnp.array([1, 0.1, 0.01, 0.001])
 
     vol0 = None
