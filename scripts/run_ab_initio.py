@@ -61,8 +61,8 @@ def main(args):
     print(f'shifts0.shape = {shifts0.shape}')
     print(f'ctf_params0.shape = {ctf_params0.shape}', flush = True)
 
-    print(f"min(shifts) = {jnp.min(shifts0){")
-    print(f"max(shifts) = {jnp.max(shifts0){")
+    print(f"min(shifts) = {jnp.min(shifts0)}")
+    print(f"max(shifts) = {jnp.max(shifts0)}")
 
     # Only keep the first N images
     if args.N_imgs:
@@ -157,13 +157,17 @@ def main(args):
     dt_list_hmc = jnp.array([0.1, 0.5, 1, 5, 10])
 
     pixel_size_crop = pixel_size[0] * nx0/nx
-    B = pixel_size[0] * nx0/4
-    B_list = jnp.array([B/16])
+    B = pixel_size[0] * nx0/8
+    B_list = jnp.array([B/4, B/8, B/16, B/32])
     sigma_perturb_list = jnp.array([1, 0.1, 0.01, 0.001])
 
     vol0 = None
     angles0 = None
     shifts0 = None 
+
+    print(f"B = {B}")
+    print(f"B_list = {B_list}")
+    print(f"sigma_perturb_list = {sigma_perturb_list}")
     
     key = random.PRNGKey(int(jnp.floor(np.random.rand()*1000)))
     v_rec, angles_rec, shifts_rec = ab_initio_mcmc(key, 

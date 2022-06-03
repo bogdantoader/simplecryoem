@@ -132,12 +132,7 @@ def ab_initio_mcmc(
     for idx_iter in range(N_iter):
         if nx_iter == nx and jnp.mod(idx_iter, freq_marching_step_iters-1)==0 and N_samples_vol < 100:
         #if nx_iter == nx and N_samples_vol < 100:
-
-            N_samples_angles_global = 1000
-            N_samples_angles_local = 1000
-            N_samples_shifts = 1000
-            N_samples_vol = 100
-
+            N_samples_vol = 500
 
         if verbose:
             print(f"Iter {idx_iter}")
@@ -503,7 +498,7 @@ def get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter
         angles1 = generate_uniform_orientations_jax(keys[0], angles0)
         proj = rotate_and_interpolate_iter(v, angles1)
 
-        N_samples_shifts = 100
+        N_samples_shifts = 500
         N = angles0.shape[0]
         #B0 = random.permutation(keys[1], B_list)[0]
         #shifts1_states = random.normal(keys[2], (N,N_samples_shifts,2)) * B0
