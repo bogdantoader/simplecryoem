@@ -422,9 +422,6 @@ def get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and
 
     loss_func_angles = jax.jit(jax.vmap(loss_func, in_axes = (None, 0, None, None, None, None)))
 
-    @jax.jit
-    def rotate_and_interpolate(v, angles):
-        return jax.vmap(rotate_and_interpolate_func, in_axes=(None,0,None,None))(v*mask, angles, x_grid, x_grid)
 
     return slice_func_array_angles, grad_loss_volume_sum, loss_func_angles, loss_func_batched0, loss_func_sum, loss_proj_func_batched0, rotate_and_interpolate
 

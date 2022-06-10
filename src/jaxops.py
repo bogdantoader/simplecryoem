@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 from src.utils import l2sq, wl2sq
-from src.projection import project, apply_shifts_and_ctf
+from src.projection import project, apply_shifts_and_ctf, rotate_and_interpolate
 
 class Slice:
     """Class to represent the slice operator in the Fourier domain.
@@ -40,7 +40,10 @@ class Slice:
     @jax.jit
     def apply_shifts_and_ctf(projection, shifts, ctf_params):
         return self.apply_shifts_and_ctf(projection, shifts, ctf_params, self.x_grid)
-  
+
+    @jax.jit
+    def rotate_and_interpolate_vmap(v, angles):
+        return jax.vmap(rotate_and_interpolate, in_axes=(None,0,None,None))(v*mask, angles, x_grid, x_grid)
 
 class Loss:
     """A class to represent the loss function, batched and sum.
@@ -56,6 +59,14 @@ class Loss:
 
     alpha : 
         Regularisation parameter for l2 regularisation.
+
+    Methods:
+    -------
+    loss: 
+
+    loss_batched:
+
+    loss_sum:
     """
 
     def __init__(self, slice: Slice, err_func = wl2sq, alpha = 0):
@@ -93,7 +104,7 @@ class Loss:
         return jax.vmap(self.loss_proj, in_axes = (None, 0, 0, 0, 0, None))(v, projection, shifts, ctf_params, imgs, sigma)
 
 
-class GradsV:
+class GradV:
     def __init__(self, loss: Loss):
         self.loss = loss
 

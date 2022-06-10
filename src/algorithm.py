@@ -198,55 +198,5 @@ def kaczmarz(key, data, angles, fwd_model_vmap, loss_func, grad_loss_func, x0, N
 
 
 
-def proposal_uniform_orientations(key, x0, logPi):
-    """Uniform orientations proposal function, for N
-    (independent) images at once.
-    
-    Parameters:
-    -----------
-    key : jax.random.PRNGKey
-    
-    logPi :
-        Function that computes the log of the target
-        density function Pi. If working on multiple images, 
-        logPi returns a vector.
-        
-    x0 : array 
-        Current state, with N = x0.shape[0]. It is important
-        that x0 is an array even when N=1.
-    
-    Returns:
-    --------
-    Proposed sample x1 and the Metropolis-Hastings ratio r.
-    """
-
-    N = x0.shape[0]
-    x1 = generate_uniform_orientations_jax(key, N)
-
-    logPix1x0 = jax.vmap(logPi)(jnp.array([x1,x0]))
-    r = jnp.exp(logPix1x0[0] - logPix1x0[1])
-    
-    return x1, r
-
-
-def proposal_uniform_shifts(key, x0, logPi, B):
-    """Same as the proposal_uniform_orientations function."""
-    N = x0.shape[0]
-    x1 = generate_uniform_shifts(key, N, B)
-    r = jnp.exp(logPi(x1) - logPi(x0))
-
-    return x1, r
-
-def proposal_gaussian_shifts(key, x0, logPi, B):
-    """Same as the proposal_uniform_shifts function, but Guassian."""
-
-    N = x0.shape[0]
-    x1 = generate_gaussian_shifts(key, N, B)
-
-    logPix1x0 = jax.vmap(logPi)(jnp.array([x1,x0]))
-    r = jnp.exp(logPix1x0[0] - logPix1x0[1])
-
-    return x1, r
-
 
 
