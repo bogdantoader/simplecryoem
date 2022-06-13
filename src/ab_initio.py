@@ -166,7 +166,7 @@ def ab_initio_mcmc(
             #M_iter = 1/jnp.max(sigma_noise_iter)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
             M_iter = 1/jnp.max(sigma_noise)**2 * jnp.ones([nx_iter, nx_iter, nx_iter])
             # Get the operators for the dimensions at this iteration.
-            slice_func_array_angles_iter, grad_loss_volume_sum_iter, loss_func_angles, loss_func_batched0_iter, loss_func_sum_iter, loss_proj_func_batched0_iter, rotate_and_interpolate_iter = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid_iter, mask3d, alpha, interp_method)
+            slice_func_array_angles_iter, grad_loss_volume_sum_iter, loss_func_batched0_iter, loss_func_sum_iter, loss_proj_func_batched0_iter, rotate_and_interpolate_iter = get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and_ctf_func, x_grid_iter, mask3d, alpha, interp_method)
 
             proposal_func_orientations_unif, proposal_func_orientations_pert, proposal_func_shifts_local, proposal_func_vol, proposal_func_vol_batch, proposal_func_mtm_orientations_shifts = get_jax_proposal_funcs(loss_func_batched0_iter, loss_proj_func_batched0_iter, loss_func_sum_iter, grad_loss_volume_sum_iter, rotate_and_interpolate_iter, sigma_noise_iter, B, B_list, dt_list_hmc, L_hmc, M_iter)
 
@@ -420,10 +420,7 @@ def get_jax_ops_iter(project_func, rotate_and_interpolate_func, apply_shifts_and
     _, loss_func_batched0, _ = get_loss_funcs(slice_func, alpha = 0)
     loss_proj_func_batched0 = get_loss_proj_funcs(apply_shifts_and_ctf_func, x_grid, alpha = 0)
 
-    loss_func_angles = jax.jit(jax.vmap(loss_func, in_axes = (None, 0, None, None, None, None)))
-
-
-    return slice_func_array_angles, grad_loss_volume_sum, loss_func_angles, loss_func_batched0, loss_func_sum, loss_proj_func_batched0, rotate_and_interpolate
+    return slice_func_array_angles, grad_loss_volume_sum, loss_func_batched0, loss_func_sum, loss_proj_func_batched0, 
 
 
 

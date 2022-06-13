@@ -82,6 +82,14 @@ class Loss:
         return 1/2 * (self.alpha * l2sq(v) + self.err_func(self.slice.slice(v, angles, shifts, ctf_params), img, 1/sigma**2))
 
     @jax.jit 
+    def loss0(self, v, angles, shifts, ctf_params, img, sigma = 1):
+        """Similar to loss function, but with alpha=0 (no regularisation)."""
+        return 1/2 * self.err_func(self.slice.slice(v, angles, shifts, ctf_params), img, 1/sigma**2)
+
+
+
+
+    @jax.jit 
     def loss_batched(self, v, angles, shifts, ctf_params, imgs, sigma):
         return jax.vmap(self.loss, in_axes = (None, 0, 0, 0, 0,  None))(v, angles, shifts, ctf_params, imgs, sigma)
 
