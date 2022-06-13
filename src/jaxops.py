@@ -9,6 +9,7 @@ class Slice:
     as jit-compiled JAX functions."""
 
     def __init__(self, x_grid, mask = None, project = project,  
+            rotate_and_interpolate = rotate_and_interpolate, 
             apply_shifts_and_ctf = apply_shifts_and_ctf, 
             interp_method = "tri"):
 
@@ -21,6 +22,10 @@ class Slice:
             self.mask = jnp.ones([nx, nx])
         else:
             self.mask = mask
+
+        self.project = project
+        self.rotate_and_interpolate = rotate_and_interpolate
+        self.apply_shifts_and_ctf = apply_shifts_and_ctf
 
     @jax.jit
     def slice(self, v, angles, shifts, ctf_params):
@@ -43,7 +48,7 @@ class Slice:
 
     @jax.jit
     def rotate_and_interpolate_vmap(v, angles):
-        return jax.vmap(rotate_and_interpolate, in_axes=(None,0,None,None))(v*mask, angles, x_grid, x_grid)
+        return jax.vmap(self.rotate_and_interpolate, in_axes=(None,0,None,None))(v*mask, angles, x_grid, x_grid)
 
 class Loss:
     """A class to represent the loss function, batched and sum.
@@ -86,12 +91,13 @@ class Loss:
         """Similar to loss function, but with alpha=0 (no regularisation)."""
         return 1/2 * self.err_func(self.slice.slice(v, angles, shifts, ctf_params), img, 1/sigma**2)
 
-
-
-
     @jax.jit 
     def loss_batched(self, v, angles, shifts, ctf_params, imgs, sigma):
         return jax.vmap(self.loss, in_axes = (None, 0, 0, 0, 0,  None))(v, angles, shifts, ctf_params, imgs, sigma)
+
+    @jax.jit 
+    def loss_batched0(self, v, angles, shifts, ctf_params, imgs, sigma):
+        return jax.vmap(self.loss0, in_axes = (None, 0, 0, 0, 0,  None))(v, angles, shifts, ctf_params, imgs, sigma)
 
     @jax.jit
     def loss_sum(self, v, angles, shifts, ctf_params, imgs, sigma):
@@ -107,9 +113,20 @@ class Loss:
         proj = self.slice.apply_shifts_and_ctf_jit(projection, shifts, ctf_params)
         return 1/2 * (self.alpha * l2sq(v) + self.err_func(projection, img, 1/sigma**2))
 
+    @jax.jit
+    def loss_proj0(v, projection, shifts, ctf_params, img, sigma):
+        "The alpha=0 version of loss_proj."""
+
+        proj = self.slice.apply_shifts_and_ctf_jit(projection, shifts, ctf_params)
+        return 1/2 * self.err_func(projection, img, 1/sigma**2)
+
     @jax.jit 
     def loss_proj_batched(v, projection, shifts, ctf_params, imgs, sigma):
         return jax.vmap(self.loss_proj, in_axes = (None, 0, 0, 0, 0, None))(v, projection, shifts, ctf_params, imgs, sigma)
+
+    @jax.jit 
+    def loss_proj_batched0(v, projection, shifts, ctf_params, imgs, sigma):
+        return jax.vmap(self.loss_proj0, in_axes = (None, 0, 0, 0, 0, None))(v, projection, shifts, ctf_params, imgs, sigma)
 
 
 class GradV:

@@ -20,7 +20,7 @@ class CryoProposals:
     @jax.jit
     def proposal_orientations_uniform(key, angles0, logPiX0, v, shifts, ctf_params, imgs):
         empty_params = {}
-        return self.__proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs, generate_uniform_orientations_jax, empty_params)
+        return self._proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs, generate_uniform_orientations_jax, empty_params)
 
     @jax.jit
     def proposal_orientations_perturb(key, angles0, logPiX0, v, shifts, ctf_params, imgs, sigma_perturb):
@@ -28,12 +28,11 @@ class CryoProposals:
         sig_p = random.permutation(subkey, sigma_perturb)[0]
         orient_params = {'sig' : sig_p}
 
-        return self.__proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs, generate_perturbed_orientations, orient_params)
+        return self._proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs, generate_perturbed_orientations, orient_params)
   
-    def __proposal_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs, generate_orientations_func, params_orientations):
+    def _proposal_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs, generate_orientations_func, params_orientations):
         #logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs, sigma_noise_iter)
-        #TODO: check it's ok to not have batched0 (i.e. with alpha = 0)
-        logPi = lambda a : -self.loss.loss_batched(v, a, shifts, ctf_params, imgs, self.sigma_noise)
+        logPi = lambda a : -self.loss.loss_batched0(v, a, shifts, ctf_params, imgs, self.sigma_noise)
 
         angles1 = generate_orientations_func(key, angles0, **params_orientations)
 
@@ -74,14 +73,14 @@ class CryoProposals:
 
    
     @jax.jit
-    def proposal_func_vol(key, v0, logPiX0, angles, shifts, ctf_params, imgs):
+    def proposal_vol(key, v0, logPiX0, angles, shifts, ctf_params, imgs):
         logPi_vol = lambda v : -self.loss.loss_sum(v, angles, shifts, ctf_params, imgs, self.sigma_noise)
         gradLogPi_vol = lambda v : -jnp.conj(self.grad.grad_loss_volume_sum(v, angles, shifts, ctf_params, imgs, self.sigma_noise))
         
         return proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, self.dt_list_hmc, self.L_hmc, self.M)
 
 
-    def proposal_func_vol_batch(key, v0, logPiX0, angles, shifts, ctf_params, imgs):
+    def proposal_vol_batch(key, v0, logPiX0, angles, shifts, ctf_params, imgs):
         """Similar to proposal_func_vol, but it loads the images to GPU in batches to 
         compute the gradient, so it is not jit-ed"""
         def logPi_vol(v):
@@ -101,7 +100,6 @@ class CryoProposals:
             return grad/N_batch
  
         return proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, self.dt_list_hmc, self.L_hmc, self.M)
-
 
 
     @jax.jit 
@@ -126,8 +124,7 @@ class CryoProposals:
         #shifts1_states = jnp.repeat(jnp.expand_dims(shifts1_states, 0), N, 0)
        
         # weights has shape [N, N_samples_shifts], w(y_i) = logPi(y_i)
-        #TODO: check it works without batched0_iter
-        weights = -jax.vmap(self.loss.loss_proj_batched, in_axes=(None,None,1,None,None,None))(v, proj, shifts1_states, ctf_params, imgs, self.sigma_noise).transpose()
+        weights = -jax.vmap(self.loss.loss_proj_batched0, in_axes=(None,None,1,None,None,None))(v, proj, shifts1_states, ctf_params, imgs, self.sigma_noise).transpose()
         
         # Select the proposed state with probability proportional
         # to weights, batch mode (all images in parallel).
@@ -137,11 +134,10 @@ class CryoProposals:
         # The weights corresponding to proposed state (angles1,shifts1) (i.e. logPiX1)
         weights1 = jax.vmap(lambda weights_i, sh1idx_i : weights_i[sh1idx_i], in_axes=(0,0))(weights, sh1idx)
 
-        #TODO: batched0_iter
-        weights0 = -self.loss.loss_batched(v,angles0,shifts0,ctf_params,imgs,self.sigma_noise)
+        weights0 = -self.loss.loss_batched0(v,angles0,shifts0,ctf_params,imgs,self.sigma_noise)
         weights_reference = jax.vmap(lambda weights_i, sh1idx_i, w0_i : weights_i.at[sh1idx_i].set(w0_i), in_axes = (0,0,0))(weights, sh1idx, weights0)
 
-        r = jax.vmap(self.__ratio_sum_exp, in_axes=(0,0))(weights, weights_reference)
+        r = jax.vmap(self._ratio_sum_exp, in_axes=(0,0))(weights, weights_reference)
 
         as1 = jnp.concatenate([angles1,shifts1], axis=1)
 
@@ -149,7 +145,7 @@ class CryoProposals:
 
          
     @jax.jit
-    def __ratio_sum_exp(a, b):
+    def _ratio_sum_exp(a, b):
         """Given two arrays a=[A1, ..., An], b=[B1,..., Bn],
         compute the ratio sum(exp(a1)) / sum(exp(a2)) in a way
         that doesn't lead to nan's."""
