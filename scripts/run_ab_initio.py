@@ -9,6 +9,7 @@ from src.utils import *
 from src.projection import *
 from src.interpolate import *
 from src.jaxops import *
+from src.noise import noise 
 from src.fsc import *
 from src.algorithm import *
 from src.ab_initio import ab_initio_mcmc
@@ -132,11 +133,8 @@ def main(args):
             N_imgs_noise = N
         
         print(f"Estimating the noise using the {N_px_noise} x {N_px_noise} corners of the first {N_imgs_noise} images...", end="", flush=True)
-
         t0 = time.time()
-        sigma_noise_estimated = estimate_noise_imgs(imgs0[:N_imgs_noise], nx_empty = N_px_noise, nx_final = nx).reshape([nx,nx])
-        sigma_noise_avg = average_radially(sigma_noise_estimated, x_grid)
-        sigma_noise = sigma_noise_avg.reshape(-1)
+        sigma_noise = estimate_noise_radial(imgs0[:N_imgs_noise], nx_empty = N_px_noise, nx_final = nx)
         print(f"done. Time: {time.time()-t0} seconds.", flush=True) 
    
     # Delete the initial large images.
