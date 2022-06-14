@@ -11,7 +11,7 @@ import mrcfile
 from src.algorithm import *
 from src.utils import *
 from src.jaxops import *
-from src.fsc import plot_angles
+from src.utils import plot_angles
 
 
 

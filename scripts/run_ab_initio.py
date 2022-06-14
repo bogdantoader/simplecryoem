@@ -14,8 +14,9 @@ from src.fsc import *
 from src.algorithm import *
 from src.ab_initio import ab_initio_mcmc
 from src.residual import get_volume_residual
-import jax
+from src.preprocess import preprocess
 
+import jax
 import mrcfile
 
 
@@ -50,17 +51,7 @@ def parse_args(parser):
 
 def main(args):
     params0, imgs0 = load_data(args.data_dir, args.star_file, load_imgs = True, fourier = False)
-    ctf_params0 = params0["ctf_params"]
-    pixel_size0 = params0["pixel_size"]
-    angles0 = params0["angles"]
-    shifts0 = params0["shifts"]
-    nx0 = imgs0.shape[-1]
 
-    print(f'imgs0.shape = {imgs0.shape}')
-    print(f'pixel_size0 = {pixel_size0.shape}')
-    print(f'angles0.shape = {angles0.shape}')
-    print(f'shifts0.shape = {shifts0.shape}')
-    print(f'ctf_params0.shape = {ctf_params0.shape}', flush = True)
 
     print(f"min(shifts) = {jnp.min(shifts0)}")
     print(f"max(shifts) = {jnp.max(shifts0)}")
@@ -69,58 +60,14 @@ def main(args):
     if args.N_imgs:
         assert (args.N_imgs <= imgs0.shape[0]), 'N cannot be smaller than the number of particles.'
         N = args.N_imgs
-        idxrand = np.random.permutation(imgs0.shape[0])[:N]
+        shuffle = True
     else:
         N = imgs0.shape[0]
-        idxrand = jnp.arange(N)
-        
-    print(f'N = {N}', flush = True)
-
-    imgs0 = imgs0[idxrand]
-    pixel_size = pixel_size0[idxrand]
-    angles = angles0[idxrand]
-    shifts = shifts0[idxrand]
-    ctf_params = ctf_params0[idxrand]
-    
-    file2 = open(args.out_dir + '/idxrand','wb')
-    pickle.dump(idxrand, file2)
-    file2.close()
-
-    # Take the FFT of the images
-    print("Taking FFT of the images...", end="", flush=True)
-    t0 = time.time()
-    imgs_f = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs0])
-    print(f"done. Time: {time.time()-t0} seconds.", flush = True) 
-
-    # Create the grids
-    # Assume the pixel size is the same for all images
-    nx = imgs_f.shape[-1]
-    px = pixel_size[0]
-    N = imgs_f.shape[0]
-
-    x_grid = create_grid(nx, px)
-    y_grid = x_grid
-    z_grid = x_grid
-    print(f"x_grid = {x_grid}", flush = True)
-
-
-    # Crop the images
-    if args.nx_crop:
-        nx = args.nx_crop
-        imgs_f, x_grid = crop_fourier_images(imgs_f, x_grid, nx)
-        y_grid = x_grid
-        z_grid = x_grid
-        print(f"new x_grid = {x_grid}", flush = True)
-
-    # Vectorise images
-    imgs_f = imgs_f.reshape(N, -1)
-    print(f"imgs_f.shape = {imgs_f.shape}", flush = True)
+        shuffle = False
 
     # Estimate the noise   
     if args.noise_free:
-        print(f"Noise free - setting sigma_noise = 1", flush=True)
-
-        sigma_noise = np.ones((nx*nx,))
+        N_px_noise = 0
     else:    
         if args.N_px_noise:
             N_px_noise = args.N_px_noise
@@ -132,11 +79,21 @@ def main(args):
         else:
             N_imgs_noise = N
         
-        print(f"Estimating the noise using the {N_px_noise} x {N_px_noise} corners of the first {N_imgs_noise} images...", end="", flush=True)
-        t0 = time.time()
-        sigma_noise = estimate_noise_radial(imgs0[:N_imgs_noise], nx_empty = N_px_noise, nx_final = nx)
-        print(f"done. Time: {time.time()-t0} seconds.", flush=True) 
-   
+    processed_data = preprocess(imgs0, params0, args.out_dir, nx_crop = args.nx_crop, N = N, shuffle = shuffle, N_px_noise = N_px_noise, N_imgs_noise = N_imgs_noise)
+
+    imgs_f = processed_data["imgs_f"]
+    pixel_size = processed_data["pixel_size"]
+    angles = processed_data["angles"]
+    shifts = processed_data["shifts"]
+    ctf_params = processed_data["ctf_params"]
+    idxrand = processed_data["idxrand"]
+    nx = processed_data["nx"]
+    x_grid = processed_data["x_grid"]
+    mask = processed_data["mask"]
+    sigma_noise = processed_data["sigma_noise"]
+    N = imgs_f.shape[0]
+
+    nx0 = imgs.shape[2]
     # Delete the initial large images.
     del(imgs0)
 

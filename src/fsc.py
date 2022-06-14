@@ -71,27 +71,6 @@ def calc_fsc(v1, v2, grid, dr = None):
     return res, fsc, shell_points 
 
 
-def plot_angles(angs):
-    """Display a list of Euler angles as points on a sphere."""
-
-    # A sphere
-    phi = jnp.linspace(0, jnp.pi)
-    theta = jnp.linspace(0, 2*jnp.pi)
-    Phi, Theta = jnp.meshgrid(phi, theta)
-    x = jnp.cos(Phi) * jnp.sin(Theta)
-    y = jnp.sin(Phi) * jnp.sin(Theta)
-    z = jnp.cos(Theta)
-
-    # Get point coordinates
-    coords = jnp.array([get_rotation_matrix(a[0],a[1],a[2])@jnp.array([0,0,1.1]) for a in angs])
-    xx, yy, zz = jnp.hsplit(coords, 3)
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection = '3d')
-    ax.plot_surface(x,y,z, rstride=1, cstride = 1, alpha=0.6, linewidth=0)
-    ax.scatter(xx,yy,zz, color="k", s=20)
-    return
-
 def rotate_list(x_grid, angles):
     """Apply the rotate function to a list of angles."""
 
