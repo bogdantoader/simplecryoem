@@ -2,35 +2,39 @@ import jax
 from jax import random
 import jax.numpy as jnp
 import numpy as np
+from functools import partial
 
 from src.jaxops import Slice, Loss, GradV
-from src.utils import l2sq, generate_uniform_orientations_jax, generate_uniform_shifts,generate_gaussian_shifts
+from src.utils import *
+from src.mcmc import proposal_hmc
 
 class CryoProposals:
 
-    def __init__(self, sigma_noise, B, B_list, dt_list_hmc, L_hmc, M, loss: Loss, grad: GradV):
+    def __init__(self, sigma_noise, B, B_list, dt_list_hmc, L_hmc, M, slice: Slice, loss: Loss, gradv: GradV):
         self.sigma_noise = sigma_noise
         self.B = B
         self.B_list = B_list
         self.dt_list_hmc = dt_list_hmc
         self.L_hmc = L_hmc
         self.M = M
+        self.slice = slice
         self.loss = loss
+        self.gradv = gradv
 
-    @jax.jit
-    def proposal_orientations_uniform(key, angles0, logPiX0, v, shifts, ctf_params, imgs):
+    @partial(jax.jit, static_argnums=(0,))
+    def proposal_orientations_uniform(self, key, angles0, logPiX0, v, shifts, ctf_params, imgs):
         empty_params = {}
-        return self._proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs, generate_uniform_orientations_jax, empty_params)
+        return self._proposal_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs, generate_uniform_orientations_jax, empty_params)
 
-    @jax.jit
-    def proposal_orientations_perturb(key, angles0, logPiX0, v, shifts, ctf_params, imgs, sigma_perturb):
+    @partial(jax.jit, static_argnums=(0,))
+    def proposal_orientations_perturb(self, key, angles0, logPiX0, v, shifts, ctf_params, imgs, sigma_perturb):
         key, subkey = random.split(key)
         sig_p = random.permutation(subkey, sigma_perturb)[0]
         orient_params = {'sig' : sig_p}
 
-        return self._proposal_func_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs, generate_perturbed_orientations, orient_params)
+        return self._proposal_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs, generate_perturbed_orientations, orient_params)
   
-    def _proposal_orientations(key, angles0, logPiX0, v, shifts, ctf_params, imgs, generate_orientations_func, params_orientations):
+    def _proposal_orientations(self, key, angles0, logPiX0, v, shifts, ctf_params, imgs, generate_orientations_func, params_orientations):
         #logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs, sigma_noise_iter)
         logPi = lambda a : -self.loss.loss_batched0(v, a, shifts, ctf_params, imgs, self.sigma_noise)
 
@@ -47,8 +51,8 @@ class CryoProposals:
         return angles1, r, logPiX1, logPiX0 
 
 
-    @jax.jit
-    def proposal_shifts_local(key, shifts0, logPiX0, v, proj, ctf_params, imgs):
+    @partial(jax.jit, static_argnums=(0,))
+    def proposal_shifts_local(self, key, shifts0, logPiX0, v, proj, ctf_params, imgs):
         #logPi = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs, self.sigma_noise)
         logPi = lambda sh : -self.loss.loss_proj_batched(v, proj, sh, ctf_params, imgs, self.sigma_noise)
 
@@ -72,15 +76,15 @@ class CryoProposals:
         return shifts1, r, logPiX1, logPiX0
 
    
-    @jax.jit
-    def proposal_vol(key, v0, logPiX0, angles, shifts, ctf_params, imgs):
+    @partial(jax.jit, static_argnums=(0,))
+    def proposal_vol(self, key, v0, logPiX0, angles, shifts, ctf_params, imgs):
         logPi_vol = lambda v : -self.loss.loss_sum(v, angles, shifts, ctf_params, imgs, self.sigma_noise)
-        gradLogPi_vol = lambda v : -jnp.conj(self.grad.grad_loss_volume_sum(v, angles, shifts, ctf_params, imgs, self.sigma_noise))
+        gradLogPi_vol = lambda v : -jnp.conj(self.gradv.grad_loss_volume_sum(v, angles, shifts, ctf_params, imgs, self.sigma_noise))
         
         return proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, self.dt_list_hmc, self.L_hmc, self.M)
 
 
-    def proposal_vol_batch(key, v0, logPiX0, angles, shifts, ctf_params, imgs):
+    def proposal_vol_batch(self, key, v0, logPiX0, angles, shifts, ctf_params, imgs):
         """Similar to proposal_func_vol, but it loads the images to GPU in batches to 
         compute the gradient, so it is not jit-ed"""
         def logPi_vol(v):
@@ -95,15 +99,15 @@ class CryoProposals:
             grad = 0
             N_batch = angles.shape[0]
             for i in range(N_batch):
-                grad += -jnp.conj(self.grad.grad_loss_volume_sum(v, angles[i], shifts[i], ctf_params[i], imgs[i], self.sigma_noise)) 
+                grad += -jnp.conj(self.gradv.grad_loss_volume_sum(v, angles[i], shifts[i], ctf_params[i], imgs[i], self.sigma_noise)) 
 
             return grad/N_batch
  
         return proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, self.dt_list_hmc, self.L_hmc, self.M)
 
 
-    @jax.jit 
-    def proposal_mtm_orientations_shifts(key, as0, logPiX0, v, ctf_params, imgs, N_samples_shifts = 100):
+    @partial(jax.jit, static_argnums=(0,))
+    def proposal_mtm_orientations_shifts(self, key, as0, logPiX0, v, ctf_params, imgs, N_samples_shifts = 100):
         key, *keys = random.split(key, 4)
         
         angles0 = as0[:,:3]
@@ -144,8 +148,8 @@ class CryoProposals:
         return as1, r, weights1, weights0 
 
          
-    @jax.jit
-    def _ratio_sum_exp(a, b):
+    @partial(jax.jit, static_argnums=(0,))
+    def _ratio_sum_exp(self, a, b):
         """Given two arrays a=[A1, ..., An], b=[B1,..., Bn],
         compute the ratio sum(exp(a1)) / sum(exp(a2)) in a way
         that doesn't lead to nan's."""

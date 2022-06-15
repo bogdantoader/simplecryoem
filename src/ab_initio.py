@@ -9,9 +9,10 @@ from matplotlib import pyplot as plt
 import mrcfile
 
 from src.algorithm import *
+from src.mcmc import mcmc
 from src.utils import *
 from src.jaxops import *
-from src.utils import plot_angles
+from src.proposals import CryoProposals
 
 
 
@@ -105,7 +106,7 @@ def ab_initio_mcmc(
         slice_full = Slice(x_grid)
         loss_full = Loss(slice_full, alpha = alpha)
         gradv_full = GradV(loss_full)
-        v, angles, shifts = initialize_ab_initio_vol(subkey, imgs, ctf_params, gradv_full.grad_loss_volume_sum, N_vol_iter, eps_vol, sigma_noise, learning_rate, sgd_batch_size, verbose)
+        v, angles, shifts = initialize_ab_initio_vol(subkey, imgs, ctf_params, gradv_full, N_vol_iter, eps_vol, sigma_noise, learning_rate, sgd_batch_size, verbose)
 
         if diagnostics:
             plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
@@ -171,7 +172,7 @@ def ab_initio_mcmc(
             gradv_iter = GradV(loss_iter)
 
             proposals = CryoProposals(sigma_noise_iter, B, B_list, dt_list_hmc, L_hmc, M_iter,
-                    loss_iter, gradv_iter)
+                    slice_iter, loss_iter, gradv_iter)
 
         if minibatch_factor is not None and N1 == 1:
             minibatch = True
@@ -203,7 +204,7 @@ def ab_initio_mcmc(
                 for i in jnp.arange(N1):
                     if verbose and N1 > 1:
                         print("batch ", i)
-                    params_mtm = {'v':v, 'ctf_params':ctf_params_iter[i], 'imgs_iter' : imgs_iter[i]}
+                    params_mtm = {'v':v, 'ctf_params':ctf_params_iter[i], 'imgs' : imgs_iter[i]}
                     #_, r_samples_angles, samples_angles = mcmc(key_angles_unif, proposals.proposal_orientations_uniform, angles_iter[i], N_samples_angles_global, params_orientations, imgs_iter.shape[1], 1, verbose = True)
 
                     as0 = jnp.concatenate([angles_iter[i], shifts_iter[i]], axis=1)
@@ -227,7 +228,7 @@ def ab_initio_mcmc(
             for i in jnp.arange(N1):
                 if verbose and N1 > 1:
                     print(f"batch {i}")
-                params_orientations = {'v':v, 'shifts':shifts_iter[i], 'ctf_params':ctf_params_iter[i], 'imgs_iter' : imgs_iter[i], 'sigma_perturb': sigma_perturb_list}
+                params_orientations = {'v':v, 'shifts':shifts_iter[i], 'ctf_params':ctf_params_iter[i], 'imgs' : imgs_iter[i], 'sigma_perturb': sigma_perturb_list}
                 _, r_samples_angles, samples_angles = mcmc(key_angles_pert, proposals.proposal_orientations_perturb, angles_iter[i], N_samples_angles_local, params_orientations, imgs_iter.shape[1], 1, verbose = True, iter_display = 10)
                 angles_new.append(samples_angles[N_samples_angles_local-2])
             angles_iter = jnp.array(angles_new)
@@ -248,7 +249,7 @@ def ab_initio_mcmc(
                 if verbose and N1 > 1:
                     print(f"batch {i}")
 
-                params_shifts = {'v':v, 'proj':proj[i], 'ctf_params' : ctf_params_iter[i], 'imgs_iter' : imgs_iter[i]}
+                params_shifts = {'v':v, 'proj':proj[i], 'ctf_params' : ctf_params_iter[i], 'imgs' : imgs_iter[i]}
                 _, r_samples_shifts, samples_shifts = mcmc(key_shifts, proposals.proposal_shifts_local, shifts_iter[i], N_samples_shifts, params_shifts, imgs_iter.shape[1], 1, verbose = True, iter_display = 10)
                 shifts_new.append(samples_shifts[N_samples_shifts-2])
             shifts_iter = jnp.array(shifts_new)
@@ -262,10 +263,10 @@ def ab_initio_mcmc(
         print("Sampling the volume")
 
         if N1 == 1:
-            params_vol = {'angles':angles_iter[0], 'shifts':shifts_iter[0], 'ctf_params':ctf_params_iter[0], 'imgs_iter':imgs_iter[0]}
+            params_vol = {'angles':angles_iter[0], 'shifts':shifts_iter[0], 'ctf_params':ctf_params_iter[0], 'imgs':imgs_iter[0]}
             proposal_vol = proposals.proposal_vol 
         else:
-            params_vol = {'angles':angles_iter, 'shifts':shifts_iter, 'ctf_params':ctf_params_iter, 'imgs_iter':imgs_iter}
+            params_vol = {'angles':angles_iter, 'shifts':shifts_iter, 'ctf_params':ctf_params_iter, 'imgs':imgs_iter}
             proposal_vol = proposals.proposal_vol_batch
 
         t0 = time.time()
@@ -332,7 +333,7 @@ def ab_initio_mcmc(
 def initialize_ab_initio_vol(key, 
         imgs, 
         ctf_params, 
-        grad_loss_volume_sum,
+        gradv_obj,
         N_vol_iter, 
         eps_vol, 
         sigma_noise = 1, 
@@ -353,7 +354,7 @@ def initialize_ab_initio_vol(key,
     angles = generate_uniform_orientations_jax_batch(key, N1, N2)
     shifts = jnp.zeros([N1, N2, 2]) 
 
-    sgd_grad_func = get_sgd_vol_ops(grad_loss_volume_sum, angles[0], shifts[0], ctf_params[0], imgs[0], sigma_noise)
+    sgd_grad_func = get_sgd_vol_ops(gradv_obj, angles[0], shifts[0], ctf_params[0], imgs[0], sigma_noise)
     v = sgd(sgd_grad_func, N2, v0, learning_rate, N_vol_iter, batch_size, None, eps_vol, verbose = verbose)
 
     return v, angles, shifts

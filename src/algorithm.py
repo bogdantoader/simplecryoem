@@ -7,6 +7,7 @@ from  matplotlib import pyplot as plt
 import time
 
 from src.utils import l2sq, generate_uniform_orientations_jax, generate_uniform_shifts,generate_gaussian_shifts
+from src.jaxops import GradV
 
 
 
@@ -142,10 +143,10 @@ def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, ep
     return x
 
 
-def get_sgd_vol_ops(grad_loss_volume, angles, shifts, ctf_params, imgs, sigma = 1):
+def get_sgd_vol_ops(gradv: GradV, angles, shifts, ctf_params, imgs, sigma = 1):
     #loss_func = lambda v, idx : loss_func_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx]) 
     #grad_func = lambda v, idx : grad_loss_volume(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], z[idx], sigma) 
-    grad_func = lambda v, idx : grad_loss_volume(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx],  sigma) 
+    grad_func = lambda v, idx : gradv.grad_loss_volume_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx],  sigma) 
 
     return grad_func
 
