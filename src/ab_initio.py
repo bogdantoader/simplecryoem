@@ -34,7 +34,8 @@ def ab_initio_mcmc(
         N_samples_vol = 100, 
         N_samples_angles_global = 1000, 
         N_samples_angles_local = 100, 
-        N_samples_shifts = 1000,
+        N_samples_shifts_global = 100,
+        N_samples_shifts_local = 1000,
         dt_list_hmc = [0.5], 
         sigma_perturb_list = jnp.array([1, 0.1, 0.01, 0.001]),
         L_hmc = 10, 
@@ -106,7 +107,7 @@ def ab_initio_mcmc(
         slice_full = Slice(x_grid)
         loss_full = Loss(slice_full, alpha = alpha)
         gradv_full = GradV(loss_full)
-        v, angles, shifts = initialize_ab_initio_vol(subkey, imgs, ctf_params, gradv_full, N_vol_iter, eps_vol, sigma_noise, learning_rate, sgd_batch_size, verbose)
+        v, angles, shifts = initialize_ab_initio_vol(subkey, imgs, ctf_params, gradv_full, N_vol_iter, eps_vol, sigma_noise, learning_rate, sgd_batch_size, shifts0, verbose)
 
         if diagnostics:
             plt.imshow(jnp.abs(jnp.fft.fftshift(v[:,:,0])))
@@ -204,7 +205,10 @@ def ab_initio_mcmc(
                 for i in jnp.arange(N1):
                     if verbose and N1 > 1:
                         print("batch ", i)
-                    params_mtm = {'v':v, 'ctf_params':ctf_params_iter[i], 'imgs' : imgs_iter[i]}
+                    params_mtm = {'v':v, 
+                            'ctf_params':ctf_params_iter[i], 
+                            'imgs' : imgs_iter[i],
+                            'N_samples_shifts' : N_samples_shifts_global}
                     #_, r_samples_angles, samples_angles = mcmc(key_angles_unif, proposals.proposal_orientations_uniform, angles_iter[i], N_samples_angles_global, params_orientations, imgs_iter.shape[1], 1, verbose = True)
 
                     as0 = jnp.concatenate([angles_iter[i], shifts_iter[i]], axis=1)
@@ -250,7 +254,7 @@ def ab_initio_mcmc(
                     print(f"batch {i}")
 
                 params_shifts = {'v':v, 'proj':proj[i], 'ctf_params' : ctf_params_iter[i], 'imgs' : imgs_iter[i]}
-                _, r_samples_shifts, samples_shifts = mcmc(key_shifts, proposals.proposal_shifts_local, shifts_iter[i], N_samples_shifts, params_shifts, imgs_iter.shape[1], 1, verbose = True, iter_display = 10)
+                _, r_samples_shifts, samples_shifts = mcmc(key_shifts, proposals.proposal_shifts_local, shifts_iter[i], N_samples_shifts_local, params_shifts, imgs_iter.shape[1], 1, verbose = True, iter_display = 10)
                 shifts_new.append(samples_shifts[N_samples_shifts-2])
             shifts_iter = jnp.array(shifts_new)
 
@@ -339,6 +343,7 @@ def initialize_ab_initio_vol(key,
         sigma_noise = 1, 
         learning_rate = 1, 
         batch_size = -1,  
+        shifts = None,
         verbose = True):
 
     if verbose:
@@ -352,7 +357,8 @@ def initialize_ab_initio_vol(key,
 
     v0 = jnp.array(np.random.randn(nx,nx,nx) + np.random.randn(nx,nx,nx)*1j)
     angles = generate_uniform_orientations_jax_batch(key, N1, N2)
-    shifts = jnp.zeros([N1, N2, 2]) 
+    if shifts is None:
+        shifts = jnp.zeros([N1, N2, 2]) 
 
     sgd_grad_func = get_sgd_vol_ops(gradv_obj, angles[0], shifts[0], ctf_params[0], imgs[0], sigma_noise)
     v = sgd(sgd_grad_func, N2, v0, learning_rate, N_vol_iter, batch_size, None, eps_vol, verbose = verbose)

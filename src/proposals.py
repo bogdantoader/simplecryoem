@@ -106,7 +106,7 @@ class CryoProposals:
         return proposal_hmc(key, v0, logPiX0, logPi_vol, gradLogPi_vol, self.dt_list_hmc, self.L_hmc, self.M)
 
 
-    @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,7))
     def proposal_mtm_orientations_shifts(self, key, as0, logPiX0, v, ctf_params, imgs, N_samples_shifts = 100):
         key, *keys = random.split(key, 4)
         
@@ -116,17 +116,9 @@ class CryoProposals:
         angles1 = generate_uniform_orientations_jax(keys[0], angles0)
         proj = self.slice.rotate_and_interpolate_vmap(v, angles1)
 
-        #N_samples_shifts = 500
         N = angles0.shape[0]
-        #B0 = random.permutation(keys[1], self.B_list)[0]
-        #shifts1_states = random.normal(keys[2], (N,N_samples_shifts,2)) * B0
         shifts1_states = random.uniform(keys[2], (N, N_samples_shifts,2)) * 2 * self.B - self.B
 
-        #s1 = np.linspace(-self.B,self.B,100)
-        #s1x, s1y = jnp.meshgrid(s1,s1)
-        #shifts1_states = jnp.array([s1x.ravel(), s1y.ravel()]).transpose()
-        #shifts1_states = jnp.repeat(jnp.expand_dims(shifts1_states, 0), N, 0)
-       
         # weights has shape [N, N_samples_shifts], w(y_i) = logPi(y_i)
         weights = -jax.vmap(self.loss.loss_proj_batched0, in_axes=(None,None,1,None,None,None))(v, proj, shifts1_states, ctf_params, imgs, self.sigma_noise).transpose()
         
@@ -142,7 +134,6 @@ class CryoProposals:
         weights_reference = jax.vmap(lambda weights_i, sh1idx_i, w0_i : weights_i.at[sh1idx_i].set(w0_i), in_axes = (0,0,0))(weights, sh1idx, weights0)
 
         r = jax.vmap(self._ratio_sum_exp, in_axes=(0,0))(weights, weights_reference)
-
         as1 = jnp.concatenate([angles1,shifts1], axis=1)
 
         return as1, r, weights1, weights0 
