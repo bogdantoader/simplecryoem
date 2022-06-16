@@ -205,20 +205,30 @@ def ab_initio_mcmc(
                 for i in jnp.arange(N1):
                     if verbose and N1 > 1:
                         print("batch ", i)
-                    params_mtm = {'v':v, 
-                            'ctf_params':ctf_params_iter[i], 
-                            'imgs' : imgs_iter[i],
-                            'N_samples_shifts' : N_samples_shifts_global}
-                    #_, r_samples_angles, samples_angles = mcmc(key_angles_unif, proposals.proposal_orientations_uniform, angles_iter[i], N_samples_angles_global, params_orientations, imgs_iter.shape[1], 1, verbose = True)
+                    
+                    if shifts0 is None:
+                        params_mtm = {'v':v, 
+                                'ctf_params':ctf_params_iter[i], 
+                                'imgs' : imgs_iter[i],
+                                'N_samples_shifts' : N_samples_shifts_global}
+                        as0 = jnp.concatenate([angles_iter[i], shifts_iter[i]], axis=1)
+                        _, r_samples_as, samples_as = mcmc(key_angles_unif, proposals.proposal_mtm_orientations_shifts, as0, N_samples_angles_global, params_mtm, imgs_iter.shape[1], 1, verbose = True, iter_display = 50)
+                        as1 = samples_as[N_samples_angles_global-2]
 
-                    as0 = jnp.concatenate([angles_iter[i], shifts_iter[i]], axis=1)
-                    _, r_samples_as, samples_as = mcmc(key_angles_unif, proposals.proposal_mtm_orientations_shifts, as0, N_samples_angles_global, params_mtm, imgs_iter.shape[1], 1, verbose = True, iter_display = 50)
-                    as1 = samples_as[N_samples_angles_global-2]
+                        angles_new.append(as1[:,:3])
+                        shifts_new.append(as1[:,3:])
+                    else:
+                        params_orientations = {'v':v, 
+                                'ctf_params':ctf_params_iter[i], 
+                                'imgs' : imgs_iter[i],
+                                'shifts' : shifts_iter[i]}
+                        _, r_samples_as, samples_angles = mcmc(key_angles_unif, proposals.proposal_orientations_uniform, angles_iter[i], N_samples_angles_global, params_orientations, imgs_iter.shape[1], 1, verbose = True, iter_display = 50)
+                        
+                        angles_new.append(samples_angles[N_samples_angles_global-2])
 
-                    angles_new.append(as1[:,:3])
-                    shifts_new.append(as1[:,3:])
                 angles_iter = jnp.array(angles_new)
-                shifts_iter = jnp.array(shifts_new)
+                if shifts0 is None:
+                    shifts_iter = jnp.array(shifts_new)
 
                 if verbose:
                     print("  Time global orientations and shifts sampling =", time.time()-t0)
