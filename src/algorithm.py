@@ -82,7 +82,7 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
     return AA, Ab
 
 
-def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, eps = 1e-15, verbose = False, loss_func = None):
+def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, eps = 1e-15, verbose = False, iter_display = 1):
     """SGD
    
    Parameters:
@@ -108,6 +108,7 @@ def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, ep
 
     P : nx x nx x nx
         Diagonal preconditioner (entry-wise multiplication of the gradient).
+
     
     """
 
@@ -129,7 +130,7 @@ def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, ep
             gradx = grad_func(x, idx)
             x = x - alpha * P * jnp.conj(gradx)
 
-            if jnp.mod(epoch, 10) == 0 and i == len(idx_batches)-1:
+            if jnp.mod(epoch, iter_display) == 0 and i == len(idx_batches)-1:
                 #full_grad = jnp.abs(jnp.mean(grad_func(x, jnp.arange(N))))
                 # OOM here, obvs
                 full_grad = jnp.abs(jnp.mean(gradx))

@@ -131,6 +131,7 @@ class Loss:
         return jax.vmap(self.loss_proj0, in_axes = (None, 0, 0, 0, 0, None))(v, projection, shifts, ctf_params, imgs, sigma)
 
 
+#TODO: maybe move these functions to the Loss class as grad_volume and grad_volume_sum
 class GradV:
     def __init__(self, loss: Loss):
         self.loss = loss
