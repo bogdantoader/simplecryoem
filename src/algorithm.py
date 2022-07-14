@@ -7,7 +7,7 @@ from  matplotlib import pyplot as plt
 import time
 
 from src.utils import l2sq, generate_uniform_orientations_jax, generate_uniform_shifts,generate_gaussian_shifts
-from src.jaxops import GradV
+from src.jaxops import GradV, Loss
 
 
 
@@ -82,7 +82,7 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
     return AA, Ab
 
 
-def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, eps = 1e-15, verbose = False, iter_display = 1):
+def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, eps = 1e-15, verbose = False, iter_display = 1):
     """SGD
    
    Parameters:
@@ -115,41 +115,57 @@ def sgd(grad_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, ep
     rng = np.random.default_rng()
 
     if batch_size == -1 or batch_size == N:
-        number_of_batches = 1
+        N_batch = 1
     else:
-        number_of_batches = N/batch_size
+        N_batch = N/batch_size
 
     if P is None:
         P = jnp.ones(x0.shape)
 
     x = x0
-    for epoch in range(N_epoch):
-        idx_batches = np.array_split(rng.permutation(N), number_of_batches)
+    loss_list = []
+    grad_list = []
+    for idx_epoch, epoch in enumerate(range(N_epoch)):
+        print(f"Epoch {idx_epoch+1}/{N_epoch} ", end="")
+        idx_batches = np.array_split(rng.permutation(N), N_batch)
 
-        for i, idx in enumerate(idx_batches):
+        grad_epoch = []
+        loss_epoch = []
+        pbar = tqdm(idx_batches)
+        for idx in pbar:
             gradx = grad_func(x, idx)
             x = x - alpha * P * jnp.conj(gradx)
+            
+            loss_iter = loss_func(x, idx)
 
-            if jnp.mod(epoch, iter_display) == 0 and i == len(idx_batches)-1:
-                #full_grad = jnp.abs(jnp.mean(grad_func(x, jnp.arange(N))))
-                # OOM here, obvs
-                full_grad = jnp.abs(jnp.mean(gradx))
+            gradmax = jnp.max(jnp.abs(gradx))
+            grad_epoch.append(gradmax)
+            loss_epoch.append(loss_iter)
+            
+            pbar.set_postfix(grad = f"{gradmax :.3e}",
+                    loss = f"{loss_iter :.2f}")
+                
+            #time.sleep(2)
 
-                if verbose:
-                    print("  sgd epoch " + str(epoch) + ": mean gradient = " + str(full_grad))
+        grad_epoch = jnp.mean(jnp.array(grad_epoch))
+        loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
+        print(f"  |Grad| = {grad_epoch :.3e}")
+        print(f"  |Loss| = {loss_epoch :.3f}")
 
-        if full_grad < eps:
+        grad_list.append(grad_epoch)
+        loss_list.append(loss_epoch)
+
+        if grad_epoch < eps:
             break
 
-    return x
+    return x, jnp.array(loss_list), jnp.array(grad_list)
 
 
-def get_sgd_vol_ops(gradv: GradV, angles, shifts, ctf_params, imgs, sigma = 1):
-    #loss_func = lambda v, idx : loss_func_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx]) 
-    #grad_func = lambda v, idx : grad_loss_volume(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], z[idx], sigma) 
+def get_sgd_vol_ops(gradv: GradV, loss: Loss, angles, shifts, ctf_params, imgs, sigma = 1):
+    loss_func = lambda v, idx : loss.loss_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma) 
     grad_func = lambda v, idx : gradv.grad_loss_volume_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx],  sigma) 
 
-    return grad_func
+    return grad_func, loss_func
 
 
 

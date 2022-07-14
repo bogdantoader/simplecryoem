@@ -31,16 +31,16 @@ def load_data(data_dir, star_file, load_imgs = False, fourier = True):
     
     df = star.parse_star(data_dir + star_file, keep_index = False)
 
-    print("load_data: number of partcles: ", len(df))
+    print(f"load_data: number of partcles: {len(df)}")
     t0 = time.time()
     pixel_size, angles, shifts, ctf_params, imgs = get_data_from_df(df, data_dir, load_imgs)
     t1 = time.time()
-    print("load_data: data loaded, time: ", t1-t0) 
+    print(f"load_data: data loaded, time: {t1-t0 : .2f} sec.") 
 
     if fourier:
         imgs = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs])
         t2 = time.time()
-        print("load_data: FFT of data, time: ", t2-t1)
+        print(f"load_data: FFT of data, time: {t2-t1 : .2f} sec.")
 
     params = {'ctf_params' : ctf_params,
               'pixel_size' : pixel_size,

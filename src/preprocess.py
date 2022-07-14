@@ -86,10 +86,22 @@ def preprocess(imgs0, params0, out_dir, nx_crop = None, N = None, shuffle = Fals
     file.close()
 
     # Take FFT
-    print("Taking FFT of the images...", end="", flush=True)
+    print("Taking FFT of the images:", flush=True)
     t0 = time.time()
-    imgs_f = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs0])
-    print(f"done. Time: {time.time()-t0} seconds.", flush = True) 
+    
+    # Hardcoded batch for now, as this works (or should work) most
+    # of the time.
+    n_batches = 10
+    imgs0_batches = np.array_split(imgs0, n_batches)
+    imgs_f = []
+    for idx_batch, imgs0_batch in enumerate(imgs0_batches): 
+        print(f"Batch {idx_batch+1}/{n_batches} ", end="")
+        t01 = time.time()
+        imgs_f_batch = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs0_batch])
+        imgs_f.append(imgs_f_batch)
+        print(f"{time.time()-t01 : .2f} sec.")
+    imgs_f = np.concatenate(imgs_f, axis = 0)
+    print(f"FFT done. Time: {time.time()-t0 : .2f} sec.", flush = True) 
 
     # Create grids
     # Assume the pixel size is the same for all images
@@ -126,7 +138,7 @@ def preprocess(imgs0, params0, out_dir, nx_crop = None, N = None, shuffle = Fals
         print(f"Estimating the noise using the {N_px_noise} x {N_px_noise} corners of the first {N_imgs_noise} images.", flush=True)
         t0 = time.time()
         sigma_noise = estimate_noise_radial(imgs0[:N_imgs_noise], nx_empty = N_px_noise, nx_final = nx)
-        print(f"Noise estimation done. Time: {time.time()-t0} seconds.", flush=True) 
+        print(f"Noise estimation done. Time: {time.time()-t0 : .2f} sec.", flush=True) 
     else:
         print(f"Noise free - setting sigma_noise = 1", flush=True)
         sigma_noise = np.ones((nx*nx,))
