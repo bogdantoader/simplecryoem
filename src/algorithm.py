@@ -126,12 +126,19 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P
     loss_list = []
     grad_list = []
     for idx_epoch, epoch in enumerate(range(N_epoch)):
-        print(f"Epoch {idx_epoch+1}/{N_epoch} ", end="")
-        idx_batches = np.array_split(rng.permutation(N), N_batch)
+        # This is mostly useful when running a lot of epochs as deterministic gradient descent
+        if idx_epoch % iter_display == 0:
+            print(f"Epoch {idx_epoch+1}/{N_epoch} ", end="")
+            idx_batches = np.array_split(rng.permutation(N), N_batch)
 
         grad_epoch = []
         loss_epoch = []
-        pbar = tqdm(idx_batches)
+        
+        if idx_epoch % iter_display == 0:
+            pbar = tqdm(idx_batches)
+        else:
+            pbar = idx_batches
+
         for idx in pbar:
             gradx = grad_func(x, idx)
             x = x - alpha * P * jnp.conj(gradx)
@@ -141,17 +148,21 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P
             gradmax = jnp.max(jnp.abs(gradx))
             grad_epoch.append(gradmax)
             loss_epoch.append(loss_iter)
-            
-            pbar.set_postfix(grad = f"{gradmax :.3e}",
-                    loss = f"{loss_iter :.2f}")
+           
+
+            if idx_epoch % iter_display == 0:
+                pbar.set_postfix(grad = f"{gradmax :.3e}",
+                        loss = f"{loss_iter :.2f}")
 
         grad_epoch = jnp.mean(jnp.array(grad_epoch))
         loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
-        print(f"  |Grad| = {grad_epoch :.3e}")
-        print(f"  Loss = {loss_epoch :.3f}")
-
+        
         grad_list.append(grad_epoch)
         loss_list.append(loss_epoch)
+
+        if idx_epoch % iter_display == 0:
+            print(f"  |Grad| = {grad_epoch :.3e}")
+            print(f"  Loss = {loss_epoch :.3f}")
 
         if grad_epoch < eps:
             break
