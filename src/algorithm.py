@@ -132,7 +132,6 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P
         grad_epoch = []
         loss_epoch = []
         pbar = tqdm(idx_batches)
-        #aa = 0
         for idx in pbar:
             gradx = grad_func(x, idx)
             x = x - alpha * P * jnp.conj(gradx)
@@ -145,23 +144,17 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P
             
             pbar.set_postfix(grad = f"{gradmax :.3e}",
                     loss = f"{loss_iter :.2f}")
-                
-            #time.sleep(2)
-            #aa +=1 
-            #if aa == 100:
-            #    break
 
         grad_epoch = jnp.mean(jnp.array(grad_epoch))
         loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
         print(f"  |Grad| = {grad_epoch :.3e}")
-        print(f"  |Loss| = {loss_epoch :.3f}")
+        print(f"  Loss = {loss_epoch :.3f}")
 
         grad_list.append(grad_epoch)
         loss_list.append(loss_epoch)
 
         if grad_epoch < eps:
             break
-
 
     return x, jnp.array(loss_list), jnp.array(grad_list)
 
