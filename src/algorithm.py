@@ -155,7 +155,7 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
 
             if idx_epoch % iter_display == 0:
                 pbar.set_postfix(grad = f"{gradmax :.3e}",
-                        loss = f"{loss_iter :.3f}")
+                        loss = f"{loss_iter :.3e}")
 
         grad_epoch = jnp.mean(jnp.array(grad_epoch))
         loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
@@ -165,7 +165,7 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
 
         if idx_epoch % iter_display == 0:
             print(f"  |Grad| = {grad_epoch :.3e}")
-            print(f"  Loss = {loss_epoch :.3f}")
+            print(f"  Loss = {loss_epoch :.3e}")
 
         if grad_epoch < eps:
             break
