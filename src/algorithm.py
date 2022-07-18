@@ -82,7 +82,7 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
     return AA, Ab
 
 
-def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P = None, eps = 1e-15, verbose = False, iter_display = 1):
+def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None, P = None, eps = 1e-15, verbose = False, iter_display = 1):
     """SGD
    
    Parameters:
@@ -114,7 +114,7 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P
 
     rng = np.random.default_rng()
 
-    if batch_size == -1 or batch_size == N:
+    if batch_size is None or batch_size == N:
         N_batch = 1
     else:
         N_batch = N/batch_size
@@ -125,6 +125,9 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P
     x = x0
     loss_list = []
     grad_list = []
+
+    
+    #TODO: hmm not sure why I'm using enumerate here
     for idx_epoch, epoch in enumerate(range(N_epoch)):
         # This is mostly useful when running a lot of epochs as deterministic gradient descent
         if idx_epoch % iter_display == 0:
@@ -142,7 +145,9 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P
         for idx in pbar:
             gradx = grad_func(x, idx)
             x = x - alpha * P * jnp.conj(gradx)
-            
+           
+            # TODO: maybe only compute the loss in the iterations
+            # where the loss is printed
             loss_iter = loss_func(x, idx)
 
             gradmax = jnp.max(jnp.abs(gradx))
@@ -152,7 +157,7 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = -1, P
 
             if idx_epoch % iter_display == 0:
                 pbar.set_postfix(grad = f"{gradmax :.3e}",
-                        loss = f"{loss_iter :.2f}")
+                        loss = f"{loss_iter :.3f}")
 
         grad_epoch = jnp.mean(jnp.array(grad_epoch))
         loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
