@@ -146,8 +146,6 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
             gradx = grad_func(x, idx)
             x = x - alpha * P * jnp.conj(gradx)
            
-            # TODO: maybe only compute the loss in the iterations
-            # where the loss is printed
             loss_iter = loss_func(x, idx)
 
             gradmax = jnp.max(jnp.abs(gradx))
