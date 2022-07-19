@@ -231,18 +231,24 @@ from tqdm import tqdm
 def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, iter_display = 1):
     """OASIS with fixed learning rate, deterministic or stochastic."""
     
-    n = w0.shape[0] 
+    n = w0.shape 
     
     if batch_size is None or batch_size == N:
         N_batch = 1
     else:
         N_batch = N/batch_size
-    
-    gradFw0 = gradF(w0, jnp.arange(N))
+   
+    key, subkey = random.split(key)
+
+    gradFw0 = gradF(w0, random.permutation(subkey, N)[:batch_size])
     Dhat0 = jnp.maximum(jnp.abs(D0), alpha)
-                      
-    invDhat0 = jnp.diag(1/Dhat0)
-    w1 = w0 - eta * (invDhat0 @ gradFw0)
+           
+    # Since we only work with the diagonal of the Hessian, we
+    # can simply write it as a matrix of whatever shape the input 
+    # is and element-wise multiply with it (instead of forming a
+    # diagonal matrix and do matrix-vector multiplication).
+    invDhat0 = 1/Dhat0
+    w1 = w0 - eta * (invDhat0 * gradFw0)
 
     loss_list = []
     for idx_epoch in range(1, N_epoch+1):
@@ -254,20 +260,22 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
         idx_batches_grad = np.array_split(random.permutation(subkey1, N), N_batch)
         idx_batches_hess = np.array_split(random.permutation(subkey2, N), N_batch)
         
-        z = random.rademacher(key, (len(idx_batches_grad), n)).astype(jnp.float64)
-     
+        zkeys = random.split(key, len(idx_batches_grad))
+
         loss_epoch = []
         if idx_epoch % iter_display == 0:
             pbar = tqdm(range(len(idx_batches_grad)))
         else:
             pbar = range(len(idx_batches_grad))
         for k in pbar:
+            
+            z = random.rademacher(zkeys[k-1], n).astype(w0.dtype)
 
-            D1 = beta2 * D0 + (1-beta2) * (z[k-1] * hvpF(w1, z[k-1], idx_batches_hess[k-1]))
+            D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_hess[k-1]))
             Dhat1 = jnp.maximum(jnp.abs(D1), alpha)       
-            invDhat1 = jnp.diag(1/Dhat1)
+            invDhat1 = 1/Dhat1
 
-            w2 = w1 - eta * (invDhat1 @ gradF(w1, idx_batches_grad[k-1]))
+            w2 = w1 - eta * (invDhat1 * gradF(w1, idx_batches_grad[k-1]))
 
             w0 = w1
             w1 = w2
@@ -290,21 +298,22 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
 def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, iter_display = 1):
     """OASIS with adaptive learning rate, deterministic and stochastic."""
 
-    n = w0.shape[0] 
+    n = w0.shape 
     
     if batch_size is None or batch_size == N:
         N_batch = 1
     else:
         N_batch = N/batch_size
-    
-    gradFw0 = gradF(w0, jnp.arange(N))
+   
+    key, subkey0, subkey1 = random.split(key, 3)
+    gradFw0 = gradF(w0, random.permutation(subkey0, N)[:batch_size])
     theta0 = jnp.inf
     Dhat0 = jnp.maximum(jnp.abs(D0), alpha)
                         
-    invDhat0 = jnp.diag(1/Dhat0)
-    w1 = w0 - eta0 * (invDhat0 @ gradFw0)
+    invDhat0 = 1/Dhat0
+    w1 = w0 - eta0 * (invDhat0 * gradFw0)
     
-    gradFw1 = gradF(w1, jnp.arange(N))
+    gradFw1 = gradF(w1, random.permutation(subkey1, N)[:batch_size])
 
     loss_list = []
     for idx_epoch in range(1, N_epoch+1):
@@ -316,7 +325,7 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
         idx_batches_grad = np.array_split(random.permutation(subkey1, N), N_batch)
         idx_batches_hess = np.array_split(random.permutation(subkey2, N), N_batch)
         
-        z = random.rademacher(key, (len(idx_batches_grad), n)).astype(jnp.float64)
+        zkeys = random.split(key, len(idx_batches_grad))
      
         loss_epoch = []
         if idx_epoch % iter_display == 0:
@@ -325,11 +334,12 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
             pbar = range(len(idx_batches_grad))
         for k in pbar:
             
-            D1 = beta2 * D0 + (1-beta2) * (z[k-1] * hvpF(w1, z[k-1], idx_batches_hess[k-1]))
+            z = random.rademacher(zkeys[k-1], n).astype(w0.dtype)
+
+            D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_hess[k-1]))
 
             Dhat1 = jnp.maximum(jnp.abs(D1), alpha)
-            invDhat1 = jnp.diag(1/Dhat1)
-            Dhat1 = jnp.diag(Dhat1)
+            invDhat1 = 1/Dhat1
 
             tl = jnp.sqrt(1 + theta0)*eta0
 
@@ -338,11 +348,11 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
 
             wd = w1-w0
             gfd = gradFw1 - gradFw0
-            tr = 1/2 * jnp.sqrt(jnp.vdot(wd, Dhat1 @ wd) / jnp.vdot(gfd, invDhat1 @ gfd))
+            tr = 1/2 * jnp.sqrt(jnp.vdot(wd, Dhat1 * wd) / jnp.vdot(gfd, invDhat1 * gfd))
 
-            eta1 = jnp.minimum(tl, tr)
-            
-            w2 = w1 - eta1 * (invDhat1 @ gradFw1)
+            eta1 = jnp.real(jnp.minimum(tl, tr))
+
+            w2 = w1 - eta1 * (invDhat1 * gradFw1)
             gradFw2 = gradF(w2, idx_batches_grad[k-1])
 
             theta1 = eta1/eta0
