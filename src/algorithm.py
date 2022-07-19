@@ -226,7 +226,144 @@ def kaczmarz(key, data, angles, fwd_model_vmap, loss_func, grad_loss_func, x0, N
 
 
 
+from tqdm import tqdm 
+
+def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, iter_display = 1):
+    """OASIS with fixed learning rate, deterministic or stochastic."""
+    
+    n = w0.shape[0] 
+    
+    if batch_size is None or batch_size == N:
+        N_batch = 1
+    else:
+        N_batch = N/batch_size
+    
+    gradFw0 = gradF(w0, jnp.arange(N))
+    Dhat0 = jnp.maximum(jnp.abs(D0), alpha)
+                      
+    invDhat0 = jnp.diag(1/Dhat0)
+    w1 = w0 - eta * (invDhat0 @ gradFw0)
+
+    loss_list = []
+    for idx_epoch in range(1, N_epoch+1):
+        if idx_epoch % iter_display == 0:
+            print(f"Epoch {idx_epoch}/{N_epoch}")
+
+        key, subkey1, subkey2 = random.split(key, 3)
+
+        idx_batches_grad = np.array_split(random.permutation(subkey1, N), N_batch)
+        idx_batches_hess = np.array_split(random.permutation(subkey2, N), N_batch)
+        
+        z = random.rademacher(key, (len(idx_batches_grad), n)).astype(jnp.float64)
+     
+        loss_epoch = []
+        if idx_epoch % iter_display == 0:
+            pbar = tqdm(range(len(idx_batches_grad)))
+        else:
+            pbar = range(len(idx_batches_grad))
+        for k in pbar:
+
+            D1 = beta2 * D0 + (1-beta2) * (z[k-1] * hvpF(w1, z[k-1], idx_batches_hess[k-1]))
+            Dhat1 = jnp.maximum(jnp.abs(D1), alpha)       
+            invDhat1 = jnp.diag(1/Dhat1)
+
+            w2 = w1 - eta * (invDhat1 @ gradF(w1, idx_batches_grad[k-1]))
+
+            w0 = w1
+            w1 = w2
+
+            loss_iter = F(w1, idx_batches_grad[k-1])
+            loss_epoch.append(loss_iter)
+            #print(loss_iter)     
+            if idx_epoch % iter_display == 0:
+                pbar.set_postfix(loss = f"{loss_iter : .3e}")
+                
+        loss_epoch = jnp.mean(jnp.array(loss_epoch))
+        loss_list.append(loss_epoch)
+         
+        if idx_epoch % iter_display == 0:
+            print(f"  Loss = {loss_epoch : .3e}")
+        
+    return w1, jnp.array(loss_list)
 
 
+def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, iter_display = 1):
+    """OASIS with adaptive learning rate, deterministic and stochastic."""
 
+    n = w0.shape[0] 
+    
+    if batch_size is None or batch_size == N:
+        N_batch = 1
+    else:
+        N_batch = N/batch_size
+    
+    gradFw0 = gradF(w0, jnp.arange(N))
+    theta0 = jnp.inf
+    Dhat0 = jnp.maximum(jnp.abs(D0), alpha)
+                        
+    invDhat0 = jnp.diag(1/Dhat0)
+    w1 = w0 - eta0 * (invDhat0 @ gradFw0)
+    
+    gradFw1 = gradF(w1, jnp.arange(N))
+
+    loss_list = []
+    for idx_epoch in range(1, N_epoch+1):
+        if idx_epoch % iter_display == 0:
+            print(f"Epoch {idx_epoch}/{N_epoch}")
+
+        key, subkey1, subkey2 = random.split(key, 3)
+
+        idx_batches_grad = np.array_split(random.permutation(subkey1, N), N_batch)
+        idx_batches_hess = np.array_split(random.permutation(subkey2, N), N_batch)
+        
+        z = random.rademacher(key, (len(idx_batches_grad), n)).astype(jnp.float64)
+     
+        loss_epoch = []
+        if idx_epoch % iter_display == 0:
+            pbar = tqdm(range(len(idx_batches_grad)))
+        else:
+            pbar = range(len(idx_batches_grad))
+        for k in pbar:
+            
+            D1 = beta2 * D0 + (1-beta2) * (z[k-1] * hvpF(w1, z[k-1], idx_batches_hess[k-1]))
+
+            Dhat1 = jnp.maximum(jnp.abs(D1), alpha)
+            invDhat1 = jnp.diag(1/Dhat1)
+            Dhat1 = jnp.diag(Dhat1)
+
+            tl = jnp.sqrt(1 + theta0)*eta0
+
+            gradFw1 = gradF(w1, idx_batches_grad[k-1])
+            gradFw0 = gradF(w0, idx_batches_grad[k-1])
+
+            wd = w1-w0
+            gfd = gradFw1 - gradFw0
+            tr = 1/2 * jnp.sqrt(jnp.vdot(wd, Dhat1 @ wd) / jnp.vdot(gfd, invDhat1 @ gfd))
+
+            eta1 = jnp.minimum(tl, tr)
+            
+            w2 = w1 - eta1 * (invDhat1 @ gradFw1)
+            gradFw2 = gradF(w2, idx_batches_grad[k-1])
+
+            theta1 = eta1/eta0
+
+            w0 = w1
+            w1 = w2
+
+            eta0 = eta1
+            theta0 = theta1
+
+            loss_iter = F(w1, idx_batches_grad[k-1])
+            loss_epoch.append(loss_iter) 
+            
+            if idx_epoch % iter_display == 0:
+                pbar.set_postfix(loss = f"{loss_iter : .3e}")
+            
+        loss_epoch = jnp.mean(jnp.array(loss_epoch))
+        loss_list.append(loss_epoch)
+        
+        if idx_epoch % iter_display == 0:
+            print(f"  Loss = {loss_epoch : .3e}")            
+            
+    return w1, jnp.array(loss_list)
 
