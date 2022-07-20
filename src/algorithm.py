@@ -226,8 +226,6 @@ def kaczmarz(key, data, angles, fwd_model_vmap, loss_func, grad_loss_func, x0, N
 
 
 
-from tqdm import tqdm 
-
 def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, iter_display = 1):
     """OASIS with fixed learning rate, deterministic or stochastic."""
     
