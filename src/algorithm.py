@@ -174,11 +174,19 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
 
 
 def get_sgd_vol_ops(gradv: GradV, loss: Loss, angles, shifts, ctf_params, imgs, sigma = 1):
+    """Return the loss function, its gradient function and a its hessian-vector 
+    product function in a way that allows subsampling of the gradient 
+    (and Hessian) for SGD or higher order stochastic methods."""
+
+    @jax.jit
+    def hvp_loss_func(v, x, angles, shifts, ctf_params, imgs, sigma_noise):
+        return jax.jvp(lambda u : gradv.grad_loss_volume_sum(u, angles, shifts, ctf_params, imgs, sigma_noise), (v,), (x,))[1]
+
     loss_func = lambda v, idx : loss.loss_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma) 
     grad_func = lambda v, idx : gradv.grad_loss_volume_sum(v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx],  sigma) 
+    hvp_func = lambda v, x, idx : hvp_loss_func(v, x, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma)
 
-    return grad_func, loss_func
-
+    return grad_func, loss_func, hvp_func
 
 
 def kaczmarz(key, data, angles, fwd_model_vmap, loss_func, grad_loss_func, x0, N_epoch, N_batches, N_iter_cg = 2, eps_cg = 1e-7):
