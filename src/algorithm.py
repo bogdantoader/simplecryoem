@@ -285,6 +285,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
 
             w0 = w1
             w1 = w2
+            D0 = D1
 
             loss_iter = F(w1, idx_batches_grad[k-1])
             loss_epoch.append(loss_iter)
@@ -365,6 +366,7 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
 
             w0 = w1
             w1 = w2
+            D0 = D1
 
             eta0 = eta1
             theta0 = theta1
