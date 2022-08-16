@@ -135,7 +135,7 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
             idx_batches = np.array_split(rng.permutation(N), N_batch)
 
         grad_epoch = []
-        loss_epoch = []
+        #loss_epoch = []
         
         if idx_epoch % iter_display == 0:
             pbar = tqdm(idx_batches)
@@ -150,7 +150,7 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
 
             gradmax = jnp.max(jnp.abs(gradx))
             grad_epoch.append(gradmax)
-            loss_epoch.append(loss_iter)
+            #loss_epoch.append(loss_iter)
            
 
             if idx_epoch % iter_display == 0:
@@ -158,7 +158,8 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
                         loss = f"{loss_iter :.3e}")
 
         grad_epoch = jnp.mean(jnp.array(grad_epoch))
-        loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
+        #loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
+        loss_epoch = loss_func(x, jnp.arange(N)) # TODO: maybe should be done in batches on bigger data
         
         grad_list.append(grad_epoch)
         loss_list.append(loss_epoch)
@@ -268,7 +269,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
         
         zkeys = random.split(key, len(idx_batches_grad))
 
-        loss_epoch = []
+        #loss_epoch = []
         if idx_epoch % iter_display == 0:
             pbar = tqdm(range(len(idx_batches_grad)))
         else:
@@ -288,12 +289,13 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
             D0 = D1
 
             loss_iter = F(w1, idx_batches_grad[k-1])
-            loss_epoch.append(loss_iter)
+            #loss_epoch.append(loss_iter)
             #print(loss_iter)     
             if idx_epoch % iter_display == 0:
                 pbar.set_postfix(loss = f"{loss_iter : .3e}")
                 
-        loss_epoch = jnp.mean(jnp.array(loss_epoch))
+        #loss_epoch = jnp.mean(jnp.array(loss_epoch))
+        loss_epoch = F(w1, jnp.arange(N)) # TODO: maybe should be done in batches on bigger data
         loss_list.append(loss_epoch)
          
         if idx_epoch % iter_display == 0:
@@ -334,7 +336,7 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
         
         zkeys = random.split(key, len(idx_batches_grad))
      
-        loss_epoch = []
+        #loss_epoch = []
         if idx_epoch % iter_display == 0:
             pbar = tqdm(range(len(idx_batches_grad)))
         else:
@@ -372,12 +374,13 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
             theta0 = theta1
 
             loss_iter = F(w1, idx_batches_grad[k-1])
-            loss_epoch.append(loss_iter) 
+            #loss_epoch.append(loss_iter) 
             
             if idx_epoch % iter_display == 0:
                 pbar.set_postfix(loss = f"{loss_iter : .3e}")
             
-        loss_epoch = jnp.mean(jnp.array(loss_epoch))
+        #loss_epoch = jnp.mean(jnp.array(loss_epoch))
+        loss_epoch = F(w1, jnp.arange(N)) #TODO: maybe this shoudl be done in batches on bigger data
         loss_list.append(loss_epoch)
         
         if idx_epoch % iter_display == 0:
