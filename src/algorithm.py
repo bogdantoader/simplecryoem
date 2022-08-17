@@ -18,6 +18,7 @@ def conjugate_gradient(op, b, x0, iterations, eps = 1e-16, verbose = False):
 
     x = x0
     p = r
+    x_all = [x0]
     #for k in tqdm(range(iterations)):
     for k in range(iterations):
         rkTrk = jnp.sum(jnp.conj(r) * r)
@@ -36,10 +37,11 @@ def conjugate_gradient(op, b, x0, iterations, eps = 1e-16, verbose = False):
         beta = jnp.sum(jnp.conj(r) * r) / rkTrk
         p = r + beta * p
 
-        if verbose and jnp.mod(k,10) == 0:
+        x_all.append(x)
+        if verbose and jnp.mod(k,100) == 0:
             print("  cg iter", k, "||r|| =", norm_r)
                     
-    return x, k
+    return x, k, x_all
 
 
 def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol_shape, sigma = 1):
@@ -135,7 +137,6 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
             idx_batches = np.array_split(rng.permutation(N), N_batch)
 
         grad_epoch = []
-        #loss_epoch = []
         
         if idx_epoch % iter_display == 0:
             pbar = tqdm(idx_batches)
@@ -150,16 +151,18 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
 
             gradmax = jnp.max(jnp.abs(gradx))
             grad_epoch.append(gradmax)
-            #loss_epoch.append(loss_iter)
            
-
             if idx_epoch % iter_display == 0:
                 pbar.set_postfix(grad = f"{gradmax :.3e}",
                         loss = f"{loss_iter :.3e}")
 
         grad_epoch = jnp.mean(jnp.array(grad_epoch))
-        #loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
-        loss_epoch = loss_func(x, jnp.arange(N)) # TODO: maybe should be done in batches on bigger data
+        
+        loss_epoch = []
+        for idx in pbar:
+            loss_iter = loss_func(x, idx)
+            loss_epoch.append(loss_iter)
+        loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
         
         grad_list.append(grad_epoch)
         loss_list.append(loss_epoch)
@@ -255,7 +258,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
     # is and element-wise multiply with it (instead of forming a
     # diagonal matrix and do matrix-vector multiplication).
     invDhat0 = 1/Dhat0
-    w1 = w0 - eta * (invDhat0 * gradFw0)
+    w1 = w0 - eta * jnp.conj(invDhat0 * gradFw0)
 
     loss_list = []
     for idx_epoch in range(1, N_epoch+1):
@@ -269,7 +272,6 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
         
         zkeys = random.split(key, len(idx_batches_grad))
 
-        #loss_epoch = []
         if idx_epoch % iter_display == 0:
             pbar = tqdm(range(len(idx_batches_grad)))
         else:
@@ -282,7 +284,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
             Dhat1 = jnp.maximum(jnp.abs(D1), alpha)       
             invDhat1 = 1/Dhat1
 
-            w2 = w1 - eta * (invDhat1 * gradF(w1, idx_batches_grad[k-1]))
+            w2 = w1 - eta * jnp.conj(invDhat1 * gradF(w1, idx_batches_grad[k-1]))
 
             w0 = w1
             w1 = w2
@@ -294,9 +296,14 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
             if idx_epoch % iter_display == 0:
                 pbar.set_postfix(loss = f"{loss_iter : .3e}")
                 
-        #loss_epoch = jnp.mean(jnp.array(loss_epoch))
-        loss_epoch = F(w1, jnp.arange(N)) # TODO: maybe should be done in batches on bigger data
+        loss_epoch = []
+        for k in pbar:
+            loss_iter = F(w1, idx_batches_grad[k-1])
+            loss_epoch.append(loss_iter)
+        loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
+
         loss_list.append(loss_epoch)
+
          
         if idx_epoch % iter_display == 0:
             print(f"  Loss = {loss_epoch : .3e}")
@@ -320,7 +327,7 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
     Dhat0 = jnp.maximum(jnp.abs(D0), alpha)
                         
     invDhat0 = 1/Dhat0
-    w1 = w0 - eta0 * (invDhat0 * gradFw0)
+    w1 = w0 - eta0 * jnp.conj(invDhat0 * gradFw0)
     
     gradFw1 = gradF(w1, random.permutation(subkey1, N)[:batch_size])
 
@@ -336,7 +343,6 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
         
         zkeys = random.split(key, len(idx_batches_grad))
      
-        #loss_epoch = []
         if idx_epoch % iter_display == 0:
             pbar = tqdm(range(len(idx_batches_grad)))
         else:
@@ -361,7 +367,7 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
 
             eta1 = jnp.real(jnp.minimum(tl, tr))
 
-            w2 = w1 - eta1 * (invDhat1 * gradFw1)
+            w2 = w1 - eta1 * jnp.conj(invDhat1 * gradFw1)
             gradFw2 = gradF(w2, idx_batches_grad[k-1])
 
             theta1 = eta1/eta0
@@ -374,13 +380,17 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
             theta0 = theta1
 
             loss_iter = F(w1, idx_batches_grad[k-1])
-            #loss_epoch.append(loss_iter) 
             
             if idx_epoch % iter_display == 0:
                 pbar.set_postfix(loss = f"{loss_iter : .3e}")
             
-        #loss_epoch = jnp.mean(jnp.array(loss_epoch))
-        loss_epoch = F(w1, jnp.arange(N)) #TODO: maybe this shoudl be done in batches on bigger data
+
+        loss_epoch = []
+        for k in pbar:
+            loss_iter = F(w1, idx_batches_grad[k-1])
+            loss_epoch.append(loss_iter)
+        loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
+
         loss_list.append(loss_epoch)
         
         if idx_epoch % iter_display == 0:
