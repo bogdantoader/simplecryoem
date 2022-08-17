@@ -38,7 +38,7 @@ def conjugate_gradient(op, b, x0, iterations, eps = 1e-16, verbose = False):
         p = r + beta * p
 
         x_all.append(x)
-        if verbose and jnp.mod(k,100) == 0:
+        if verbose and jnp.mod(k,10) == 0:
             print("  cg iter", k, "||r|| =", norm_r)
                     
     return x, k, x_all
@@ -363,12 +363,13 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
 
             wd = w1-w0
             gfd = gradFw1 - gradFw0
-            tr = 1/2 * jnp.sqrt(jnp.vdot(wd, Dhat1 * wd) / jnp.vdot(gfd, invDhat1 * gfd))
+            tr = 1/2 * jnp.sqrt(jnp.real(jnp.sum(jnp.conj(wd) * Dhat1 * wd)) / jnp.real(jnp.sum(jnp.conj(gfd) * invDhat1 * gfd))) 
+            #print(jnp.max(jnp.imag(wd)))
+            #print(jnp.max(jnp.imag(gfd)))
 
-            eta1 = jnp.real(jnp.minimum(tl, tr))
+            eta1 = jnp.minimum(tl, tr) 
 
             w2 = w1 - eta1 * jnp.conj(invDhat1 * gradFw1)
-            gradFw2 = gradF(w2, idx_batches_grad[k-1])
 
             theta1 = eta1/eta0
 
