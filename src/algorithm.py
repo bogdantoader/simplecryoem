@@ -258,7 +258,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
     # is and element-wise multiply with it (instead of forming a
     # diagonal matrix and do matrix-vector multiplication).
     invDhat0 = 1/Dhat0
-    w1 = w0 - eta * jnp.conj(invDhat0 * gradFw0)
+    w1 = w0 - eta * invDhat0 * jnp.conj(gradFw0)
 
     loss_list = []
     for idx_epoch in range(1, N_epoch+1):
@@ -284,7 +284,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
             Dhat1 = jnp.maximum(jnp.abs(D1), alpha)       
             invDhat1 = 1/Dhat1
 
-            w2 = w1 - eta * jnp.conj(invDhat1 * gradF(w1, idx_batches_grad[k-1]))
+            w2 = w1 - eta * invDhat1 * jnp.conj(gradF(w1, idx_batches_grad[k-1]))
 
             w0 = w1
             w1 = w2
