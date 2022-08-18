@@ -75,7 +75,7 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
     AA, Ab: the operator and the vector to give CG to solve A*Ax = A*b.
     """
 
-    zero = jnp.zeros(vol_shape).astype(jnp.complex64)
+    zero = jnp.zeros(vol_shape).astype(jnp.complex128)
     Abfun = grad_loss_volume_sum(zero, angles, shifts, ctf_params, imgs_f, sigma)
 
     Ab = - jnp.conj(Abfun)
