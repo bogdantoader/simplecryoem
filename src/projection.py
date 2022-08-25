@@ -73,7 +73,7 @@ def project(vol, angles, shifts, ctf_params, grid_vol, grid_proj, interpolation_
     """
     
     # Get the rotated coordinates of the projection in the z=0 plane.
-    proj = rotate_and_interpolate(vol, angles, grid_vol, grid_proj, interpolation_method = "tri")
+    proj = rotate_and_interpolate(vol, angles, grid_vol, grid_proj, interpolation_method = interpolation_method)
 
     # Apply the shift and the CTF.        
     proj = apply_shifts_and_ctf(proj, shifts, ctf_params, grid_proj)
