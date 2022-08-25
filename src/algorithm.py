@@ -18,7 +18,7 @@ def conjugate_gradient(op, b, x0, iterations, eps = 1e-16, verbose = False):
 
     x = x0
     p = r
-    x_all = [x0]
+    x_all = []
     #for k in tqdm(range(iterations)):
     for k in range(iterations):
         rkTrk = jnp.sum(jnp.conj(r) * r)
@@ -127,10 +127,8 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
     x = x0
     loss_list = []
     grad_list = []
-
     
-    #TODO: hmm not sure why I'm using enumerate here
-    for idx_epoch, epoch in enumerate(range(N_epoch)):
+    for idx_epoch in range(N_epoch):
         # This is mostly useful when running a lot of epochs as deterministic gradient descent
         if idx_epoch % iter_display == 0:
             print(f"Epoch {idx_epoch+1}/{N_epoch} ", end="")
