@@ -9,33 +9,25 @@ from src.utils import *
 from src.noise import estimate_noise_radial
 
 
-def preprocess(imgs0, params0, out_dir, nx_crop = None, N = None, shuffle = False, N_px_noise = 0, N_imgs_noise = None):
+def preprocess(imgs0, params0, nx_crop = None, idx = None, N_px_noise = 0, N_imgs_noise = None):
     """Basic preprocessing of particle images to extract relevant information 
     for reconstruction.
 
     Parameters:
     -----------
-    imgs0 : [N x nx x nx] array
+    imgs0 : [N0 x nx x nx] array
         Stack of particle images as returned by emfiles.load_data
 
     params0 : dict
         Dictionary with keys 'ctf_params', 'pixel_size', 'angles', 'shifts',
         each containing an array.
 
-    out_dir : str
-        Name of directory to write output to.
-
     nx_crop: int
         Downsample images to dimensions nx_crop x nx_crop.
         This is done by cropping the images in the Fourier domain.
 
-    N : int
-        If N < number of images, only keep N images, 
-        either the first N if shuffle = False, or random
-        N images if shuffle = True.
-
-    shuffle : bool
-        Shuffle the data set if True, do not shuffle otherwise.
+    idx : list[int]
+        If given, only apply the preprocessing steps to imgs0[idx].
 
     N_px_noise : int
         The size of the corner crop that is used to estimate the noise.
@@ -62,28 +54,25 @@ def preprocess(imgs0, params0, out_dir, nx_crop = None, N = None, shuffle = Fals
     print(f"ctf_params0.shape = {ctf_params0.shape}", flush = True)
     nx0 = imgs0.shape[-1]
 
-    # Keep N points at random.
-    if N is None or N > imgs0.shape[0]:
-        N = imgs0.shape[0]
+    N0 = imgs0.shape[0]
+    print(f"N0 = {N0}", flush = True)
 
-    if shuffle:
-        idxrand = np.random.permutation(imgs0.shape[0])[:N]
-        print("Shuffle = True")
+    if idx is None:
+        idx = np.arange(N0)
+        print("idx not provided")
     else:
-        idxrand = np.arange(N)
-        print("Shuffle = False")
-                    
-    print(f'N = {N}', flush = True)
+        assert(np.max(idx) < N0)
+        assert(idx.shape[0] <= N0)
+        print("idx provided")
 
-    imgs0 = imgs0[idxrand]
-    pixel_size = pixel_size0[idxrand]
-    angles = angles0[idxrand]
-    shifts = shifts0[idxrand]
-    ctf_params = ctf_params0[idxrand]
+    N = idx.shape[0]
+    print(f"N = {N}", flush = True)
 
-    file = open(out_dir + '/idxrand','wb')
-    pickle.dump(idxrand, file)
-    file.close()
+    imgs0 = imgs0[idx]
+    pixel_size = pixel_size0[idx]
+    angles = angles0[idx]
+    shifts = shifts0[idx]
+    ctf_params = ctf_params0[idx]
 
     # Take FFT
     print("Taking FFT of the images:", flush=True)
@@ -140,7 +129,7 @@ def preprocess(imgs0, params0, out_dir, nx_crop = None, N = None, shuffle = Fals
         sigma_noise = estimate_noise_radial(imgs0[:N_imgs_noise], nx_empty = N_px_noise, nx_final = nx)
         print(f"Noise estimation done. Time: {time.time()-t0 : .2f} sec.", flush=True) 
     else:
-        print(f"Noise free - setting sigma_noise = 1", flush=True)
+        print(f"Noise free, setting sigma_noise = 1", flush=True)
         sigma_noise = np.ones((nx*nx,))
 
     processed_data = {
@@ -149,7 +138,7 @@ def preprocess(imgs0, params0, out_dir, nx_crop = None, N = None, shuffle = Fals
         "angles" : angles,
         "shifts" : shifts,
         "ctf_params" : ctf_params, 
-        "idxrand" : idxrand,
+        "idx" : idx,
         "nx" : nx,
         "x_grid" : x_grid,
         "mask" : mask,

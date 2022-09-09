@@ -64,7 +64,7 @@ def average_radially(img, x_grid):
 
     img_avg = np.zeros(img.shape)
     for rad_i in rads:
-        idx = (jnp.abs(r - rad_i) <= eps)
+        idx = np.array(jnp.abs(r - rad_i) <= eps)
         img_rad_avg = jnp.mean(img[idx])
         img_avg[idx] = img_rad_avg
 
