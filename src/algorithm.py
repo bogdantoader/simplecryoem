@@ -266,7 +266,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
         key, subkey1, subkey2 = random.split(key, 3)
 
         idx_batches_grad = np.array_split(random.permutation(subkey1, N), N_batch)
-        idx_batches_hess = np.array_split(random.permutation(subkey2, N), N_batch)
+        #idx_batches_hess = np.array_split(random.permutation(subkey2, N), N_batch)
         
         zkeys = random.split(key, len(idx_batches_grad))
 
@@ -278,7 +278,8 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
             
             z = random.rademacher(zkeys[k-1], n).astype(w0.dtype)
 
-            D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_hess[k-1]))
+            #D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_hess[k-1]))
+            D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_grad[k-1]))
             Dhat1 = jnp.maximum(jnp.abs(D1), alpha)       
             invDhat1 = 1/Dhat1
 
@@ -337,7 +338,7 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
         key, subkey1, subkey2 = random.split(key, 3)
 
         idx_batches_grad = np.array_split(random.permutation(subkey1, N), N_batch)
-        idx_batches_hess = np.array_split(random.permutation(subkey2, N), N_batch)
+        #idx_batches_hess = np.array_split(random.permutation(subkey2, N), N_batch)
         
         zkeys = random.split(key, len(idx_batches_grad))
      
@@ -349,7 +350,8 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
             
             z = random.rademacher(zkeys[k-1], n).astype(w0.dtype)
 
-            D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_hess[k-1]))
+            #D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_hess[k-1]))
+            D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_grad[k-1]))
 
             Dhat1 = jnp.maximum(jnp.abs(D1), alpha)
             invDhat1 = 1/Dhat1
