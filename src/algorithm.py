@@ -239,7 +239,7 @@ def kaczmarz(key, data, angles, fwd_model_vmap, loss_func, grad_loss_func, x0, N
 def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, iter_display = 1):
     """OASIS with fixed learning rate, deterministic or stochastic."""
     
-    n = w0.shape 
+    n = jnp.array(w0.shape )
     
     if batch_size is None or batch_size == N:
         N_batch = 1
@@ -258,8 +258,15 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
     invDhat0 = 1/Dhat0
     w1 = w0 - eta * invDhat0 * jnp.conj(gradFw0)
 
+
+    nsamp = 1
+    D1sum = D0
     loss_list = []
     for idx_epoch in range(1, N_epoch+1):
+        if idx_epoch > 5:
+            eta = 1e-1
+        print(f"eta = {eta}")
+
         if idx_epoch % iter_display == 0:
             print(f"Epoch {idx_epoch}/{N_epoch}")
 
@@ -275,11 +282,21 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
         else:
             pbar = range(len(idx_batches_grad))
         for k in pbar:
-            
-            z = random.rademacher(zkeys[k-1], n).astype(w0.dtype)
+            h_steps = 2 
+
+            z = random.rademacher(zkeys[k-1], jnp.flip(jnp.append(n, h_steps))).astype(w0.dtype)
 
             #D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_hess[k-1]))
-            D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_grad[k-1]))
+            #D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_grad[k-1]))
+           
+            #D1sum = D1sum + (z * hvpF(w1, z, idx_batches_grad[k-1]))
+            
+            hvp_step = [zi * hvpF(w1, zi, idx_batches_grad[k-1]) for zi in z]
+            hvp_step = jnp.mean(jnp.array(hvp_step), axis=0)
+            D1sum = D1sum + hvp_step 
+            nsamp = nsamp + 1
+            D1 = D1sum/nsamp
+            
             Dhat1 = jnp.maximum(jnp.abs(D1), alpha)       
             invDhat1 = 1/Dhat1
 
@@ -313,7 +330,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
 def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, iter_display = 1):
     """OASIS with adaptive learning rate, deterministic and stochastic."""
 
-    n = w0.shape 
+    n = jnp.array(w0.shape)
     
     if batch_size is None or batch_size == N:
         N_batch = 1
@@ -330,6 +347,8 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
     
     gradFw1 = gradF(w1, random.permutation(subkey1, N)[:batch_size])
 
+    nsamp = 1
+    D1sum = D0
     loss_list = []
     for idx_epoch in range(1, N_epoch+1):
         if idx_epoch % iter_display == 0:
@@ -348,10 +367,19 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
             pbar = range(len(idx_batches_grad))
         for k in pbar:
             
-            z = random.rademacher(zkeys[k-1], n).astype(w0.dtype)
+            h_steps = 20
+
+            z = random.rademacher(zkeys[k-1], jnp.flip(jnp.append(n, h_steps))).astype(w0.dtype)
+            #z = random.rademacher(zkeys[k-1], n).astype(w0.dtype)
 
             #D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_hess[k-1]))
-            D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_grad[k-1]))
+            #D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_grad[k-1]))
+
+            hvp_step = [zi * hvpF(w1, zi, idx_batches_grad[k-1]) for zi in z]
+            hvp_step = jnp.mean(jnp.array(hvp_step), axis=0)
+            D1sum = D1sum + hvp_step 
+            nsamp = nsamp + 1
+            D1 = D1sum/nsamp
 
             Dhat1 = jnp.maximum(jnp.abs(D1), alpha)
             invDhat1 = 1/Dhat1
