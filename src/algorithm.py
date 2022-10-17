@@ -84,7 +84,7 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
     return AA, Ab
 
 
-def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None, P = None, eps = 1e-15, verbose = False, iter_display = 1):
+def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None, P = None, adaptive_step_size = False, eps = 1e-15, verbose = False, iter_display = 1):
     """SGD
    
    Parameters:
@@ -128,6 +128,7 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
     loss_list = []
     grad_list = []
     
+    #alpha_max = 100
     for idx_epoch in range(N_epoch):
         # This is mostly useful when running a lot of epochs as deterministic gradient descent
         if idx_epoch % iter_display == 0:
@@ -142,10 +143,31 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
             pbar = idx_batches
 
         for idx in pbar:
+            
+            #TODO: adapt the grad functions to return the function value too 
+            #(since JAX can return it for free)
             gradx = grad_func(x, idx)
-            x = x - alpha * P * jnp.conj(gradx)
+            fx = loss_func(x, idx)
            
-            loss_iter = loss_func(x, idx)
+            x1 = x - alpha * P * jnp.conj(gradx)
+            fx1 = loss_func(x1, idx)
+            
+            if adaptive_step_size:
+                #alpha = alpha_max
+                
+                while fx1 > fx - 0.9 * alpha * jnp.real(jnp.sum(jnp.conj(gradx)* P * gradx)):
+                    #print("AAA")
+                    #print(fx1)
+                    #print(fx - 1/2*alpha*jnp.real(jnp.sum(jnp.conj(gradx)*gradx)))
+                    
+                    alpha = alpha / 2
+                    #print(f"Halving step size. New alpha = {alpha}")
+                    
+                    x1 = x - alpha * P * jnp.conj(gradx)
+                    fx1 = loss_func(x1, idx)
+                    
+            x = x1
+            loss_iter = fx1
 
             gradmax = jnp.max(jnp.abs(gradx))
             grad_epoch.append(gradmax)
@@ -168,6 +190,8 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
         if idx_epoch % iter_display == 0:
             print(f"  |Grad| = {grad_epoch :.3e}")
             print(f"  Loss = {loss_epoch :.3e}")
+            
+            print(f"  alpha = {alpha}")
 
         if grad_epoch < eps:
             break
@@ -236,7 +260,7 @@ def kaczmarz(key, data, angles, fwd_model_vmap, loss_func, grad_loss_func, x0, N
 
 
 
-def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, iter_display = 1):
+def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, adaptive_step_size = False, iter_display = 1):
     """OASIS with fixed learning rate, deterministic or stochastic."""
     
     n = jnp.array(w0.shape )
@@ -282,6 +306,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
         else:
             pbar = range(len(idx_batches_grad))
         for k in pbar:
+            
             h_steps = 2 
 
             z = random.rademacher(zkeys[k-1], jnp.flip(jnp.append(n, h_steps))).astype(w0.dtype)
