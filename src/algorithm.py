@@ -282,15 +282,14 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
     invDhat0 = 1/Dhat0
     w1 = w0 - eta * invDhat0 * jnp.conj(gradFw0)
 
-
-    nsamp = 1
-    D1sum = D0
+    # This can be placed before the epoch loop starts or before each epoch
+    # (or even between iterations within an epoch)
+    # depending on when the Hessian changes
+    nsamp = 0
+    D1sum = jnp.zeros(D0.shape)
+    
     loss_list = []
     for idx_epoch in range(1, N_epoch+1):
-        if idx_epoch > 5:
-            eta = 1e-1
-        print(f"eta = {eta}")
-
         if idx_epoch % iter_display == 0:
             print(f"Epoch {idx_epoch}/{N_epoch}")
 
@@ -298,9 +297,10 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
 
         idx_batches_grad = np.array_split(random.permutation(subkey1, N), N_batch)
         #idx_batches_hess = np.array_split(random.permutation(subkey2, N), N_batch)
-        
+       
         zkeys = random.split(key, len(idx_batches_grad))
 
+    
         if idx_epoch % iter_display == 0:
             pbar = tqdm(range(len(idx_batches_grad)))
         else:
@@ -318,20 +318,38 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
             
             hvp_step = [zi * hvpF(w1, zi, idx_batches_grad[k-1]) for zi in z]
             hvp_step = jnp.mean(jnp.array(hvp_step), axis=0)
-            D1sum = D1sum + hvp_step 
-            nsamp = nsamp + 1
-            D1 = D1sum/nsamp
+            D1sum += hvp_step 
+            nsamp += 1
+            Davg = D1sum/nsamp
+          
+            # Exponential average between the 'guess' and the latest running average.
+            D1 = beta2*D0 + (1-beta2)*Davg
             
             Dhat1 = jnp.maximum(jnp.abs(D1), alpha)       
             invDhat1 = 1/Dhat1
 
-            w2 = w1 - eta * invDhat1 * jnp.conj(gradF(w1, idx_batches_grad[k-1]))
+            Fw1 = F(w1, idx_batches_grad[k-1])
+            gradFw1 = gradF(w1, idx_batches_grad[k-1])
+           
+            #if adaptive_step_size:
+            #    eta = eta_max
+                
+            w2 = w1 - eta * invDhat1 * jnp.conj(gradFw1)
+            Fw2 = F(w2, idx_batches_grad[k-1])
 
+            if adaptive_step_size:
+                while Fw2 > Fw1 - 0.95 * eta * jnp.real(jnp.sum(jnp.conj(gradFw1)* invDhat1 * gradFw1)):
+                    eta = eta / 2
+                    w2 = w1 - eta * invDhat1 * jnp.conj(gradFw1)
+                    Fw2 = F(w2, idx_batches_grad[k-1])
+                    
             w0 = w1
             w1 = w2
             D0 = D1
 
-            loss_iter = F(w1, idx_batches_grad[k-1])
+            #loss_iter = F(w1, idx_batches_grad[k-1])
+            loss_iter = Fw2
+            
             #loss_epoch.append(loss_iter)
             #print(loss_iter)     
             if idx_epoch % iter_display == 0:
@@ -344,10 +362,10 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
         loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
 
         loss_list.append(loss_epoch)
-
-         
+        
         if idx_epoch % iter_display == 0:
             print(f"  Loss = {loss_epoch : .3e}")
+            print(f"  eta = {eta}")
         
     return w1, jnp.array(loss_list)
 
