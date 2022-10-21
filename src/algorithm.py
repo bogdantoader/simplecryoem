@@ -128,7 +128,7 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
     loss_list = []
     grad_list = []
     
-    #alpha_max = 100
+    alpha_max = 10
     for idx_epoch in range(N_epoch):
         # This is mostly useful when running a lot of epochs as deterministic gradient descent
         if idx_epoch % iter_display == 0:
@@ -148,12 +148,14 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
             #(since JAX can return it for free)
             gradx = grad_func(x, idx)
             fx = loss_func(x, idx)
-           
+          
+            if adaptive_step_size: 
+                alpha = alpha_max
+        
             x1 = x - alpha * P * jnp.conj(gradx)
             fx1 = loss_func(x1, idx)
             
             if adaptive_step_size:
-                #alpha = alpha_max
                 
                 while fx1 > fx - 0.9 * alpha * jnp.real(jnp.sum(jnp.conj(gradx)* P * gradx)):
                     #print("AAA")
@@ -289,6 +291,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
     D1sum = jnp.zeros(D0.shape)
     
     loss_list = []
+    eta_max = 10
     for idx_epoch in range(1, N_epoch+1):
         if idx_epoch % iter_display == 0:
             print(f"Epoch {idx_epoch}/{N_epoch}")
@@ -331,8 +334,8 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
             Fw1 = F(w1, idx_batches_grad[k-1])
             gradFw1 = gradF(w1, idx_batches_grad[k-1])
            
-            #if adaptive_step_size:
-            #    eta = eta_max
+            if adaptive_step_size:
+                eta = eta_max
                 
             w2 = w1 - eta * invDhat1 * jnp.conj(gradFw1)
             Fw2 = F(w2, idx_batches_grad[k-1])
