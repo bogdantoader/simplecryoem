@@ -84,7 +84,7 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
     return AA, Ab
 
 
-def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None, P = None, adaptive_step_size = False, eps = 1e-15, verbose = False, iter_display = 1):
+def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None, P = None, adaptive_step_size = False, c = 0.5, eps = 1e-15, verbose = False, iter_display = 1):
     """SGD
    
    Parameters:
@@ -128,7 +128,9 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
     loss_list = []
     grad_list = []
     
-    alpha_max = 10
+    if adaptive_step_size:
+        alpha_max = alpha
+    
     for idx_epoch in range(N_epoch):
         # This is mostly useful when running a lot of epochs as deterministic gradient descent
         if idx_epoch % iter_display == 0:
@@ -150,14 +152,14 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
             fx = loss_func(x, idx)
           
             if adaptive_step_size: 
-                alpha = alpha_max
+                alpha = alpha * 1.2
         
             x1 = x - alpha * P * jnp.conj(gradx)
             fx1 = loss_func(x1, idx)
             
             if adaptive_step_size:
                 
-                while fx1 > fx - 0.9 * alpha * jnp.real(jnp.sum(jnp.conj(gradx)* P * gradx)):
+                while fx1 > fx - c * alpha * jnp.real(jnp.sum(jnp.conj(gradx)* P * gradx)):
                     #print("AAA")
                     #print(fx1)
                     #print(fx - 1/2*alpha*jnp.real(jnp.sum(jnp.conj(gradx)*gradx)))
@@ -262,7 +264,7 @@ def kaczmarz(key, data, angles, fwd_model_vmap, loss_func, grad_loss_func, x0, N
 
 
 
-def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, adaptive_step_size = False, iter_display = 1):
+def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, adaptive_step_size = False, c = 0.5, iter_display = 1):
     """OASIS with fixed learning rate, deterministic or stochastic."""
     
     n = jnp.array(w0.shape )
@@ -289,20 +291,26 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
     # depending on when the Hessian changes
     nsamp = 0
     D1sum = jnp.zeros(D0.shape)
-    
+   
+    if adaptive_step_size:
+        eta_max = eta
+
+    beta0 = beta2    
     loss_list = []
-    eta_max = 10
     for idx_epoch in range(1, N_epoch+1):
         if idx_epoch % iter_display == 0:
             print(f"Epoch {idx_epoch}/{N_epoch}")
 
         key, subkey1, subkey2 = random.split(key, 3)
 
+        if idx_epoch == 1:
+            beta2 = 1
+        else:
+            beta2 = beta0
+        
         idx_batches_grad = np.array_split(random.permutation(subkey1, N), N_batch)
-        #idx_batches_hess = np.array_split(random.permutation(subkey2, N), N_batch)
        
         zkeys = random.split(key, len(idx_batches_grad))
-
     
         if idx_epoch % iter_display == 0:
             pbar = tqdm(range(len(idx_batches_grad)))
@@ -310,11 +318,10 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
             pbar = range(len(idx_batches_grad))
         for k in pbar:
             
-            h_steps = 2 
+            h_steps = 4 
 
             z = random.rademacher(zkeys[k-1], jnp.flip(jnp.append(n, h_steps))).astype(w0.dtype)
 
-            #D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_hess[k-1]))
             #D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_grad[k-1]))
            
             #D1sum = D1sum + (z * hvpF(w1, z, idx_batches_grad[k-1]))
@@ -335,13 +342,13 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
             gradFw1 = gradF(w1, idx_batches_grad[k-1])
            
             if adaptive_step_size:
-                eta = eta_max
+                eta = eta * 1.2 
                 
             w2 = w1 - eta * invDhat1 * jnp.conj(gradFw1)
             Fw2 = F(w2, idx_batches_grad[k-1])
 
             if adaptive_step_size:
-                while Fw2 > Fw1 - 0.95 * eta * jnp.real(jnp.sum(jnp.conj(gradFw1)* invDhat1 * gradFw1)):
+                while Fw2 > Fw1 - c * eta * jnp.real(jnp.sum(jnp.conj(gradFw1)* invDhat1 * gradFw1)):
                     eta = eta / 2
                     w2 = w1 - eta * invDhat1 * jnp.conj(gradFw1)
                     Fw2 = F(w2, idx_batches_grad[k-1])
@@ -403,7 +410,6 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
         key, subkey1, subkey2 = random.split(key, 3)
 
         idx_batches_grad = np.array_split(random.permutation(subkey1, N), N_batch)
-        #idx_batches_hess = np.array_split(random.permutation(subkey2, N), N_batch)
         
         zkeys = random.split(key, len(idx_batches_grad))
      
@@ -418,7 +424,6 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
             z = random.rademacher(zkeys[k-1], jnp.flip(jnp.append(n, h_steps))).astype(w0.dtype)
             #z = random.rademacher(zkeys[k-1], n).astype(w0.dtype)
 
-            #D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_hess[k-1]))
             #D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_grad[k-1]))
 
             hvp_step = [zi * hvpF(w1, zi, idx_batches_grad[k-1]) for zi in z]
