@@ -292,7 +292,8 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
     # depending on when the Hessian changes
     nsamp = 0
     D1sum = jnp.zeros(D0.shape)
-   
+    Davg = jnp.zeros(D0.shape) 
+
     if adaptive_step_size:
         eta_max = eta
 
@@ -319,19 +320,27 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
             pbar = range(len(idx_batches_grad))
         for k in pbar:
             
-            h_steps = 10 
+            h_steps = 4 
 
             z = random.rademacher(zkeys[k-1], jnp.flip(jnp.append(n, h_steps))).astype(w0.dtype)
 
             #D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_grad[k-1]))
            
             #D1sum = D1sum + (z * hvpF(w1, z, idx_batches_grad[k-1]))
+           
             
             hvp_step = [zi * hvpF(w1, zi, idx_batches_grad[k-1]) for zi in z]
             hvp_step = jnp.mean(jnp.array(hvp_step), axis=0)
-            D1sum += hvp_step 
-            nsamp += 1
-            Davg = D1sum/nsamp
+            #D1sum += hvp_step 
+            #nsamp += 1
+            #Davg = D1sum/nsamp
+
+            nsamp0 = nsamp
+            nsamp = nsamp + 1
+            Davg0 = Davg
+
+            Davg = Davg0 * nsamp0/nsamp + hvp_step/nsamp
+            
           
             # Exponential average between the 'guess' and the latest running average.
             D1 = beta2*D0 + (1-beta2)*Davg
