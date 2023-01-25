@@ -152,8 +152,8 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
             fx = loss_func(x, idx)
           
             if adaptive_step_size: 
-                #alpha = alpha * 1.2
-                alpha = alpha_max
+                alpha = alpha * 1.2
+                #alpha = alpha_max
         
             x1 = x - alpha * P * jnp.conj(gradx)
             fx1 = loss_func(x1, idx)
