@@ -320,7 +320,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
             pbar = range(len(idx_batches_grad))
         for k in pbar:
             
-            h_steps = 4 
+            h_steps = 2
 
             z = random.rademacher(zkeys[k-1], jnp.flip(jnp.append(n, h_steps))).astype(w0.dtype)
 
@@ -352,8 +352,8 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
             gradFw1 = gradF(w1, idx_batches_grad[k-1])
            
             if adaptive_step_size:
-                #eta = eta * 1.2 
-                eta = eta_max
+                eta = eta * 1.2 
+                #eta = eta_max
                 #print("hello")
                 
             w2 = w1 - eta * invDhat1 * jnp.conj(gradFw1)
