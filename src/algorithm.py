@@ -144,14 +144,19 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
         else:
             pbar = idx_batches
 
+        # Trying this: reset the step size at each epoch in case it goes
+        # very bad (i.e. very small) during the previous epoch.
+        if adaptive_step_size: 
+            alpha = alpha_max
+
         for idx in pbar:
-            
+
             #TODO: adapt the grad functions to return the function value too 
             #(since JAX can return it for free)
             gradx = grad_func(x, idx)
             fx = loss_func(x, idx)
-          
-            if adaptive_step_size: 
+
+            if adaptive_step_size:  
                 alpha = alpha * 1.2
                 #alpha = alpha_max
         
