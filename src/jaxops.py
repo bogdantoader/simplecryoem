@@ -143,8 +143,8 @@ class Loss:
     @partial(jax.jit, static_argnums=(0,))
     def loss_px_sum(self, v, angles, shifts, ctf_params, imgs, sigma):
         return jnp.mean(self.loss_px_batched(v, angles, shifts, ctf_params, imgs, sigma), axis=0)
-    
-    
+
+
 
 #TODO: maybe move these functions to the Loss class as grad_volume and grad_volume_sum
 class GradV:
@@ -158,7 +158,6 @@ class GradV:
     @partial(jax.jit, static_argnums=(0,))
     def grad_loss_volume_sum(self, v, angles, shifts, ctf_params, imgs, sigma):
         return jax.grad(self.loss.loss_sum)(v, angles, shifts, ctf_params, imgs, sigma)
-
 
 
 ##TODO: Include the below functions in the above classes
