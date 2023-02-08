@@ -86,7 +86,7 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
 # TODO: 
 # 1. include the keyboard interrupt thing
 # 2. use jax.value_and_grad to speed things up (need to modify the jax operator classes)
-def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None, P = None, adaptive_step_size = False, c = 0.5, eps = 1e-15, verbose = False, iter_display = 1):
+def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None, P = None, adaptive_step_size = False, c = 0.5, eps = 1e-15, verbose = False, iter_display = 1, mask = None):
     """SGD
 
    Parameters:
@@ -115,8 +115,6 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
 
     """
 
-    rng = np.random.default_rng()
-
     if batch_size is None or batch_size == N:
         N_batch = 1
     else:
@@ -124,6 +122,10 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
 
     if P is None:
         P = jnp.ones(x0.shape)
+        
+    if mask is None:
+        print("mask is None")
+        mask = jnp.ones(x0.shape)
 
     x = x0
     loss_list = []
@@ -134,84 +136,95 @@ def sgd(grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None,
     if adaptive_step_size:
         alpha_max = alpha
 
+    step_sizes = []
     for idx_epoch in range(N_epoch):
-        # This is mostly useful when running a lot of epochs as deterministic gradient descent
-        if idx_epoch % iter_display == 0:
-            print(f"Epoch {idx_epoch+1}/{N_epoch} ", end="")
-            idx_batches = np.array_split(rng.permutation(N), N_batch)
+        try:
+            # This is mostly useful when running a lot of epochs as deterministic gradient descent
+            if idx_epoch % iter_display == 0:
+                print(f"Epoch {idx_epoch+1}/{N_epoch} ", end="")
+            
+            key, subkey = random.split(key)
+            idx_batches = np.array_split(random.permutation(subkey, N), N_batch)
 
-        grad_epoch = []
-
-        if idx_epoch % iter_display == 0:
-            pbar = tqdm(idx_batches)
-        else:
-            pbar = idx_batches
-
-        # Trying this: reset the step size at each epoch in case it goes
-        # very bad (i.e. very small) during the previous epoch.
-        if adaptive_step_size:
-            alpha = alpha_max
-
-        for idx in pbar:
-
-            #TODO: adapt the grad functions to return the function value too 
-            #(since JAX can return it for free)
-            gradx = grad_func(x, idx)
-            fx = loss_func(x, idx)
-
-            if adaptive_step_size:  
-                alpha = alpha * 1.2
-                #alpha = alpha_max
-
-            x1 = x - alpha * P * jnp.conj(gradx)
-            fx1 = loss_func(x1, idx)
-
-            if adaptive_step_size:
-
-                while fx1 > fx - c * alpha * jnp.real(jnp.sum(jnp.conj(gradx)* P * gradx)):
-                    #print("AAA")
-                    #print(fx1)
-                    #print(fx - 1/2*alpha*jnp.real(jnp.sum(jnp.conj(gradx)*gradx)))
-
-                    alpha = alpha / 2
-                    #print(f"Halving step size. New alpha = {alpha}")
-
-                    x1 = x - alpha * P * jnp.conj(gradx)
-                    fx1 = loss_func(x1, idx)
-
-            x = x1
-            loss_iter = fx1
-
-            gradmax = jnp.max(jnp.abs(gradx))
-            grad_epoch.append(gradmax)
+            grad_epoch = []
 
             if idx_epoch % iter_display == 0:
-                pbar.set_postfix(grad = f"{gradmax :.3e}",
-                        loss = f"{loss_iter :.3e}")
+                pbar = tqdm(idx_batches)
+            else:
+                pbar = idx_batches
 
-        grad_epoch = jnp.mean(jnp.array(grad_epoch))
+            # Trying this: reset the step size at each epoch in case it goes
+            # very bad (i.e. very small) during the previous epoch.
+            if adaptive_step_size:
+                alpha = alpha_max
 
-        loss_epoch = []
-        for idx in pbar:
-            loss_iter = loss_func(x, idx)
-            loss_epoch.append(loss_iter)
-        loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
+            for idx in pbar:
 
-        grad_list.append(grad_epoch)
-        loss_list.append(loss_epoch)
+                #TODO: adapt the grad functions to return the function value too 
+                #(since JAX can return it for free)
+                gradx = grad_func(x, idx)
+                fx = loss_func(x, idx)
 
-        iterates.append(x)
+                if adaptive_step_size:  
+                    #alpha = alpha * 1.2
+                    alpha = alpha_max
 
-        if idx_epoch % iter_display == 0:
-            print(f"  |Grad| = {grad_epoch :.3e}")
-            print(f"  Loss = {loss_epoch :.3e}")
+                x1 = x - alpha * P * jnp.conj(gradx)
+                x1 = x1 * mask # TEMPORARY
+                fx1 = loss_func(x1, idx)
 
-            print(f"  alpha = {alpha}")
+                if adaptive_step_size:
 
-        if grad_epoch < eps:
+                    while fx1 > fx - c * alpha * jnp.real(jnp.sum(jnp.conj(gradx)* P * gradx)):
+                        #print("AAA")
+                        #print(fx1)
+                        #print(fx - 1/2*alpha*jnp.real(jnp.sum(jnp.conj(gradx)*gradx)))
+
+                        alpha = alpha / 2
+                        #print(f"Halving step size. New alpha = {alpha}")
+
+                        x1 = x - alpha * P * jnp.conj(gradx)
+                        x1 = x1 * mask # TEMPORARY
+                        fx1 = loss_func(x1, idx)
+
+                step_sizes.append(alpha)
+
+                x = x1
+                loss_iter = fx1
+
+                gradmax = jnp.max(jnp.abs(gradx))
+                grad_epoch.append(gradmax)
+
+                if idx_epoch % iter_display == 0:
+                    pbar.set_postfix(grad=f"{gradmax :.3e}",
+                            loss=f"{loss_iter :.3e}", 
+                            alpha=f"{alpha :.3e}")
+
+            grad_epoch = jnp.mean(jnp.array(grad_epoch))
+
+            loss_epoch = []
+            for idx in pbar:
+                loss_iter = loss_func(x, idx)
+                loss_epoch.append(loss_iter)
+            loss_epoch = jnp.mean(jnp.array(loss_epoch)) 
+
+            grad_list.append(grad_epoch)
+            loss_list.append(loss_epoch)
+
+            iterates.append(x)
+
+            if idx_epoch % iter_display == 0:
+                print(f"  |Grad| = {grad_epoch :.3e}")
+                print(f"  Loss = {loss_epoch :.3e}")
+
+                print(f"  alpha = {alpha}")
+
+            if grad_epoch < eps:
+                break
+        except KeyboardInterrupt:
             break
 
-    return x, jnp.array(loss_list), jnp.array(grad_list), iterates
+    return x, jnp.array(loss_list), jnp.array(grad_list), iterates, step_sizes
 
 
 def get_sgd_vol_ops(gradv: GradV, loss: Loss, angles, shifts, ctf_params, imgs, sigma = 1):
