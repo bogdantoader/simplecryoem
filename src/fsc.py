@@ -71,6 +71,64 @@ def calc_fsc(v1, v2, grid, dr = None):
     return res, fsc, shell_points 
 
 
+def average_shells(v, grid, dr = None):
+    """Calculate the average of the values in each shell, where the shells
+    are computed in the same way as for the FSC function above.
+
+    Parameters:
+    ----------
+    v :  (N x N x N) array
+        Fourier volumes to compute the FSC between.
+    grid: [dx, N] 
+        The Fourier grid the volumes are defined on.
+        dx is the spacing and N is the number of points of the grid.
+    dr: double 
+        The width of each Fourier shell. 
+    Returns:
+    -------
+    res: double array
+        The resolutions defining each shell, the first being 0.
+    shell_means: double array
+        The cross-correlation between the volumes at each shell.
+    shell_points: int array    
+        The number of points in each shell.
+    
+    Return the resolution and the FSC at that resolution."""
+
+    # Calculate the radius in the Fourier domain.
+    x_freq = jnp.fft.fftfreq(int(grid[1]), 1/(grid[0]*grid[1]))
+    X, Y, Z = jnp.meshgrid(x_freq, x_freq, x_freq)
+    r = np.sqrt(X**2 + Y**2 + Z**2)
+
+    # Max radius so that the shells are not outside the
+    # rectangular domain.
+    max_rad = jnp.max(r[:,0,0])
+
+    # "Calculate" dr if not given
+    if dr is None:
+        dr = r[1,1,1]
+
+    # Calculate the shells.
+    s = []
+    res = []
+    R = -dr/2
+    while R + dr <= max_rad:
+        cond = ((r >= R) & (r < R + dr))
+        s.append(v[cond])
+        res.append(R+dr)
+        R += dr
+
+    # The sums in each shell.
+    sums = jnp.array([jnp.sum(si) for si in s])
+    shell_n_pts = jnp.array([len(si) for si in s])
+    shell_means = sums/shell_n_pts
+    
+    res = jnp.array(res)
+
+    return res, shell_means, shell_n_pts
+
+
+
 def rotate_list(x_grid, angles):
     """Apply the rotate function to a list of angles."""
 

@@ -104,7 +104,7 @@ class Loss:
     @partial(jax.jit, static_argnums=(0,))
     def loss_sum(self, v, angles, shifts, ctf_params, imgs, sigma):
         return jnp.mean(self.loss_batched(v, angles, shifts, ctf_params, imgs, sigma))
-
+    
     @partial(jax.jit, static_argnums=(0,))
     def loss_proj(self, v, projection, shifts, ctf_params, img, sigma):
         """Loss when the rotation is already done.
@@ -129,7 +129,22 @@ class Loss:
     @partial(jax.jit, static_argnums=(0,))
     def loss_proj_batched0(self, v, projection, shifts, ctf_params, imgs, sigma):
         return jax.vmap(self.loss_proj0, in_axes = (None, 0, 0, 0, 0, None))(v, projection, shifts, ctf_params, imgs, sigma)
+    
+    @partial(jax.jit, static_argnums=(0,))
+    def loss_px(self, v, angles, shifts, ctf_params, img, sigma = 1):
+        """Return the pixel-wise loss for one image. CAREFUL: IT DOES NOT USE SIGMA AND REGULARIZATION"""
+        err = self.slice.slice(v, angles, shifts, ctf_params) - img
+        return 1/2 * jnp.real(jnp.conj(err)*err)
 
+    @partial(jax.jit, static_argnums=(0,))
+    def loss_px_batched(self, v, angles, shifts, ctf_params, imgs, sigma):
+        return jax.vmap(self.loss_px, in_axes = (None, 0, 0, 0, 0,  None))(v, angles, shifts, ctf_params, imgs, sigma)
+
+    @partial(jax.jit, static_argnums=(0,))
+    def loss_px_sum(self, v, angles, shifts, ctf_params, imgs, sigma):
+        return jnp.mean(self.loss_px_batched(v, angles, shifts, ctf_params, imgs, sigma), axis=0)
+    
+    
 
 #TODO: maybe move these functions to the Loss class as grad_volume and grad_volume_sum
 class GradV:
