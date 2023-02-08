@@ -122,11 +122,46 @@ def average_shells(v, grid, dr = None):
     sums = jnp.array([jnp.sum(si) for si in s])
     shell_n_pts = jnp.array([len(si) for si in s])
     shell_means = sums/shell_n_pts
-    
+
     res = jnp.array(res)
 
     return res, shell_means, shell_n_pts
 
+
+def average_shells_2D(img, grid, dr = None):
+    "The same as the above function but only for an image"
+
+    # Calculate the radius in the Fourier domain.
+    x_freq = jnp.fft.fftfreq(int(grid[1]), 1/(grid[0]*grid[1]))
+    X, Y = jnp.meshgrid(x_freq, x_freq)
+    r = np.sqrt(X**2 + Y**2)
+
+    # Max radius so that the shells are not outside the
+    # rectangular domain.
+    max_rad = jnp.max(r[:,0])
+    
+    # "Calculate" dr if not given
+    if dr is None:
+        dr = r[1,1]
+
+    # Calculate the shells.
+    s = []
+    res = []
+    R = -dr/2
+    while R + dr <= max_rad:
+        cond = ((r >= R) & (r < R + dr))
+        s.append(img[cond])
+        res.append(R+dr)
+        R += dr
+        
+    # The sums in each shell.
+    sums = jnp.array([jnp.sum(si) for si in s])
+    shell_n_pts = jnp.array([len(si) for si in s])
+    shell_means = sums/shell_n_pts
+
+    res = jnp.array(res)
+
+    return shell_means
 
 
 def rotate_list(x_grid, angles):
