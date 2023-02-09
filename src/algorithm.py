@@ -170,6 +170,8 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
 
                 x1 = x - alpha * P * jnp.conj(gradx)
                 #x1 = x1 * mask # TEMPORARY
+                x1 = x1.at[jnp.abs(x1) > 1e4].set(0)
+                
                 fx1 = loss_func(x1, idx)
 
                 if adaptive_step_size:
@@ -184,6 +186,8 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
 
                         x1 = x - alpha * P * jnp.conj(gradx)
                         #x1 = x1 * mask # TEMPORARY
+                        x1 = x1.at[jnp.abs(x1) > 1e4].set(0)
+
                         fx1 = loss_func(x1, idx)
 
                 step_sizes.append(alpha)

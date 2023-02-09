@@ -121,14 +121,14 @@ def average_shells(v, grid, dr = None):
     # The sums in each shell.
     sums = jnp.array([jnp.sum(si) for si in s])
     maxs = jnp.array([jnp.max(si) for si in s])
-    medians = jnp.array([jnp.median(si) for si in s])
+    #medians = jnp.array([jnp.median(si) for si in s])
     
     shell_n_pts = jnp.array([len(si) for si in s])
     shell_means = sums/shell_n_pts
 
     res = jnp.array(res)
 
-    return res, shell_means, shell_n_pts, maxs, medians
+    return res, shell_means, shell_n_pts, maxs, #medians
 
 
 def average_shells_2D(img, grid, dr = None):
