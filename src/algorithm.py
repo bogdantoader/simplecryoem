@@ -84,8 +84,7 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
     return AA, Ab
 
 # TODO: 
-# 1. include the keyboard interrupt thing
-# 2. use jax.value_and_grad to speed things up (need to modify the jax operator classes)
+# 1. use jax.value_and_grad to speed things up (need to modify the jax operator classes)
 def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None, P = None, adaptive_step_size = False, c = 0.5, eps = 1e-15, verbose = False, iter_display = 1, mask = None):
     """SGD
 
@@ -166,11 +165,11 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
                 fx = loss_func(x, idx)
 
                 if adaptive_step_size:  
-                    #alpha = alpha * 1.2
-                    alpha = alpha_max
+                    alpha = alpha * 1.2
+                    #alpha = alpha_max
 
                 x1 = x - alpha * P * jnp.conj(gradx)
-                x1 = x1 * mask # TEMPORARY
+                #x1 = x1 * mask # TEMPORARY
                 fx1 = loss_func(x1, idx)
 
                 if adaptive_step_size:
@@ -184,7 +183,7 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
                         #print(f"Halving step size. New alpha = {alpha}")
 
                         x1 = x - alpha * P * jnp.conj(gradx)
-                        x1 = x1 * mask # TEMPORARY
+                        #x1 = x1 * mask # TEMPORARY
                         fx1 = loss_func(x1, idx)
 
                 step_sizes.append(alpha)
