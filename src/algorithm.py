@@ -306,15 +306,10 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
 
     key, subkey = random.split(key)
 
-    gradFw0 = gradF(w0, random.permutation(subkey, N)[:batch_size])
-    Dhat0 = jnp.maximum(jnp.abs(D0), alpha)
-
     # Since we only work with the diagonal of the Hessian, we
     # can simply write it as a matrix of whatever shape the input 
     # is and element-wise multiply with it (instead of forming a
     # diagonal matrix and do matrix-vector multiplication).
-    invDhat0 = 1/Dhat0
-    w1 = w0 - eta * invDhat0 * jnp.conj(gradFw0)
 
     # This can be placed before the epoch loop starts or before each epoch
     # (or even between iterations within an epoch)
@@ -361,7 +356,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
                 #D1sum = D1sum + (z * hvpF(w1, z, idx_batches_grad[k-1]))
 
 
-                hvp_step = [zi * hvpF(w1, zi, idx_batches_grad[k-1]) for zi in z]
+                hvp_step = [zi * hvpF(w0, zi, idx_batches_grad[k-1]) for zi in z]
                 hvp_step = jnp.mean(jnp.array(hvp_step), axis=0)
                 #D1sum += hvp_step 
                 #nsamp += 1
@@ -373,42 +368,34 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
 
                 Davg = Davg0 * nsamp0/nsamp + hvp_step/nsamp
 
-
                 # Exponential average between the 'guess' and the latest running average.
                 D1 = beta2*D0 + (1-beta2)*Davg
 
-                Dhat1 = jnp.maximum(jnp.abs(D1), alpha)       
-                invDhat1 = 1/Dhat1
+                Dhat = jnp.maximum(jnp.abs(D1), alpha)       
+                invDhat = 1/Dhat
 
-                Fw1 = F(w1, idx_batches_grad[k-1])
-                gradFw1 = gradF(w1, idx_batches_grad[k-1])
+                Fw0 = F(w0, idx_batches_grad[k-1])
+                gradFw0 = gradF(w0, idx_batches_grad[k-1])
 
                 if adaptive_step_size:
                     eta = eta * 1.2 
                     #eta = eta_max
                     #print("hello")
 
-                w2 = w1 - eta * invDhat1 * jnp.conj(gradFw1)
-                Fw2 = F(w2, idx_batches_grad[k-1])
+                w1 = w0 - eta * invDhat * jnp.conj(gradFw0)
+                Fw1 = F(w1, idx_batches_grad[k-1])
 
                 if adaptive_step_size:
-                    while Fw2 > Fw1 - c * eta * jnp.real(jnp.sum(jnp.conj(gradFw1)* invDhat1 * gradFw1)):
+                    while Fw1 > Fw0 - c * eta * jnp.real(jnp.sum(jnp.conj(gradFw0)* invDhat * gradFw0)):
                         eta = eta / 2
-                        w2 = w1 - eta * invDhat1 * jnp.conj(gradFw1)
-                        Fw2 = F(w2, idx_batches_grad[k-1])
+                        w1 = w0 - eta * invDhat * jnp.conj(gradFw0)
+                        Fw1 = F(w1, idx_batches_grad[k-1])
 
                 w0 = w1
-                w1 = w2
                 D0 = D1
-
-                #loss_iter = F(w1, idx_batches_grad[k-1])
-                loss_iter = Fw2
-
-                #loss_epoch.append(loss_iter)
-                #print(loss_iter) 
-                
+                loss_iter = Fw1
                 step_sizes.append(eta)
-                
+
                 if idx_epoch % iter_display == 0:
                     pbar.set_postfix(loss=f"{loss_iter : .3e}", eta=f"{eta :.3e}")
 
