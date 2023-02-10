@@ -347,7 +347,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
                 pbar = range(len(idx_batches_grad))
             for k in pbar:
 
-                h_steps = 4
+                h_steps = 1
 
                 z = random.rademacher(zkeys[k-1], jnp.flip(jnp.append(n, h_steps))).astype(w0.dtype)
 
