@@ -332,10 +332,10 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
 
             key, subkey1, subkey2 = random.split(key, 3)
 
-            if idx_epoch == 1:
-                beta2 = 1
-            else:
-                beta2 = beta0
+            #if idx_epoch == 1:
+            #    beta2 = 1
+            #else:
+            #    beta2 = beta0
 
             idx_batches_grad = np.array_split(random.permutation(subkey1, N), N_batch)
 
