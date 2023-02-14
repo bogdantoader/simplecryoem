@@ -42,11 +42,16 @@ def calc_fsc(v1, v2, grid, dr = None):
     # rectangular domain.
     max_rad = jnp.max(r[:,0,0])
 
-    # "Calculate" dr if not given
+    # "Calculate" dr if not given:
+    # The diagnoal of the smallest cube with a corner at the origin
     if dr is None:
         dr = r[1,1,1]
 
     # Calculate the shells.
+    # Each shell has thickness = dr, with res storing the smallest radial coordinate 
+    # of the shell (along the radius). The first shell has radius is manually set to 0.
+    # Chose the lowest coordinate of the shell instead of the highest one so that the
+    # estimates are conservative rather than optimisic
     s1 = []
     s2 = []
     res = []
@@ -55,8 +60,9 @@ def calc_fsc(v1, v2, grid, dr = None):
         cond = ((r >= R) & (r < R + dr))
         s1.append(v1[cond])
         s2.append(v2[cond])
-        res.append(R+dr)
+        res.append(R)
         R += dr
+    res[0] = 0
 
     # The correlations between corresponding shells.
     fsc = []
@@ -108,15 +114,17 @@ def average_shells(v, grid, dr = None):
     if dr is None:
         dr = r[1,1,1]
 
-    # Calculate the shells.
+    # Calculate the shells. See the explanation in the FSC function above.
     s = []
     res = []
     R = -dr/2
     while R + dr <= max_rad:
         cond = ((r >= R) & (r < R + dr))
         s.append(v[cond])
-        res.append(R+dr)
+        res.append(R)
         R += dr
+    res[0] = 0
+
 
     # The sums in each shell.
     sums = jnp.array([jnp.sum(si) for si in s])
@@ -155,8 +163,10 @@ def average_shells_2D(img, grid, dr = None):
     while R + dr <= max_rad:
         cond = ((r >= R) & (r < R + dr))
         s.append(img[cond])
-        res.append(R+dr)
+        res.append(R)
         R += dr
+    res[0] = 0
+
         
     # The sums in each shell.
     sums = jnp.array([jnp.sum(si) for si in s])

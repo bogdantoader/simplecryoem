@@ -85,7 +85,7 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
 
 # TODO: 
 # 1. use jax.value_and_grad to speed things up (need to modify the jax operator classes)
-def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None, P = None, adaptive_step_size = False, c = 0.5, eps = 1e-15, verbose = False, iter_display = 1, mask = None):
+def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None, P = None, adaptive_step_size = False, c = 0.5, eps = 1e-15, verbose = False, iter_display = 1):
     """SGD
 
    Parameters:
@@ -122,10 +122,6 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
     if P is None:
         P = jnp.ones(x0.shape)
         
-    if mask is None:
-        print("mask is None")
-        mask = jnp.ones(x0.shape)
-
     x = x0
     loss_list = []
     grad_list = []
