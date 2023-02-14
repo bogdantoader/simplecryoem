@@ -98,7 +98,7 @@ def average_shells(v, grid, dr = None):
     # Calculate the radius in the Fourier domain.
     x_freq = jnp.fft.fftfreq(int(grid[1]), 1/(grid[0]*grid[1]))
     X, Y, Z = jnp.meshgrid(x_freq, x_freq, x_freq)
-    r = np.sqrt(X**2 + Y**2 + Z**2)
+    r = jnp.sqrt(X**2 + Y**2 + Z**2)
 
     # Max radius so that the shells are not outside the
     # rectangular domain.
