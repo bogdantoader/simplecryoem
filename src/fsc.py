@@ -68,7 +68,7 @@ def calc_fsc(v1, v2, grid, dr = None):
     fsc = jnp.real(jnp.array(fsc))
     shell_points = jnp.array([len(s) for s in s1])
 
-    return res, fsc, shell_points 
+    return jnp.array([res, fsc, shell_points])
 
 
 def average_shells(v, grid, dr = None):
