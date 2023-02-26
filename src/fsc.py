@@ -175,7 +175,7 @@ def average_shells_2D(img, grid, dr = None):
 
     res = jnp.array(res)
 
-    return shell_means
+    return res, shell_means, shell_n_pts
 
 
 def rotate_list(x_grid, angles):
