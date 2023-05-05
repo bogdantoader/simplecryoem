@@ -85,7 +85,7 @@ def get_cg_vol_ops(grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol
 
 # TODO: 
 # 1. use jax.value_and_grad to speed things up (need to modify the jax operator classes)
-def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = None, P = None, adaptive_step_size = False, c = 0.5, eps = 1e-15, verbose = False, iter_display = 1):
+def sgd(key, grad_func, loss_func, N, x0, eta = 1, N_epoch = 10, batch_size = None, D0 = None, adaptive_step_size = False, c = 0.5, eps = 1e-15, verbose = False, iter_display = 1, adaptive_threshold = False, alpha = 1e-10):
     """SGD
 
    Parameters:
@@ -100,7 +100,7 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
     x0 : nx x nx x nx
         Starting volume
 
-    alpha : float
+    eta: float
         Learning rate
 
     N_epochs : int
@@ -119,9 +119,12 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
     else:
         N_batch = N/batch_size
 
-    if P is None:
-        P = jnp.ones(x0.shape)
-        
+    if D0 is None:
+        D0 = jnp.ones(x0.shape)
+
+    D0hat = jnp.maximum(jnp.abs(D0), alpha)
+    P = 1/D0hat
+
     x = x0
     loss_list = []
     grad_list = []
@@ -129,7 +132,7 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
     iterates = [x0]
 
     if adaptive_step_size:
-        alpha_max = alpha
+        eta_max = eta 
 
     step_sizes = []
     for idx_epoch in range(N_epoch):
@@ -137,7 +140,7 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
             # This is mostly useful when running a lot of epochs as deterministic gradient descent
             if idx_epoch % iter_display == 0:
                 print(f"Epoch {idx_epoch+1}/{N_epoch} ", end="")
-            
+
             key, subkey = random.split(key)
             idx_batches = np.array_split(random.permutation(subkey, N), N_batch)
 
@@ -151,7 +154,7 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
             # Trying this: reset the step size at each epoch in case it goes
             # very bad (i.e. very small) during the previous epoch.
             if adaptive_step_size:
-                alpha = alpha_max
+                eta = eta_max
 
             for idx in pbar:
 
@@ -161,32 +164,34 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
                 fx = loss_func(x, idx)
 
                 if adaptive_step_size:  
-                    alpha = alpha * 1.2
-                    #alpha = alpha_max
+                    eta = eta * 2 #1.2
+                    #eta = eta_max
 
-                x1 = x - alpha * P * jnp.conj(gradx)
+                x1 = x - eta * P * jnp.conj(gradx)
                 #x1 = x1 * mask # TEMPORARY
                 #x1 = x1.at[jnp.abs(x1) > 1e4].set(0)
-                
+
                 fx1 = loss_func(x1, idx)
 
+                
                 if adaptive_step_size:
 
-                    while fx1 > fx - c * alpha * jnp.real(jnp.sum(jnp.conj(gradx)* P * gradx)):
+                    while fx1 > fx - c * eta * jnp.real(jnp.sum(jnp.conj(gradx)* P * gradx)):
                         #print("AAA")
                         #print(fx1)
-                        #print(fx - 1/2*alpha*jnp.real(jnp.sum(jnp.conj(gradx)*gradx)))
+                        #print(fx - 1/2*eta*jnp.real(jnp.sum(jnp.conj(gradx)*gradx)))
 
-                        alpha = alpha / 2
-                        #print(f"Halving step size. New alpha = {alpha}")
+                        eta = eta / 2
+                        #print(f"Halving step size. New eta = {eta}")
 
-                        x1 = x - alpha * P * jnp.conj(gradx)
+                        x1 = x - eta * P * jnp.conj(gradx)
                         #x1 = x1 * mask # TEMPORARY
                         #x1 = x1.at[jnp.abs(x1) > 1e4].set(0)
 
                         fx1 = loss_func(x1, idx)
 
-                step_sizes.append(alpha)
+                
+                step_sizes.append(eta)
 
                 x = x1
                 loss_iter = fx1
@@ -197,7 +202,7 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
                 if idx_epoch % iter_display == 0:
                     pbar.set_postfix(grad=f"{gradmax :.3e}",
                             loss=f"{loss_iter :.3e}", 
-                            alpha=f"{alpha :.3e}")
+                            eta=f"{eta :.3e}")
 
             grad_epoch = jnp.mean(jnp.array(grad_epoch))
 
@@ -214,12 +219,19 @@ def sgd(key, grad_func, loss_func, N, x0, alpha = 1, N_epoch = 10, batch_size = 
 
             if idx_epoch % iter_display == 0:
                 print(f"  |Grad| = {grad_epoch :.3e}")
-                print(f"  Loss = {loss_epoch :.3e}")
+                print(f"  Loss = {loss_epoch :.8e}")
 
+                print(f"  eta = {eta}")
                 print(f"  alpha = {alpha}")
 
             if grad_epoch < eps:
                 break
+
+            if adaptive_threshold:
+                alpha = alpha / 2
+                D0hat = jnp.maximum(jnp.abs(D0), alpha)
+                P = 1/D0hat
+
         except KeyboardInterrupt:
             break
 
@@ -290,7 +302,7 @@ def kaczmarz(key, data, angles, fwd_model_vmap, loss_func, grad_loss_func, x0, N
 
 
 
-def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, adaptive_step_size = False, c = 0.5, iter_display = 1):
+def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_size = None, N = 1, adaptive_step_size = False, c = 0.5, iter_display = 1, adaptive_threshold = False):
     """OASIS with fixed learning rate, deterministic or stochastic."""
     
     n = jnp.array(w0.shape )
@@ -337,6 +349,7 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
 
             zkeys = random.split(key, len(idx_batches_grad))
 
+            eta = eta_max
             if idx_epoch % iter_display == 0:
                 pbar = tqdm(range(len(idx_batches_grad)))
             else:
@@ -406,8 +419,12 @@ def oasis(key, F, gradF, hvpF, w0, eta, D0, beta2, alpha, N_epoch = 20, batch_si
 
 
             if idx_epoch % iter_display == 0:
-                print(f"  Loss = {loss_epoch : .3e}")
+                print(f"  Loss = {loss_epoch : .8e}")
                 print(f"  eta = {eta}")
+                print(f"  alpha= {alpha}")
+
+            if adaptive_threshold:
+                alpha = alpha / 2
         except KeyboardInterrupt:
             break
 
@@ -435,8 +452,10 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
     
     gradFw1 = gradF(w1, random.permutation(subkey1, N)[:batch_size])
 
-    nsamp = 1
-    D1sum = D0
+    nsamp = 0
+    D1sum = jnp.zeros(D0.shape)
+    Davg = jnp.zeros(D0.shape)     
+    
     loss_list = []
     for idx_epoch in range(1, N_epoch+1):
         if idx_epoch % iter_display == 0:
@@ -454,19 +473,34 @@ def oasis_adaptive(key, F, gradF, hvpF, w0, eta0, D0, beta2, alpha, N_epoch = 20
             pbar = range(len(idx_batches_grad))
         for k in pbar:
             
-            h_steps = 20
+            h_steps = 1 
 
             z = random.rademacher(zkeys[k-1], jnp.flip(jnp.append(n, h_steps))).astype(w0.dtype)
             #z = random.rademacher(zkeys[k-1], n).astype(w0.dtype)
 
+
+            #hvp_step = [zi * hvpF(w1, zi, idx_batches_grad[k-1]) for zi in z]
+            #hvp_step = jnp.mean(jnp.array(hvp_step), axis=0)
+            #D1sum = D1sum + hvp_step 
+            #nsamp = nsamp + 1
+            #D1 = D1sum/nsamp
+            
+            
+            hvp_step = [zi * hvpF(w0, zi, idx_batches_grad[k-1]) for zi in z]
+            hvp_step = jnp.mean(jnp.array(hvp_step), axis=0)
+            
+            nsamp0 = nsamp
+            nsamp = nsamp + 1
+            Davg0 = Davg
+
+            Davg = Davg0 * nsamp0/nsamp + hvp_step/nsamp
+
+            # Exponential average between the 'guess' and the latest running average.
+            D1 = beta2 * D0 + (1-beta2) * Davg
             #D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_grad[k-1]))
 
-            hvp_step = [zi * hvpF(w1, zi, idx_batches_grad[k-1]) for zi in z]
-            hvp_step = jnp.mean(jnp.array(hvp_step), axis=0)
-            D1sum = D1sum + hvp_step 
-            nsamp = nsamp + 1
-            D1 = D1sum/nsamp
-
+            
+            
             Dhat1 = jnp.maximum(jnp.abs(D1), alpha)
             invDhat1 = 1/Dhat1
 
