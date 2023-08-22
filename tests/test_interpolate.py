@@ -1,14 +1,12 @@
 import unittest
-import numpy as np 
+import numpy as np
 import jax.numpy as jnp
-import sys, site
 from jax.config import config
+from simplecryoem.interpolate import *
+from numpy.testing import assert_array_equal, assert_equal
 
 config.update("jax_enable_x64", True)
-site.addsitedir('..')
 
-from src.interpolate import * 
-from numpy.testing import assert_array_equal, assert_equal
 
 class TestInterpolate(unittest.TestCase):
 

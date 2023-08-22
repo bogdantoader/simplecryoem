@@ -2,8 +2,8 @@ import jax
 import jax.numpy as jnp
 from functools import partial
 
-from src.utils import l2sq, wl2sq
-from src.projection import project, apply_shifts_and_ctf, rotate_and_interpolate
+from simplecryoem.utils import l2sq, wl2sq
+from simplecryoem.projection import project, apply_shifts_and_ctf, rotate_and_interpolate
 
 class Slice:
     """Class to represent the slice operator in the Fourier domain.

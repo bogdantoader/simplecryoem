@@ -6,3 +6,4 @@
 *.mrc
 data/*
 nb/logs/*
+src/simplecryoem.egg-info
