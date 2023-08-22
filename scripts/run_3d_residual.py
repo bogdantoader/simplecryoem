@@ -1,21 +1,16 @@
 import argparse
 import time
 import pickle
-
+import mrcfile
 import numpy as np
 import jax.numpy as jnp
-from matplotlib import pyplot as plt
-from src.utils import *
-from src.projection import *
-from src.interpolate import *
-from src.jaxops import *
-from src.fsc import *
-from src.algorithm import *
-from src.ab_initio import ab_initio, ab_initio_mcmc
-from src.residual import get_volume_residual
-import jax
-
-import mrcfile
+from simplecryoem.utils import *
+from simplecryoem.projection import *
+from simplecryoem.interpolate import *
+from simplecryoem.jaxops import *
+from simplecryoem.fsc import *
+from simplecryoem.algorithm import *
+from simplecryoem.residual import get_volume_residual
 
 
 def parse_args(parser):

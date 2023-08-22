@@ -1,8 +1,8 @@
 import numpy as np
-import time 
+import time
 
-from src.emfiles import load_data
-from src.utils import create_grid, crop_fourier_images
+from simplecryoem.emfiles import load_data
+from simplecryoem.utils import create_grid, crop_fourier_images
 
 
 def create_het_dataset(data_dirs, star_files, N_set, nx_crop):
@@ -10,10 +10,10 @@ def create_het_dataset(data_dirs, star_files, N_set, nx_crop):
 
     Parameters:
     ----------
-    data_dirs, star_files : 
+    data_dirs, star_files :
             Lists of directory paths and star file paths in the respective directories
 
-    N_set   : array[int] 
+    N_set   : array[int]
             Number of particles to keep from each set
 
     nx_crop      : Int
@@ -24,8 +24,8 @@ def create_het_dataset(data_dirs, star_files, N_set, nx_crop):
 
     """
 
-    assert(len(data_dirs) == len(star_files))
-    assert(len(N_set) == len(data_dirs))
+    assert len(data_dirs) == len(star_files)
+    assert len(N_set) == len(data_dirs)
 
     # Read and process each dataset
     imgs = []
@@ -39,7 +39,9 @@ def create_het_dataset(data_dirs, star_files, N_set, nx_crop):
     for i in range(len(data_dirs)):
         print(f"Reading dataset {i}")
 
-        params_i, imgs_i = load_data(data_dirs[i], star_files[i], load_imgs = True, fourier = False)
+        params_i, imgs_i = load_data(
+            data_dirs[i], star_files[i], load_imgs=True, fourier=False
+        )
 
         ctf_params_i = params_i["ctf_params"]
         pixel_size_i = params_i["pixel_size"]
@@ -55,8 +57,8 @@ def create_het_dataset(data_dirs, star_files, N_set, nx_crop):
         nx0_i = imgs_i.shape[-1]
 
         # Only keep N_set[i] particles
-        idxrand_i = np.random.permutation(imgs_i.shape[0])[:N_set[i]]
-                        
+        idxrand_i = np.random.permutation(imgs_i.shape[0])[: N_set[i]]
+
         imgs_i = imgs_i[idxrand_i]
         pixel_size_i = pixel_size_i[idxrand_i]
         angles_i = angles_i[idxrand_i]
@@ -86,8 +88,7 @@ def create_het_dataset(data_dirs, star_files, N_set, nx_crop):
         imgs_f_i = imgs_f_i.reshape(N_i, -1)
 
         # The class assignment variable
-        z_i = i * np.ones((N_set[i], ))
-
+        z_i = i * np.ones((N_set[i],))
 
         imgs.append(imgs_i)
         imgs_f.append(imgs_f_i)
@@ -124,8 +125,3 @@ def create_het_dataset(data_dirs, star_files, N_set, nx_crop):
     # Note that the real space images are not cropped or shuffled.
     # They are used for estimating the noise.
     return imgs, imgs_f, ctf_params, pixel_size, angles, shifts, z, x_grid
-
-
-
-
-

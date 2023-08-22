@@ -9,10 +9,10 @@ from matplotlib import pyplot as plt
 import mrcfile
 from jax.scipy.special import gammaln
 
-from src.algorithm import *
-from src.utils import *
-from src.jaxops import *
-from src.fsc import plot_angles
+from simplecryoem.algorithm import *
+from simplecryoem.utils import *
+from simplecryoem.jaxops import *
+from simplecryoem.fsc import plot_angles
 
 
 def ab_initio_mcmc(

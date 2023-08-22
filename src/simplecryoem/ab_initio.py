@@ -1,19 +1,17 @@
 import time
 import datetime
 import pickle
-import jax
 import jax.numpy as jnp
 from jax import random
 import numpy as np
 from matplotlib import pyplot as plt
 import mrcfile
 
-from src.algorithm import *
-from src.mcmc import mcmc
-from src.utils import *
-from src.jaxops import *
-from src.proposals import CryoProposals
-
+from simplecryoem.algorithm import *
+from simplecryoem.mcmc import mcmc
+from simplecryoem.utils import *
+from simplecryoem.jaxops import *
+from simplecryoem.proposals import CryoProposals
 
 
 def ab_initio_mcmc(
