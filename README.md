@@ -5,7 +5,7 @@
 1. Clone the *simplecryoem* repository
 
 ```
-git@github.com:bogdantoader/simplecryoem.git
+git clone git@github.com:bogdantoader/simplecryoem.git
 cd simplecryoem
 ```
 
