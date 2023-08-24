@@ -207,8 +207,8 @@ class TestProjection(unittest.TestCase):
             )
 
             # And check that all's good
-            print("BB", v_proj4_nn)
-            print(v_proj4_true)
+            # print("BB", v_proj4_nn)
+            # print(v_proj4_true)
             assert_array_almost_equal(v_proj2_nn, v_proj2_true, decimal=15)
             assert_array_almost_equal(v_proj2_tri, v_proj2_true, decimal=15)
             assert_array_almost_equal(v_proj4_nn, v_proj4_true, decimal=15)

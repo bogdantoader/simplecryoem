@@ -9,8 +9,8 @@ from simplecryoem.utils import (
 )
 from simplecryoem.ctf import eval_ctf
 from jax.config import config
-from external.pyem.pyem.vop import grid_correct
-from external.pyem.pyem import star
+from pyem.vop import grid_correct
+from pyem import star
 
 config.update("jax_enable_x64", True)
 
@@ -103,7 +103,7 @@ def apply_shifts_and_ctf(proj, shifts, ctf_params, grid_proj):
     shift = get_shift_term(grid_proj, grid_proj, shifts)
     proj *= shift
 
-    if ctf_params.ndim > 0:
+    if ctf_params is not None:
         x_freq = jnp.fft.fftfreq(int(grid_proj[1]), 1 / (grid_proj[0] * grid_proj[1]))
         X, Y = jnp.meshgrid(x_freq, x_freq)
         r = jnp.sqrt(X**2 + Y**2)
