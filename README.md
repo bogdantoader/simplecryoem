@@ -9,7 +9,7 @@ git clone git@github.com:bogdantoader/simplecryoem.git
 cd simplecryoem
 ```
 
-2. Create the conda environment and activate it.
+2. Create the conda environment and activate it
 
 ```
 conda env create -f environment.yml
@@ -18,7 +18,7 @@ conda activate jax_minimal
 
 3. Install [pyem](https://github.com/asarnow/pyem/wiki/Install-pyem-with-Miniconda)
 
-Clone the *pyem* repository in a separate directory.
+Clone the *pyem* repository in a separate directory:
 
 ```
 git clone https://github.com/asarnow/pyem.git
