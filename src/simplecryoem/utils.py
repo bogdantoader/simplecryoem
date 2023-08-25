@@ -82,14 +82,12 @@ def spherical_volume(
     # we ensure the sampling locations are
     # the centres of the "pixels"
     coords_x = np.linspace(-Lx / 2 + dx / 2, Lx / 2 - dx / 2, Nx)
-    coords_y = np.linspace(-Ly / 2 + dy / 2, Ly / 2 - dy / 2, Ny)
-    coords_z = np.linspace(-Lz / 2 + dz / 2, Lz / 2 - dz / 2, Nz)
     x_grid = np.array([coords_x[1] - coords_x[0], len(coords_x)])
 
     vol = vol * create_3d_mask(x_grid, centre, radius)
 
-    if apply_filter:
-        vol = low_pass_filter(vol, X, Y, Z, sigma)
+    # if apply_filter:
+    #    vol = low_pass_filter(vol, X, Y, Z, sigma)
 
     vol = np.fft.fftshift(vol)
 
@@ -340,7 +338,6 @@ def crop_fourier_images(imgs, x_grid, nx_new):
     """
 
     N = imgs.shape[0]
-    mid = imgs.shape[-1] / 2
 
     idx = np.concatenate([np.arange(nx_new / 2), np.arange(-nx_new / 2, 0)]).astype(
         np.int64
@@ -374,9 +371,9 @@ def crop_fourier_volume(vol, x_grid, nx_new):
 
     vol_cropped = np.fft.ifftshift(
         vol[
-            int(mid - nx_new / 2) : int(mid + nx_new / 2),
-            int(mid - nx_new / 2) : int(mid + nx_new / 2),
-            int(mid - nx_new / 2) : int(mid + nx_new / 2),
+            int(mid - nx_new / 2): int(mid + nx_new / 2),
+            int(mid - nx_new / 2): int(mid + nx_new / 2),
+            int(mid - nx_new / 2): int(mid + nx_new / 2),
         ]
     )
 

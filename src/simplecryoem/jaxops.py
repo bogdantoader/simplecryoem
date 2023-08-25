@@ -111,11 +111,8 @@ class Loss:
         regularization parameter and sigma is the pixel-wise standard
         deviation of the noise."""
         return (
-            1
-            / 2
-            * (
-                self.alpha * l2sq(v)
-                + self.err_func(
+            1 / 2 * (
+                self.alpha * l2sq(v) + self.err_func(
                     self.slice.slice(v, angles, shifts, ctf_params), img, 1 / sigma**2
                 )
             )
@@ -125,9 +122,7 @@ class Loss:
     def loss0(self, v, angles, shifts, ctf_params, img, sigma=1):
         """Similar to loss function, but with alpha=0 (no regularisation)."""
         return (
-            1
-            / 2
-            * self.err_func(
+            1 / 2 * self.err_func(
                 self.slice.slice(v, angles, shifts, ctf_params), img, 1 / sigma**2
             )
         )
@@ -156,18 +151,14 @@ class Loss:
         deviation of the noise."""
 
         proj = self.slice.apply_shifts_and_ctf(projection, shifts, ctf_params)
-        return (
-            1
-            / 2
-            * (self.alpha * l2sq(v) + self.err_func(projection, img, 1 / sigma**2))
-        )
+        return 1 / 2 * (self.alpha * l2sq(v) + self.err_func(proj, img, 1 / sigma**2))
 
     @partial(jax.jit, static_argnums=(0,))
     def loss_proj0(self, v, projection, shifts, ctf_params, img, sigma):
         "The alpha=0 version of loss_proj." ""
 
         proj = self.slice.apply_shifts_and_ctf(projection, shifts, ctf_params)
-        return 1 / 2 * self.err_func(projection, img, 1 / sigma**2)
+        return 1 / 2 * self.err_func(proj, img, 1 / sigma**2)
 
     @partial(jax.jit, static_argnums=(0,))
     def loss_proj_batched(self, v, projection, shifts, ctf_params, imgs, sigma):
@@ -183,7 +174,8 @@ class Loss:
 
     @partial(jax.jit, static_argnums=(0,))
     def loss_px(self, v, angles, shifts, ctf_params, img, sigma=1):
-        """Return the pixel-wise loss for one image. CAREFUL: IT DOES NOT USE SIGMA AND REGULARIZATION"""
+        """Return the pixel-wise loss for one image,
+        with no sigma and regularization."""
         err = self.slice.slice(v, angles, shifts, ctf_params) - img
         return 1 / 2 * jnp.real(jnp.conj(err) * err)
 

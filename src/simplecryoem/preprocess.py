@@ -1,6 +1,6 @@
 import numpy as np
 import time
-from simplecryoem.utils import *
+from simplecryoem.utils import create_grid, crop_fourier_images, create_3d_mask
 from simplecryoem.noise import estimate_noise_radial
 
 
@@ -47,7 +47,6 @@ def preprocess(imgs0, params0, nx_crop=None, idx=None, N_px_noise=0, N_imgs_nois
     print(f"angles0.shape = {angles0.shape}")
     print(f"shifts0.shape = {shifts0.shape}")
     print(f"ctf_params0.shape = {ctf_params0.shape}", flush=True)
-    nx0 = imgs0.shape[-1]
 
     N0 = imgs0.shape[0]
     print(f"N0 = {N0}", flush=True)
@@ -122,7 +121,8 @@ def preprocess(imgs0, params0, nx_crop=None, idx=None, N_px_noise=0, N_imgs_nois
             N_imgs_noise = N
 
         print(
-            f"Estimating the noise using the {N_px_noise} x {N_px_noise} corners of the first {N_imgs_noise} images.",
+            (f"Estimating the noise using the {N_px_noise} x {N_px_noise}",
+             f"corners of the first {N_imgs_noise} images."),
             flush=True,
         )
         t0 = time.time()

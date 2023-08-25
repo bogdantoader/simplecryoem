@@ -13,9 +13,9 @@ def get_params_from_aspire(src: Simulation, pixel_size):
     imgs_f = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs])
     nx = imgs.shape[1]
 
-    angles = (
-        src.angles
-    )  # "_rlnAngleRot", "_rlnAngleTilt", "_rlnAnglePsi" in radians -> I store psi, tilt,rot
+    # "_rlnAngleRot", "_rlnAngleTilt", "_rlnAnglePsi" in radians
+    # -> I store psi, tilt, rot
+    angles = src.angles
     shifts = src.offsets
 
     myshifts = jnp.flip(shifts, axis=1) * pixel_size

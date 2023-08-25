@@ -388,13 +388,13 @@ def oasis(
     # (or even between iterations within an epoch)
     # depending on when the Hessian changes
     nsamp = 0
-    D1sum = jnp.zeros(D0.shape)
+    # D1sum = jnp.zeros(D0.shape)
     Davg = jnp.zeros(D0.shape)
 
     if adaptive_step_size:
         eta_max = eta
 
-    beta0 = beta2
+    # beta0 = beta2
     loss_list = []
     step_sizes = []
     iterates = [w0]
@@ -532,7 +532,7 @@ def oasis_adaptive(
     gradFw1 = gradF(w1, random.permutation(subkey1, N)[:batch_size])
 
     nsamp = 0
-    D1sum = jnp.zeros(D0.shape)
+    # D1sum = jnp.zeros(D0.shape)
     Davg = jnp.zeros(D0.shape)
 
     loss_list = []

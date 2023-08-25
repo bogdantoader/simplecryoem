@@ -73,7 +73,7 @@ def eval_ctf(s, a, params):
 def get_ctf_params_from_df_row(p, pixel_size):
     """Extract the CTF parameters from a dataframe, as arrays
     with elements in the same order as the arguments of eval_ctf."""
-    
+
     ctf_params = jnp.array(
         [
             p[star.Relion.DEFOCUSU],
@@ -89,5 +89,3 @@ def get_ctf_params_from_df_row(p, pixel_size):
     )
 
     return ctf_params
-
-    

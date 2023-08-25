@@ -2,7 +2,14 @@ import unittest
 import numpy as np
 import jax.numpy as jnp
 from jax.config import config
-from simplecryoem.interpolate import *
+from simplecryoem.interpolate import (
+    find_nearest_one_grid_point_idx,
+    interpolate_diff_grids,
+    tri_interp_point,
+    find_nearest_eight_grid_points_idx,
+    find_adjacent_grid_points_idx,
+    find_nearest_grid_point_idx,
+)
 from numpy.testing import assert_array_equal, assert_equal
 
 config.update("jax_enable_x64", True)

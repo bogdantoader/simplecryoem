@@ -54,8 +54,6 @@ def create_het_dataset(data_dirs, star_files, N_set, nx_crop):
         print(f"shifts_{i}.shape = {shifts_i.shape}")
         print(f"ctf_params_{i}.shape = {ctf_params_i.shape}")
 
-        nx0_i = imgs_i.shape[-1]
-
         # Only keep N_set[i] particles
         idxrand_i = np.random.permutation(imgs_i.shape[0])[: N_set[i]]
 
