@@ -293,63 +293,6 @@ def get_sgd_vol_ops(
     return grad_func, loss_func, hvp_func, loss_px_func
 
 
-def kaczmarz(
-    key,
-    data,
-    angles,
-    fwd_model_vmap,
-    loss_func,
-    grad_loss_func,
-    x0,
-    N_epoch,
-    N_batches,
-    N_iter_cg=2,
-    eps_cg=1e-7,
-):
-    """Implementation of the randomized block Kaczmarz method
-    introduced in [Needell & Tropp 2014]. Convenient for processing
-    a batch of particle images at one time, where for each batch
-    we solve a least squares problem using the CG algorithm above.
-
-    Rough around the edges but working implementation. It might require
-    a few adaptations to work with the cryoEM operators.l"""
-
-    key, subkey = random.split(key)
-
-    N = data.shape[0]
-    index_permutations = random.permutation(subkey, N)
-    block_indices = np.array(np.array_split(index_permutations, N_batches))
-    print(f"{block_indices.shape[0]} iterations/epoch")
-
-    x = x0
-    zero = jnp.zeros(x0.shape)
-
-    for ep in range(N_epoch):
-        if ep % 1 == 0:
-            print(f"Epoch {ep}")
-            verbose_cg = True
-
-        for i, idx in tqdm(enumerate(block_indices)):
-            # if verbose_cg:
-            #    print(i)
-
-            # Solve the least squares problem to apply the pseudoinverse
-            data_block = -fwd_model_vmap(x, angles[idx]) + data[idx]
-
-            Ab = -grad_loss_func(zero, angles[idx], data_block)
-            AA = lambda v: grad_loss_func(v, angles[idx], data_block) + Ab
-
-            x_ls, k = conjugate_gradient(
-                AA, Ab, zero, N_iter_cg, eps=eps_cg, verbose=verbose_cg
-            )
-
-            x = x + x_ls
-
-            verbose_cg = False
-
-    return x
-
-
 def oasis(
     key,
     F,
@@ -414,7 +357,8 @@ def oasis(
 
             zkeys = random.split(key, len(idx_batches_grad))
 
-            eta = eta_max
+            if adaptive_step_size:
+                eta = eta_max
             if idx_epoch % iter_display == 0:
                 pbar = tqdm(range(len(idx_batches_grad)))
             else:
@@ -512,7 +456,11 @@ def oasis_adaptive(
     N=1,
     iter_display=1,
 ):
-    """OASIS with adaptive learning rate, deterministic and stochastic."""
+    """Original OASIS implementation with adaptive learning rate, deterministic
+    and stochastic.
+    As introduced in Jahani et al., 2021
+    https://arxiv.org/pdf/2109.05198.pdf
+    """
 
     n = jnp.array(w0.shape)
 
@@ -556,13 +504,6 @@ def oasis_adaptive(
             z = random.rademacher(
                 zkeys[k - 1], jnp.flip(jnp.append(n, h_steps))
             ).astype(w0.dtype)
-            # z = random.rademacher(zkeys[k-1], n).astype(w0.dtype)
-
-            # hvp_step = [zi * hvpF(w1, zi, idx_batches_grad[k-1]) for zi in z]
-            # hvp_step = jnp.mean(jnp.array(hvp_step), axis=0)
-            # D1sum = D1sum + hvp_step
-            # nsamp = nsamp + 1
-            # D1 = D1sum/nsamp
 
             hvp_step = [zi * hvpF(w0, zi, idx_batches_grad[k - 1]) for zi in z]
             hvp_step = jnp.mean(jnp.array(hvp_step), axis=0)
@@ -595,8 +536,6 @@ def oasis_adaptive(
                     / jnp.real(jnp.sum(jnp.conj(gfd) * invDhat1 * gfd))
                 )
             )
-            # print(jnp.max(jnp.imag(wd)))
-            # print(jnp.max(jnp.imag(gfd)))
 
             eta1 = jnp.minimum(tl, tr)
 
