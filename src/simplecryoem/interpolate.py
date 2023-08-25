@@ -6,15 +6,40 @@ config.update("jax_enable_x64", True)
 
 
 def interpolate(i_coords, grid_vol, vol, method):
+    """Given a volume vol sampled on meshgrid given
+    by grid_vol, return the interpolated values of vol
+    at the coordinates i_coords of M points.
+    Nearest neighbour or trilinear interpolation.
+
+    This function assumes the 3D grid has the same length 
+    and spacing in each dimension, and calls the more
+    general function 'interpolate_diff_grids', which 
+    takes different grid objects for each dimension.
+    
+    Parameters
+    ----------
+    i_coords: 3 x M array
+        Interpolation points
+    grid_vol: [grid_spacing, grid_length]
+        The grid spacing and grid size of the Fourier grids on which
+        the volume is defined. The full grids can be obtained by running
+        x_freq = np.fft.fftfreq(grid_length, 1/(grid_length*grid_spacing)).
+    vol : Nx x Ny x Nz array
+        The volume
+    method: string
+        "nn" for nearest neighbour
+        "tri" for trilinear
+    Returns
+    -------
+    i_vals : NxNy x 1 array
+        The interpolated values of vol.
+    """
     return interpolate_diff_grids(i_coords, grid_vol, grid_vol, grid_vol, vol, method)
 
 
-# Keeping this function as more general to make sure interpolation works correctly.
-# TODO: add a check here to ensure that vol shape is consistent with grid
-# lengths
 def interpolate_diff_grids(i_coords, x_grid, y_grid, z_grid, vol, method):
     """Given a volume vol sampled on meshgrid given
-    by grid_vol, return the interpolated values of vol
+    by x_grid, y_grid, z_grid, return the interpolated values of vol
     at the coordinates i_coords of M points.
     Nearest neighbour or trilinear interpolation.
 
@@ -42,12 +67,6 @@ def interpolate_diff_grids(i_coords, x_grid, y_grid, z_grid, vol, method):
     elif method == "tri":
         interp_func = get_interpolate_tri_lambda(x_grid, y_grid, z_grid, vol)
 
-    # i_vals = jax.vmap(interp_func, in_axes = 1)(i_coords)
-
-    # apply_along_axis seems slightly faster than vmap (it is also implemented
-    # using vmap).
-    # It can be easier to debug the non-vectorized function, so use np instead
-    # of jnp.
     i_vals = jnp.apply_along_axis(interp_func, axis=0, arr=i_coords)
 
     return i_vals
