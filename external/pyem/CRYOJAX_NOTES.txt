@@ -1,5 +1,0 @@
-Bug fixes which we should report after checking:
-
-in star.py check_defaults:
-	df[Relion.IMAGEPIXELSIZE] = df[Relion.DETECTORPIXELSIZE] * df[Relion.MAGNIFICATION] / 10000
-	like in claculate_apix
