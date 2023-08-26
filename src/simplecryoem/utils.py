@@ -515,5 +515,5 @@ def wrap_around_distance_2d(x1, x2, B):
 
 
 @jax.jit
-def wrap_arround_distance_2d_array(x1, x2, B):
+def wrap_around_distance_2d_array(x1, x2, B):
     return jax.vmap(wrap_around_distance_2d, in_axes=(0, 0, None))(x1, x2, B)
