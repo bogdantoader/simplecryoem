@@ -181,16 +181,3 @@ def leapfrog_step(i, xpg0, dt, gradLogPi, M):
     p1 = p01 + dt / 2 * gradLogPiX1
 
     return jnp.array([x1, p1, gradLogPiX1])
-
-
-def proposal_mala(key, x0, logPi, gradLogPi, tau):
-    noise = jnp.array(random.normal(key, x0.shape))
-    x1 = x0 + tau**2 / 2 * gradLogPi(x0) + tau * noise
-
-    qx0x1_exparg = tau * noise
-    qx1x0_exparg = x0 - x1 - tau**2 / 2 * gradLogPi(x1)
-    q_ratio = jnp.exp(-1 / (2 * tau**2) * (l2sq(qx1x0_exparg) - l2sq(qx0x1_exparg)))
-    h_ratio = jnp.exp(logPi(x1) - logPi(x0))
-    r = q_ratio * h_ratio
-
-    return x1, r
