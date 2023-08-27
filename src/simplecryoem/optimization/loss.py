@@ -10,23 +10,16 @@ class Loss:
 
     Attributes:
     -----------
-    slice_obj:
-        An instance of the Slice class defined above.
+    slice:
+        An instance of the Slice class from forwardmodel.
 
     err_func :
         Function to calculate the error between two images,
-        defaults to l2 squared.
+        defaults to utils.wl2sq.
 
     alpha :
-        Regularisation parameter for l2 regularisation.
-
-    Methods:
-    -------
-    loss:
-
-    loss_batched:
-
-    loss_sum:
+        Regularisation parameter for l2 regularisation,
+        defaults to 0.
     """
 
     def __init__(self, slice: Slice, err_func=wl2sq, alpha=0):
@@ -127,7 +120,13 @@ class Loss:
 
 
 class GradV:
-    """Gradient of the loss function with respect to the volume."""
+    """Gradient of the loss function with respect to the volume.
+
+    Attributes:
+    -----------
+    loss:
+        An instance of the Loss class defined above.
+    """
 
     def __init__(self, loss: Loss):
         self.loss = loss

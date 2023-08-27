@@ -23,6 +23,13 @@ def load_data(data_dir, star_file, load_imgs=False, fourier=True):
                 Return the images in the Fourier domain if true, or the
                 spatial domain otherwise.
     Returns:
+    --------
+    params : dict
+        Dictionary containing arrays of ctf_params, pixel_size, angles, shifts
+        for all the loaded images.
+
+    imgs : N x nx x nx array
+        The images loaded from the file.
 
     """
 
@@ -53,7 +60,29 @@ def load_data(data_dir, star_file, load_imgs=False, fourier=True):
 
 def get_data_from_df(df, data_dir, load_imgs=False):
     """Given a data frame as returned by star.parse_star, extract the useful
-    information."""
+    information.
+
+    Parameters:
+    ----------
+    df : the data frame
+    data_dir : string
+        Location of the star file.
+    load_imgs : boolean
+        Load images or only their parameters.
+
+    Returns:
+    --------
+    pixel_size :
+        Array of pixel size for all images.
+    angles : N x 3
+        Array of Euler angles for all images (or Nones if not present in the file).
+    shifts : N x 2
+        Array of shifts for all images (or None if non present)
+    ctf_params:
+        Array containing the ctf parameters for all images
+    imgs : N x nx x nx
+        Arrays containing the images if load_imgs=True and empty array otherwise.
+    """
 
     gb = df.groupby(star.UCSF.IMAGE_ORIGINAL_PATH)
 

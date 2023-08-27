@@ -16,6 +16,29 @@ class Slice:
     Instantiate this class with a given x_grid, mask, and
     interpolation and projection-related functions to benefit
     from JAX compilation and vectorization.
+
+    Attributes:
+    -----------
+    x_grid: [grid_spacing, grid_length]
+        Fourier grid that vol is defined on.
+
+    mask: nx x nx array
+        Image-shaped mask to apply to the error when computing
+        the loss.
+
+    project:
+        Projection function, defaults to forwardmodel.project.
+
+    rotate_and_interpolate:
+        Rotate and interpolate function, defaults to
+        forwardmodel.rotate_and_interpolate.
+
+    apply_shifts_and_ctf:
+        Apply shifts and CTF function, defaults to
+        forwardmodel.apply_shifts_and_ctf.
+
+    interp_method: string
+        Interpolation method, "tri" or "nn", defaults to "tri".
     """
 
     def __init__(

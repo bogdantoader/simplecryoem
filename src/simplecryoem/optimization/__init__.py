@@ -3,6 +3,8 @@ Optimization algorithms for volume reconstruction.
 """
 
 __all__ = [
+    "Loss",
+    "GradV",
     "conjugate_gradient",
     "get_cg_vol_ops",
     "sgd",
@@ -11,6 +13,7 @@ __all__ = [
     "oasis_adaptive",
 ]
 
+from .loss import Loss, GradV
 from .conjugate_gradient import conjugate_gradient, get_cg_vol_ops
 from .sgd import sgd, get_sgd_vol_ops
 from .precon_sgd import precon_sgd

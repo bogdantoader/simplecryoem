@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
 
-from simplecryoem.loss import Loss, GradV
+from .loss import Loss, GradV
 
 
 def sgd(

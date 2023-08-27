@@ -16,12 +16,12 @@ def create_het_dataset(data_dirs, star_files, N_set, nx_crop):
     N_set   : array[int]
             Number of particles to keep from each set
 
-    nx_crop      : Int
+    nx_crop  : Int
             Crop each image to be nx x nx pixels
 
     Returns:
     --------
-
+    imgs, imgs_f, ctf_params, pixel_size, angles, shifts, z, x_grid
     """
 
     assert len(data_dirs) == len(star_files)

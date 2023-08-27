@@ -5,9 +5,11 @@ from aspire.source import Simulation
 
 
 def get_params_from_aspire(src: Simulation, pixel_size):
-    """Function that takes an ASPIRE ImageSource object and pixel size
+    """Function that takes an ASPIRE Simulation object and pixel size
     and extracts the images, angles, shifts, ctf_params in the right format
-    for JaxEM, plus a few other useful things for further JaxEM processing."""
+    for simplecryoem, plus a few other useful things for further simplecryoem
+    processing."""
+
     n = src.n
     imgs = np.array(src.images(0, n).data)
     imgs_f = np.array([np.fft.fft2(np.fft.ifftshift(img)) for img in imgs])
