@@ -8,19 +8,30 @@ from matplotlib import pyplot as plt
 def volume_comp(
     shape, dimensions, centres, radii, intensities, apply_filter=False, sigma=0.01
 ):
-    """Create a volume that is a sum of rand_volumes with given centres and
-    radii.
+    """Create a volume that is a sum of spherical_volumes
+    with given centres and radii.
 
     Parameters
     ----------
     shape : 3 x 1 array
         Dimensions of the volume, in number of elements
-    dimensions: 3 x 1 array
+    dimensions : 3 x 1 array
         Dimensions of the volume, in units (e.g. Angst?)
-    centres: N x 3 array
+    centres : N x 3 array
         Centre coordinates of each of the N components
-    radii: N array
+    radii : N array
         Radii of each of the N components
+    intensities : N array
+        Scale of the amplitudes.
+    apply_filter : boolean
+        If true, apply a Gaussian filter to the volumes in the Fourier domain.
+    sigma : float
+        Sigma value for Gausian filter
+
+    Returns
+    -------
+    vol
+        the volume
     """
     vol = sum(
         map(
@@ -51,18 +62,21 @@ def spherical_volume(
     ----------
     shape : 3 x 1 array
         Dimensions of the volume, in number of elements
-    dimensions: 3 x 1 array
+    dimensions : 3 x 1 array
         Dimensions of the volume, in units (e.g. Angst?)
+    centre : 3 x 1 array
+        Coordinates of the centre
     radius: float
         Radius of spherical object
-    sigma: float
-        Sigma for the Gaussian window
-    rand_or_not: boolean
+    intensity : float
+        Scale of the amplitudes
+    rand_or_not : boolean
         If true generate the values using randn, otherwise ones.
     apply_filter : boolean
         If true, apply a Gaussian filter to the volume in the Fourier domain.
-    sigma: float
-        Sigma value for Gausian filter.
+    sigma : float
+        Sigma value for Gausian filter
+
     Returns
     -------
     vol
@@ -119,6 +133,8 @@ def plot_angles(angs):
 
 
 def get_preconditioner(x_grid):
+    """A basic preconditioner based on the squared Fourier radius."""
+
     x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1 / (x_grid[1] * x_grid[0]))
     y_freq = x_freq
     z_freq = x_freq
@@ -129,6 +145,8 @@ def get_preconditioner(x_grid):
 
 
 def get_sinc(x_grid):
+    """3D sinc function in the Fourier domain."""
+
     x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1 / (x_grid[1] * x_grid[0]))
     y_freq = x_freq
     z_freq = x_freq
@@ -148,8 +166,10 @@ def get_sinc(x_grid):
 
 
 def create_3d_mask(x_grid, centre, radius):
-    """Works in the Fourier domain with the standard ordering, but obviously
-    it can be applied in the spatial domain too."""
+    """Create an nx x nx x nx 3D mask to apply to a volume.
+
+    It works in the Fourier domain with the standard ordering,
+    but obviously it can be applied in the spatial domain too."""
 
     x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1 / (x_grid[1] * x_grid[0]))
     y_freq = x_freq
@@ -166,8 +186,10 @@ def create_3d_mask(x_grid, centre, radius):
 
 
 def create_2d_mask(x_grid, centre, radius):
-    """Works in the Fourier domain with the standard ordering, but obviously
-    it can be applied in the spatial domain too.
+    """Create an nx x nx 2D mask to apply to an image.
+
+    Works in the Fourier domain with the standard ordering,
+    but obviously it can be applied in the spatial domain too.
     Always centered at zero."""
 
     x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1 / (x_grid[1] * x_grid[0]))
@@ -184,6 +206,8 @@ def create_2d_mask(x_grid, centre, radius):
 
 
 def low_pass_filter(vol, X, Y, Z, sigma):
+    """Gaussian low pass filter."""
+
     gauss = np.exp(-(X**2 + Y**2 + Z**2) / (2 * sigma))
     gauss = gauss / max(gauss.ravel())
     gauss = np.fft.fftshift(gauss)
@@ -206,6 +230,7 @@ def volume_fourier(vol, pixel_size, pfac=1):
         Pixel size, in units (e.g. Angst)
     pfac : int
         Padding factor.
+
     Returns
     -------
     vol_f: n x n x n array
@@ -213,7 +238,7 @@ def volume_fourier(vol, pixel_size, pfac=1):
     grid_vol: [grid_spacing, grid_length]   2 x 1 array
         Fourier grid that vol_f is defined on.
     grid_vol_nopad: [grid_spacing, grid_length]   2 x 1 array
-        Fourier grid vol_f was defined on if pfac = 1.
+        Fourier grid vol_f is defined on if pfac = 1.
     """
 
     n = vol.shape[0]
@@ -239,16 +264,22 @@ def volume_fourier(vol, pixel_size, pfac=1):
 
 
 def mip_x(img):
+    """Plot the maximum intensity projection along the first axis."""
+
     plt.imshow(np.max(img, axis=0))
     return
 
 
 def mip_y(img):
+    """Plot the maximum intensity projection along the second axis."""
+
     plt.imshow(np.max(img, axis=1))
     return
 
 
 def mip_z(img):
+    """Plot the maximum intensity projection along the third axis."""
+
     plt.imshow(np.max(img, axis=2))
     return
 
@@ -256,6 +287,11 @@ def mip_z(img):
 # TODO: tests for the three functions below,
 # and change the names of these functions, they're not great
 def rescale_smaller_grid(v, x_grid, y_grid, z_grid, radius):
+    """Rescale the Fourier volume v defined on x_grid, y_grid, z_grid
+    to a new grid of radius r.
+    Returns the scaled volume and the new (smaller) grids.
+    """
+
     x_freq = jnp.fft.fftfreq(int(x_grid[1]), 1 / (x_grid[0] * x_grid[1]))
     y_freq = jnp.fft.fftfreq(int(y_grid[1]), 1 / (y_grid[0] * y_grid[1]))
     z_freq = jnp.fft.fftfreq(int(z_grid[1]), 1 / (z_grid[0] * z_grid[1]))
@@ -331,10 +367,10 @@ def crop_fourier_images(imgs, x_grid, nx_new):
 
     Returns:
     -------
-        imgs_cropped: N x nx_new x nx_new)
-            N stacked cropped images.
-        x_grid_cropped: 2 x 1 array
-            The new Fourier grid corresponding to the cropped images.
+    imgs_cropped: N x nx_new x nx_new)
+        N stacked cropped images.
+    x_grid_cropped: 2 x 1 array
+        The new Fourier grid corresponding to the cropped images.
     """
 
     N = imgs.shape[0]
@@ -352,8 +388,10 @@ def crop_fourier_images(imgs, x_grid, nx_new):
 
 
 def crop_fourier_images_batch(imgs, x_grid, nx_new):
-    """Here the images are in batches so
-    imgs has dimension N1 x N2 x nx0 x nx0."""
+    """Crop a batches of Fourier images.
+
+    Here the images are in batches, so imgs has
+    dimension N1 x N2 x nx0 x nx0."""
 
     imgs_c = []
     for i in np.arange(imgs.shape[0]):
@@ -364,16 +402,20 @@ def crop_fourier_images_batch(imgs, x_grid, nx_new):
 
 
 def crop_fourier_volume(vol, x_grid, nx_new):
-    """Same as above, but a volume."""
+    """Similar to crop_fourier_images, but for one 3D volume.
+
+    As opposoed to rescale_smaller_grid, here the new
+    grid dimension is given (nx_new), and not determined
+    based on a given radius."""
 
     vol = np.fft.fftshift(vol)
     mid = vol.shape[-1] / 2
 
     vol_cropped = np.fft.ifftshift(
         vol[
-            int(mid - nx_new / 2): int(mid + nx_new / 2),
-            int(mid - nx_new / 2): int(mid + nx_new / 2),
-            int(mid - nx_new / 2): int(mid + nx_new / 2),
+            int(mid - nx_new / 2) : int(mid + nx_new / 2),
+            int(mid - nx_new / 2) : int(mid + nx_new / 2),
+            int(mid - nx_new / 2) : int(mid + nx_new / 2),
         ]
     )
 
@@ -385,8 +427,9 @@ def crop_fourier_volume(vol, x_grid, nx_new):
 
 
 def get_rotation_matrix(alpha, beta, gamma):
-    """Given the Euler angles alpha, beta, gamma, return
-    the rotation matrix. As seen in the pyEM implementation."""
+    """Given the Euler angles alpha, beta, gamma,
+    return the rotation matrix.
+    Similar to the pyEM implementation."""
 
     ca = jnp.cos(alpha)
     cb = jnp.cos(beta)
@@ -409,6 +452,8 @@ def get_rotation_matrix(alpha, beta, gamma):
 
 
 def generate_uniform_orientations(N):
+    """Generate orientations uniform on SO(3) -- Numpy version."""
+
     alpha = np.random.rand(N, 1) * 2 * np.pi
     gamma = np.random.rand(N, 1) * 2 * np.pi
     z = np.random.rand(N, 1) * 2 - 1
@@ -418,6 +463,8 @@ def generate_uniform_orientations(N):
 
 
 def generate_uniform_orientations_jax(key, a0):
+    """Generate orientations uniform on SO(3) -- JAX version."""
+
     key1, key2, key3 = random.split(key, 3)
     N = a0.shape[0]
 
@@ -429,10 +476,15 @@ def generate_uniform_orientations_jax(key, a0):
 
 
 def generate_perturbed_orientations(key, a0, sig):
+    """Given angles a0, return new angles based on
+    Gaussians centred at each angle with stddev sig."""
+
     return a0 + sig * random.normal(key, a0.shape)
 
 
 def generate_uniform_orientations_jax_batch(key, N1, N2):
+    """Generate uniform orientations on SO(3) in the N1 x N2 x 3 shape."""
+
     keys = random.split(key, N1)
     angles = []
     a0 = jnp.zeros(N2)
@@ -458,19 +510,22 @@ def generate_gaussian_shifts(key, N, B):
 
 def generate_gaussian_shifts_batch(key, N1, N2, B):
     """Generate normally sampled shifts around (0,0)
-    with standard deviation B."""
+    with standard deviation B -- N1 x N2 x 2 shape."""
 
     return random.normal(key, (N1, N2, 2)) * B
 
 
 @jax.jit
 def l2sq(x, y=0):
+    """L2 squared error between x and y."""
+
     return jnp.real(jnp.sum(jnp.conj(x - y) * (x - y)))
 
 
 @jax.jit
 def wl2sq(x, y=0, w=1):
     """Weighted l2 squared norm/error."""
+
     return jnp.real(jnp.sum(w * jnp.conj(x - y) * (x - y)))
 
 
@@ -509,6 +564,7 @@ def err_orientations(angles1, angles2):
 @jax.jit
 def wrap_around_distance_2d(x1, x2, B):
     """The wrap around distance between x1 and x2 on the square [-B, B]^2."""
+
     d = jnp.abs(x1 - x2)
     d = jnp.abs(jnp.minimum(d, 2 * B - d))
     return jnp.sqrt(jnp.sum(d**2))
@@ -516,4 +572,7 @@ def wrap_around_distance_2d(x1, x2, B):
 
 @jax.jit
 def wrap_around_distance_2d_array(x1, x2, B):
+    """Vectorized version of the wrap_around_distance_2d function,
+    along the first dimension of x1 and x2."""
+
     return jax.vmap(wrap_around_distance_2d, in_axes=(0, 0, None))(x1, x2, B)

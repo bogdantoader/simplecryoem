@@ -4,7 +4,7 @@ from simplecryoem.utils import crop_fourier_images
 
 
 def estimate_noise(imgs, nx_empty=48, nx_final=32):
-    """Givben an array [N, nx0, nx0] of real centred images, estimate the
+    """Given an array [N, nx0, nx0] of real centred images, estimate the
     pixel-wise Fourier noise using the empty corners of the real images.
 
     Parameters:
@@ -20,7 +20,6 @@ def estimate_noise(imgs, nx_empty=48, nx_final=32):
 
     Returns:
     -------
-
     stddev : [nx_final * nx_final] int array
         The standard deviation of the Fourier coefficients of the noise,
         with the standard ordering and reshaped as a 1D array.
@@ -72,8 +71,7 @@ def average_radially(img, x_grid):
 
 
 def estimate_noise_radial(imgs, nx_empty=48, nx_final=32):
-    """Wrapper around estimate_noise_imgs and radial averaging
-    of the output."""
+    """Estimate the noise and average it radially."""
 
     print("Estimating pixel-wise noise...", end="", flush=True)
     sigma_noise = estimate_noise(imgs, nx_empty, nx_final).reshape([nx_final, nx_final])
