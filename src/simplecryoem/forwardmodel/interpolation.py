@@ -11,11 +11,11 @@ def interpolate(i_coords, grid_vol, vol, method):
     at the coordinates i_coords of M points.
     Nearest neighbour or trilinear interpolation.
 
-    This function assumes the 3D grid has the same length 
+    This function assumes the 3D grid has the same length
     and spacing in each dimension, and calls the more
-    general function 'interpolate_diff_grids', which 
+    general function 'interpolate_diff_grids', which
     takes different grid objects for each dimension.
-    
+
     Parameters
     ----------
     i_coords: 3 x M array
@@ -63,9 +63,9 @@ def interpolate_diff_grids(i_coords, x_grid, y_grid, z_grid, vol, method):
     """
 
     if method == "nn":
-        interp_func = get_interpolate_nn_lambda(x_grid, y_grid, z_grid, vol)
+        interp_func = _get_interpolate_nn_lambda(x_grid, y_grid, z_grid, vol)
     elif method == "tri":
-        interp_func = get_interpolate_tri_lambda(x_grid, y_grid, z_grid, vol)
+        interp_func = _get_interpolate_tri_lambda(x_grid, y_grid, z_grid, vol)
 
     i_vals = jnp.apply_along_axis(interp_func, axis=0, arr=i_coords)
 
@@ -73,34 +73,34 @@ def interpolate_diff_grids(i_coords, x_grid, y_grid, z_grid, vol, method):
 
 
 # Nearest neighbour interpolation
-def get_interpolate_nn_lambda(x_grid, y_grid, z_grid, vol):
+def _get_interpolate_nn_lambda(x_grid, y_grid, z_grid, vol):
     # Obtain the closest grid point to the point and interpolate
     # i.e. take the value of the volume at the closest grid point.
     thelambda = lambda coords: vol[
-        tuple(find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid))
+        tuple(_find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid))
     ]
 
     return thelambda
 
 
-def get_interpolate_tri_lambda(x_grid, y_grid, z_grid, vol):
+def _get_interpolate_tri_lambda(x_grid, y_grid, z_grid, vol):
     # Obtain the eight grid points around each point and interpolate.
     # thelambda = lambda coords : tri_interp_point(coords, vol,
     #    find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid)
     # )
 
-    thelambda = lambda coords: the_lambda_def(coords, x_grid, y_grid, z_grid, vol)
+    thelambda = lambda coords: _the_lambda_def(coords, x_grid, y_grid, z_grid, vol)
 
     return thelambda
 
 
 # The same function as the one returned by the above, but defined properly
 # for debugging purposes
-def the_lambda_def(coords, x_grid, y_grid, z_grid, vol):
-    coords, nearest_pts = find_nearest_eight_grid_points_idx(
+def _the_lambda_def(coords, x_grid, y_grid, z_grid, vol):
+    coords, nearest_pts = _find_nearest_eight_grid_points_idx(
         coords, x_grid, y_grid, z_grid
     )
-    interp_pts = tri_interp_point(coords, vol, nearest_pts)
+    interp_pts = _tri_interp_point(coords, vol, nearest_pts)
 
     # print(" ")
     # print(x_grid, y_grid, z_grid)
@@ -117,7 +117,7 @@ def the_lambda_def(coords, x_grid, y_grid, z_grid, vol):
     return interp_pts
 
 
-def tri_interp_point(i_coords, vol, xyz_and_idx):
+def _tri_interp_point(i_coords, vol, xyz_and_idx):
     """Trilinear interpolation of the volume vol at the point given by coords
     on the grid points given by the first element of the tuple xyz_and_idx.
     Using the methods described on the Wikipedia page
@@ -173,7 +173,7 @@ def tri_interp_point(i_coords, vol, xyz_and_idx):
     return i_val
 
 
-def find_nearest_one_grid_point_idx_old(coords, x_grid, y_grid, z_grid):
+def _find_nearest_one_grid_point_idx_old(coords, x_grid, y_grid, z_grid):
     """For a point given by coords and a grid defined by
     x_grid, y_grid, z_grid, return the grid indices of the nearest grid point to coords.
     It assumes the grid is a Fourier DFT sampling grid in
@@ -197,9 +197,9 @@ def find_nearest_one_grid_point_idx_old(coords, x_grid, y_grid, z_grid):
     """
 
     x, y, z = coords
-    xc_idx = find_nearest_grid_point_idx(x, x_grid[0], x_grid[1])
-    yc_idx = find_nearest_grid_point_idx(y, y_grid[0], y_grid[1])
-    zc_idx = find_nearest_grid_point_idx(z, z_grid[0], z_grid[1])
+    xc_idx = _find_nearest_grid_point_idx(x, x_grid[0], x_grid[1])
+    yc_idx = _find_nearest_grid_point_idx(y, y_grid[0], y_grid[1])
+    zc_idx = _find_nearest_grid_point_idx(z, z_grid[0], z_grid[1])
 
     # Note that x and y indices are swapped so the indexing is the same as in
     # volume
@@ -210,12 +210,12 @@ def find_nearest_one_grid_point_idx_old(coords, x_grid, y_grid, z_grid):
 
 # TODO: run some sanity checks to compare with the old implementaiton.
 # They should both give the same results.
-def find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid):
+def _find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid):
     """An attempt at a more efficient version of find_nearest_one_grid_point_idx_old,
     following the implementation of find_nearest_eight_grid_points_idx, which is
     faster and more memory friendly."""
 
-    coords, (xyz, xyz_idx) = find_nearest_eight_grid_points_idx(
+    coords, (xyz, xyz_idx) = _find_nearest_eight_grid_points_idx(
         coords, x_grid, y_grid, z_grid
     )
 
@@ -257,7 +257,7 @@ def find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid):
     return pts_idx[min_idx]
 
 
-def find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid, eps=1e-13):
+def _find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid, eps=1e-13):
     """For a point given by coords and a grid defined by
     x_grid, y_grid, z_grid, return the 8 grid points nearest to coords
     and their indices on the grid.
@@ -293,25 +293,25 @@ def find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid, eps=1e-13
     eps = 1e-13
 
     cx, cy, cz = coords
-    x0_idx, x1_idx = find_adjacent_grid_points_idx(cx, x_grid[0], x_grid[1], eps)
-    y0_idx, y1_idx = find_adjacent_grid_points_idx(cy, y_grid[0], y_grid[1], eps)
-    z0_idx, z1_idx = find_adjacent_grid_points_idx(cz, z_grid[0], y_grid[1], eps)
+    x0_idx, x1_idx = _find_adjacent_grid_points_idx(cx, x_grid[0], x_grid[1], eps)
+    y0_idx, y1_idx = _find_adjacent_grid_points_idx(cy, y_grid[0], y_grid[1], eps)
+    z0_idx, z1_idx = _find_adjacent_grid_points_idx(cz, z_grid[0], y_grid[1], eps)
 
-    x0 = get_fourier_grid_point(x0_idx, x_grid[0], x_grid[1])
-    x1 = get_fourier_grid_point(x1_idx, x_grid[0], x_grid[1])
+    x0 = _get_fourier_grid_point(x0_idx, x_grid[0], x_grid[1])
+    x1 = _get_fourier_grid_point(x1_idx, x_grid[0], x_grid[1])
     x0x1 = jnp.array([x0, x1])
-    cx, x0x1 = adjust_grid_points(cx, x0x1, x_grid, eps)
+    cx, x0x1 = _adjust_grid_points(cx, x0x1, x_grid, eps)
 
-    y0 = get_fourier_grid_point(y0_idx, y_grid[0], y_grid[1])
-    y1 = get_fourier_grid_point(y1_idx, y_grid[0], y_grid[1])
+    y0 = _get_fourier_grid_point(y0_idx, y_grid[0], y_grid[1])
+    y1 = _get_fourier_grid_point(y1_idx, y_grid[0], y_grid[1])
     y0y1 = jnp.array([y0, y1])
 
-    cy, y0y1 = adjust_grid_points(cy, y0y1, y_grid, eps)
+    cy, y0y1 = _adjust_grid_points(cy, y0y1, y_grid, eps)
 
-    z0 = get_fourier_grid_point(z0_idx, z_grid[0], z_grid[1])
-    z1 = get_fourier_grid_point(z1_idx, z_grid[0], z_grid[1])
+    z0 = _get_fourier_grid_point(z0_idx, z_grid[0], z_grid[1])
+    z1 = _get_fourier_grid_point(z1_idx, z_grid[0], z_grid[1])
     z0z1 = jnp.array([z0, z1])
-    cz, z0z1 = adjust_grid_points(cz, z0z1, z_grid, eps)
+    cz, z0z1 = _adjust_grid_points(cz, z0z1, z_grid, eps)
 
     coords = jnp.array([cx, cy, cz])
     xyz = jnp.array([x0x1, y0y1, z0z1])
@@ -320,7 +320,7 @@ def find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid, eps=1e-13
     return coords, (xyz, xyz_idx.astype(jnp.int64))
 
 
-def get_fourier_grid_point(idx, dx, N):
+def _get_fourier_grid_point(idx, dx, N):
     """Return the grid point at index idx from a grid of frequencies of
     length N and spacing dx, assuming the standard order.
     """
@@ -337,7 +337,7 @@ def get_fourier_grid_point(idx, dx, N):
 
 # TODO: write tests for this function and also add tests to the tri interpolate
 # functions with overflowing coords and the eps stuff.
-def adjust_grid_points(p, x0x1, x_grid, eps=1e-13):
+def _adjust_grid_points(p, x0x1, x_grid, eps=1e-13):
     """Since x0, x1 are grid points on a Fourier grid and the point p
     can overflow once on either side of the grid, we have to ensure that
     x0 <= p <= x1 so that the interpolation gives sensible results.
@@ -378,7 +378,7 @@ def adjust_grid_points(p, x0x1, x_grid, eps=1e-13):
 
 # Can this be vectorized for many coords/points?
 # Would that be needed if we use jax.vmap anyway?
-def find_adjacent_grid_points_idx(p, grid_spacing, grid_length, eps=1e-13):
+def _find_adjacent_grid_points_idx(p, grid_spacing, grid_length, eps=1e-13):
     """For a one dimensional grid of Fourier samples
     and a point p, find the indices of the grid points
     to its left and its right.
@@ -410,7 +410,7 @@ def find_adjacent_grid_points_idx(p, grid_spacing, grid_length, eps=1e-13):
     return idx_left, idx_right
 
 
-def find_nearest_grid_point_idx(p, grid_spacing, grid_length):
+def _find_nearest_grid_point_idx(p, grid_spacing, grid_length):
     """For a one dimensional grid of Fourier samples and a point p,
     find the index of the grid point that is the closest to p.
     The grid is specified as grid_spacing and grid_length, and can be

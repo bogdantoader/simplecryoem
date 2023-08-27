@@ -1,6 +1,9 @@
 import numpy as np
 import jax.numpy as jnp
-from simplecryoem.interpolate import interpolate
+from jax.config import config
+from pyem.vop import grid_correct
+from pyem import star
+
 from simplecryoem.utils import (
     volume_fourier,
     create_2d_mask,
@@ -8,9 +11,7 @@ from simplecryoem.utils import (
     get_rotation_matrix,
 )
 from simplecryoem.ctf import eval_ctf
-from jax.config import config
-from pyem.vop import grid_correct
-from pyem import star
+from . import interpolate
 
 config.update("jax_enable_x64", True)
 

@@ -2,9 +2,10 @@ import unittest
 from jax.config import config
 import numpy as np
 import jax.numpy as jnp
-from simplecryoem.projection import project, project_spatial
-from simplecryoem.utils import spherical_volume
 from numpy.testing import assert_array_almost_equal
+
+from simplecryoem.forwardmodel.projection import project, project_spatial
+from simplecryoem.utils import spherical_volume
 
 config.update("jax_enable_x64", True)
 

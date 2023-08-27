@@ -3,7 +3,8 @@ from jax import random
 import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
-from simplecryoem.jaxops import GradV, Loss
+
+from simplecryoem.loss import Loss, GradV 
 
 
 def conjugate_gradient(op, b, x0, iterations, eps=1e-16, verbose=False):

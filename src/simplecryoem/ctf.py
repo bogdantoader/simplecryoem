@@ -17,7 +17,6 @@ def eval_ctf(s, a, params):
     :param bf:  B-factor, divided by 4 in exponential, lowpass positive.
     :param lp:  Hard low-pass filter (Å), should usually be Nyquist.
     """
-    # TODO: use constants like in Roy's code
     def1 = params[0]
     def2 = params[1]
     angast = params[2]
