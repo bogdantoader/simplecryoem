@@ -5,8 +5,20 @@ as well as jit-compiled functions useful for simulating images and
 reconstruction.
 """
 
-__all__ = ["interpolate", "project_spatial", "project", "apply_shifts_and_ctf", "rotate_and_interpolate", "Slice"]
+__all__ = [
+    "interpolate",
+    "project_spatial",
+    "project",
+    "apply_shifts_and_ctf",
+    "rotate_and_interpolate",
+    "Slice",
+]
 
 from .interpolation import interpolate
-from .projection import project_spatial, project, apply_shifts_and_ctf, rotate_and_interpolate
+from .projection import (
+    project_spatial,
+    project,
+    apply_shifts_and_ctf,
+    rotate_and_interpolate,
+)
 from .slice import Slice
