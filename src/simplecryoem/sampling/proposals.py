@@ -4,14 +4,17 @@ import jax.numpy as jnp
 from functools import partial
 
 from simplecryoem.jaxops import Slice, Loss, GradV
-from simplecryoem.utils import generate_uniform_orientations_jax, generate_perturbed_orientations
+from simplecryoem.utils import (
+    generate_uniform_orientations_jax,
+    generate_perturbed_orientations,
+)
 from .hmc import proposal_hmc
 
 
 class CryoProposals:
     """Class containing MCMC proposal functions that can be useful for
     cryo-EM data processing.
-    
+
     Instantiated with:
     - a noise level sigma_noise
     - a given set of HMC parameters (B, B_list, dt_list_hmc, L_hmc, M)
@@ -65,7 +68,7 @@ class CryoProposals:
     def proposal_orientations_perturb(
         self, key, angles0, logPiX0, v, shifts, ctf_params, imgs, sigma_perturb
     ):
-        """Propose new angles sampled from a normal distribution 
+        """Propose new angles sampled from a normal distribution
         around the current angles `angles0`."""
 
         key, subkey = random.split(key)
@@ -121,7 +124,7 @@ class CryoProposals:
 
     @partial(jax.jit, static_argnums=(0,))
     def proposal_shifts_local(self, key, shifts0, logPiX0, v, proj, ctf_params, imgs):
-        """Propose new shifts sampled from a normal distribution 
+        """Propose new shifts sampled from a normal distribution
         around the current shifts `shifts0`."""
 
         # logPi = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs, self.sigma_noise)
