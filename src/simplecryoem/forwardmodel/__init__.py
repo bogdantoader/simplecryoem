@@ -1,8 +1,8 @@
 """
 The forward model. Functions and classes related to rotation and
 projection, involving tri-linear and nearest-neighbour interpolation,
-as well as jit-compiled functions useful for simulating images and
-reconstruction.
+as well as jit-compiled functions useful for particle image simulation
+and volume reconstruction.
 """
 
 __all__ = [

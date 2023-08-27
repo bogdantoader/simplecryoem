@@ -4,14 +4,14 @@ from jax.config import config
 from pyem.vop import grid_correct
 from pyem import star
 
+from simplecryoem.ctf import eval_ctf
+from . import interpolate
 from simplecryoem.utils import (
     volume_fourier,
     create_2d_mask,
     create_3d_mask,
     get_rotation_matrix,
 )
-from simplecryoem.ctf import eval_ctf
-from . import interpolate
 
 config.update("jax_enable_x64", True)
 
@@ -24,6 +24,36 @@ def project_spatial(
     If N is the number of pixels in one dimension, then the origin is
     assumed to be in the pixel with index (N-1)/2 if N is odd
     and N/2 is N is even, similar to an fftshifted Fourier grid.
+
+    Parameters:
+    -----------
+    v:
+        Volume in spatial domain.
+
+    angles: [psi, tilt, rot]
+        Proper Euler angles.
+
+    pixel_size: double
+        Pixel size in Angstrom.
+
+    shifts : [originx, originy]
+
+    method: "tri" or "nn"
+        Interpolation method.
+
+    ctf_params : 9 x 1 array or None
+        As in the ctf file.
+
+    pfac : int
+        Factor to multiply the interpolation grid in Fourier domain
+        for finer interpolation. Does not affect the dimensions of
+        the output projection.
+
+    Returns:
+    --------
+    v_proj:
+         The projection of the volume after rotation, interpolation,
+         shifts and CTF.
     """
 
     V, grid_vol, grid_proj = volume_fourier(v, pixel_size, pfac)
@@ -39,15 +69,14 @@ def project_spatial(
     return v_proj
 
 
-# TODO: write the doc string properly
 def project(
     vol, angles, shifts, ctf_params, grid_vol, grid_proj, interpolation_method="tri"
 ):
     """Projection in the Fourier domain. Defining separate grid_vol (the grid
     on which the given 3D volume is defined) and grid_proj (the grid on which
     the 2D projection is defined) allows us to implement Relion-style padding
-    (i.e. Oversample the Fourier transform to interpolate on, but the dimension
-    of the projection is equal to that of the initial volume).
+    (i.e. Oversample the Fourier transform to interpolate on, but the dimensions
+    of the projection are equal to those of the initial volume).
 
     Assumption 1: the volume has equal size in all dimensions.
     Assumption 2: the frequencies are in the 'standard' order for vol.
@@ -72,11 +101,13 @@ def project(
         Fourier grid that the projection is defined on.
         It is distinct from grid_vol when pfac > 1.
 
-    interp_method : "tri" or "nn"
+    interpolation_method : "tri" or "nn"
 
     Returns:
     --------
-
+    proj:
+         The projection of the volume after rotation, interpolation,
+         shifts and CTF.
     """
 
     # Get the rotated coordinates of the projection in the z=0 plane.
@@ -93,13 +124,17 @@ def project(
 def rotate_and_interpolate(
     vol, angles, grid_vol, grid_proj, interpolation_method="tri"
 ):
+    """Apply the rotation and interpolation of the z=0 Fourier plane."""
+
     # Get the rotated coordinates of the projection in the z=0 plane.
     proj_coords = rotate_z0(grid_proj, angles)
     return interpolate(proj_coords, grid_vol, vol, interpolation_method)
 
 
 def apply_shifts_and_ctf(proj, shifts, ctf_params, grid_proj):
-    """To apply no CTF, simply make ctf_params a scalar instead of an array."""
+    """Apply the shifts and CTF to an image in the Fourier domain.
+
+    To apply no CTF, make ctf_params None."""
 
     shift = get_shift_term(grid_proj, grid_proj, shifts)
     proj *= shift
@@ -188,7 +223,9 @@ def get_shift_term(x_grid, y_grid, shifts):
 
 def project_star_params(vol, p, pfac=1):
     """Spatial domain projection of vol with parameters from one row of
-    a star file given by dictionary p. Useful to compare against Relion/pyem.
+    a star file given by the dictionary p.
+
+    Useful to compare against Relion and pyem.
     We assume vol is the same size in all dimensions."""
 
     vol = grid_correct(vol, pfac=pfac, order=1)

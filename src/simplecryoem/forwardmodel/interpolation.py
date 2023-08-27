@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 import jax
 from jax.config import config
+import warnings
 
 config.update("jax_enable_x64", True)
 
@@ -27,12 +28,12 @@ def interpolate(i_coords, grid_vol, vol, method):
     vol : Nx x Ny x Nz array
         The volume
     method: string
-        "nn" for nearest neighbour
-        "tri" for trilinear
+        "nn" for nearest neighbour interpolation
+        "tri" for trilinear interpolation
     Returns
     -------
     i_vals : NxNy x 1 array
-        The interpolated values of vol.
+        The interpolated values of vol at grid coordinates i_coords.
     """
     return interpolate_diff_grids(i_coords, grid_vol, grid_vol, grid_vol, vol, method)
 
@@ -63,58 +64,39 @@ def interpolate_diff_grids(i_coords, x_grid, y_grid, z_grid, vol, method):
     """
 
     if method == "nn":
-        interp_func = _get_interpolate_nn_lambda(x_grid, y_grid, z_grid, vol)
+        interp_func = _get_interpolate_nn_func(x_grid, y_grid, z_grid, vol)
     elif method == "tri":
-        interp_func = _get_interpolate_tri_lambda(x_grid, y_grid, z_grid, vol)
+        interp_func = _get_interpolate_tri_func(x_grid, y_grid, z_grid, vol)
 
     i_vals = jnp.apply_along_axis(interp_func, axis=0, arr=i_coords)
 
     return i_vals
 
 
-# Nearest neighbour interpolation
-def _get_interpolate_nn_lambda(x_grid, y_grid, z_grid, vol):
-    # Obtain the closest grid point to the point and interpolate
-    # i.e. take the value of the volume at the closest grid point.
-    thelambda = lambda coords: vol[
-        tuple(_find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid))
-    ]
+def _get_interpolate_nn_func(x_grid, y_grid, z_grid, vol):
+    """Obtain the closest grid point to the point and interpolate
+    i.e. take the value of the volume at the closest grid point."""
 
-    return thelambda
+    def interpolate_nn_func(coords):
+        return vol[
+            tuple(_find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid))
+        ]
 
-
-def _get_interpolate_tri_lambda(x_grid, y_grid, z_grid, vol):
-    # Obtain the eight grid points around each point and interpolate.
-    # thelambda = lambda coords : tri_interp_point(coords, vol,
-    #    find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid)
-    # )
-
-    thelambda = lambda coords: _the_lambda_def(coords, x_grid, y_grid, z_grid, vol)
-
-    return thelambda
+    return interpolate_nn_func
 
 
-# The same function as the one returned by the above, but defined properly
-# for debugging purposes
-def _the_lambda_def(coords, x_grid, y_grid, z_grid, vol):
-    coords, nearest_pts = _find_nearest_eight_grid_points_idx(
-        coords, x_grid, y_grid, z_grid
-    )
-    interp_pts = _tri_interp_point(coords, vol, nearest_pts)
+def _get_interpolate_tri_func(x_grid, y_grid, z_grid, vol):
+    """Obtain the eight grid points around each point and interpolate."""
 
-    # print(" ")
-    # print(x_grid, y_grid, z_grid)
-    # print("Coords = ", coords)
+    def interpolate_tri_func(coords):
+        coords, nearest_pts = _find_nearest_eight_grid_points_idx(
+            coords, x_grid, y_grid, z_grid
+        )
+        interp_pts = _tri_interp_point(coords, vol, nearest_pts)
 
-    # print("Nearest_pts = ", nearest_pts[0])
-    # print("Nearest_pts_idx = ", nearest_pts[1])
+        return interp_pts
 
-    # print("Interp values = ", interp_pts)
-
-    # print("Volx0 = ", vol[3,0:2,0:2])
-    # print("Volx1 = ", vol[4,0:2,0:2])
-
-    return interp_pts
+    return interpolate_tri_func
 
 
 def _tri_interp_point(i_coords, vol, xyz_and_idx):
@@ -173,11 +155,15 @@ def _tri_interp_point(i_coords, vol, xyz_and_idx):
     return i_val
 
 
-def _find_nearest_one_grid_point_idx_old(coords, x_grid, y_grid, z_grid):
+def _find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid):
     """For a point given by coords and a grid defined by
     x_grid, y_grid, z_grid, return the grid indices of the nearest grid point to coords.
     It assumes the grid is a Fourier DFT sampling grid in
     'standard' order (e.g. [0, 1, ..., n/2-1, -n/2, ..., -2, -1]).
+
+    A more efficient version of _find_nearest_one_grid_point_idx_old,
+    following the implementation of _find_nearest_eight_grid_points_idx, which is
+    faster and more memory friendly.
 
     Parameters
     ----------
@@ -195,25 +181,6 @@ def _find_nearest_one_grid_point_idx_old(coords, x_grid, y_grid, z_grid):
         coords. Note that x and y indices are swapped to match the indexing of
         the volume given by meshgrid(indices='xy')
     """
-
-    x, y, z = coords
-    xc_idx = _find_nearest_grid_point_idx(x, x_grid[0], x_grid[1])
-    yc_idx = _find_nearest_grid_point_idx(y, y_grid[0], y_grid[1])
-    zc_idx = _find_nearest_grid_point_idx(z, z_grid[0], z_grid[1])
-
-    # Note that x and y indices are swapped so the indexing is the same as in
-    # volume
-    xyz_idx = jnp.array([yc_idx, xc_idx, zc_idx])
-
-    return xyz_idx.astype(jnp.int64)
-
-
-# TODO: run some sanity checks to compare with the old implementaiton.
-# They should both give the same results.
-def _find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid):
-    """An attempt at a more efficient version of find_nearest_one_grid_point_idx_old,
-    following the implementation of find_nearest_eight_grid_points_idx, which is
-    faster and more memory friendly."""
 
     coords, (xyz, xyz_idx) = _find_nearest_eight_grid_points_idx(
         coords, x_grid, y_grid, z_grid
@@ -250,11 +217,54 @@ def _find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid):
 
     # Compute the distances between the given point ('coords')
     # and its eight neighbour grid points.
-    calc_dists = lambda p1, p2: jnp.linalg.norm(p1 - p2, 2)
-    dists = jax.vmap(calc_dists, in_axes=(None, 0))(coords, pts)
+    dists = jax.vmap(lambda p1, p2: jnp.linalg.norm(p1 - p2, 2), in_axes=(None, 0))(
+        coords, pts
+    )
     min_idx = jnp.argsort(dists)[0]
 
     return pts_idx[min_idx]
+
+
+def _find_nearest_one_grid_point_idx_old(coords, x_grid, y_grid, z_grid):
+    """WARNING: This function is deprecated and should be replaced with
+    the more efficient version _find_nearest_one_grid_point_idx.
+
+    For a point given by coords and a grid defined by
+    x_grid, y_grid, z_grid, return the grid indices of the nearest grid point to coords.
+    It assumes the grid is a Fourier DFT sampling grid in
+    'standard' order (e.g. [0, 1, ..., n/2-1, -n/2, ..., -2, -1]).
+
+    Parameters
+    ----------
+    coords: array of length 3
+        The coordinates of the input points
+    x_grid, y_grid, z_grid: [grid_spacing, grid_length]
+        The grid spacing and grid size of the Fourier grids on which we want
+        to find the nearest neighbour. The full grids can be obtained
+        by running: x_freq = np.fft.fftfreq(grid_length, 1/(grid_length*grid_spacing)).
+
+    Returns
+    -------
+    index_in_volume: array of length 3
+        The index in the volume (and grids) of the nearest grid point to
+        coords. Note that x and y indices are swapped to match the indexing of
+        the volume given by meshgrid(indices='xy')
+    """
+
+    warnings.warn(
+        "Deprecated: Use _find_nearest_one_grid_point_idx instead!", DeprecationWarning
+    )
+
+    x, y, z = coords
+    xc_idx = _find_nearest_grid_point_idx(x, x_grid[0], x_grid[1])
+    yc_idx = _find_nearest_grid_point_idx(y, y_grid[0], y_grid[1])
+    zc_idx = _find_nearest_grid_point_idx(z, z_grid[0], z_grid[1])
+
+    # Note that x and y indices are swapped so the indexing is the same as in
+    # volume
+    xyz_idx = jnp.array([yc_idx, xc_idx, zc_idx])
+
+    return xyz_idx.astype(jnp.int64)
 
 
 def _find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid, eps=1e-13):
@@ -276,6 +286,9 @@ def _find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid, eps=1e-1
         The grid spacing and grid size of the Fourier grids on which we want
         to find the nearest eight grid points. The full grids can be obtained
         by running: x_freq = np.fft.fftfreq(grid_length, 1/(grid_length*grid_spacing)).
+    eps: Double
+        How far we can be from the grid point (on either side)
+        to still be at that point.
 
     Returns
     -------
@@ -289,8 +302,7 @@ def _find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid, eps=1e-1
         x_freq, y_freq, z_freq.
     """
 
-    # For smaller eps, we start to see artefacts, so be careful.
-    eps = 1e-13
+    # For eps < 1e-13, we start to see artefacts, so be careful.
 
     cx, cy, cz = coords
     x0_idx, x1_idx = _find_adjacent_grid_points_idx(cx, x_grid[0], x_grid[1], eps)
@@ -322,7 +334,7 @@ def _find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid, eps=1e-1
 
 def _get_fourier_grid_point(idx, dx, N):
     """Return the grid point at index idx from a grid of frequencies of
-    length N and spacing dx, assuming the standard order.
+    length N and spacing dx, assuming the standard order in Fourier space.
     """
     # return dx*idx if idx < N/2 else dx * (idx - N)
 
@@ -365,7 +377,6 @@ def _adjust_grid_points(p, x0x1, x_grid, eps=1e-13):
 
     # Now, the only issue can be when the 'right' grid point is 0.
     # We fix that by making it grid_length*grid_spacing.
-
     x0x1 = jax.lax.cond(
         x0x1[1] == 0,
         true_fun=lambda _: x0x1.at[1].set(px),
@@ -376,8 +387,6 @@ def _adjust_grid_points(p, x0x1, x_grid, eps=1e-13):
     return p, x0x1
 
 
-# Can this be vectorized for many coords/points?
-# Would that be needed if we use jax.vmap anyway?
 def _find_adjacent_grid_points_idx(p, grid_spacing, grid_length, eps=1e-13):
     """For a one dimensional grid of Fourier samples
     and a point p, find the indices of the grid points
@@ -410,7 +419,7 @@ def _find_adjacent_grid_points_idx(p, grid_spacing, grid_length, eps=1e-13):
     return idx_left, idx_right
 
 
-def _find_nearest_grid_point_idx(p, grid_spacing, grid_length):
+def _find_nearest_grid_point_idx(p, grid_spacing, grid_length, eps=1e-13):
     """For a one dimensional grid of Fourier samples and a point p,
     find the index of the grid point that is the closest to p.
     The grid is specified as grid_spacing and grid_length, and can be
@@ -419,9 +428,7 @@ def _find_nearest_grid_point_idx(p, grid_spacing, grid_length):
 
     """
 
-    eps = 1e-15
-
-    # For now, just generate the grid - hack it later if needed.
+    # For now, just generate the grid.
     grid = jnp.fft.fftfreq(int(grid_length), 1 / (grid_length * grid_spacing))
 
     # In case we need to wrap around (maxium once on each side)
@@ -446,6 +453,7 @@ def _find_nearest_grid_point_idx(p, grid_spacing, grid_length):
     # We do the following to ensure that when the point is at the midpoint
     # between two grid points (or withing epsilon away from it due to e.g.
     # floating point error), we select the point on the left.
+    # For consistency.
 
     # Find the index of the second closest grid point
     # dists[closest_idx1] = jnp.inf
