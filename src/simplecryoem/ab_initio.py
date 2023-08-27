@@ -7,8 +7,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 import mrcfile
 
-from simplecryoem.algorithm import get_sgd_vol_ops, sgd
-from simplecryoem.mcmc import mcmc
+from simplecryoem.optimization import sgd, get_sgd_vol_ops
+from simplecryoem.sampling import mcmc_sampling, CryoProposals
+from simplecryoem.forwardmoel import Slice
+from simplecryoem.loss import Loss, GradV
 from simplecryoem.utils import (
     create_3d_mask,
     crop_fourier_volume,
@@ -18,8 +20,6 @@ from simplecryoem.utils import (
     generate_uniform_orientations_jax_batch,
     plot_angles,
 )
-from simplecryoem.jaxops import Slice, Loss, GradV
-from simplecryoem.proposals import CryoProposals
 
 
 def ab_initio_mcmc(
@@ -260,7 +260,7 @@ def ab_initio_mcmc(
                             "N_samples_shifts": N_samples_shifts_global,
                         }
                         as0 = jnp.concatenate([angles_iter[i], shifts_iter[i]], axis=1)
-                        _, r_samples_as, samples_as = mcmc(
+                        _, r_samples_as, samples_as = mcmc_sampling(
                             key_angles_unif,
                             proposals.proposal_mtm_orientations_shifts,
                             as0,
@@ -282,7 +282,7 @@ def ab_initio_mcmc(
                             "imgs": imgs_iter[i],
                             "shifts": shifts_iter[i],
                         }
-                        _, r_samples_as, samples_angles = mcmc(
+                        _, r_samples_as, samples_angles = mcmc_sampling(
                             key_angles_unif,
                             proposals.proposal_orientations_uniform,
                             angles_iter[i],
@@ -324,7 +324,7 @@ def ab_initio_mcmc(
                     "imgs": imgs_iter[i],
                     "sigma_perturb": sigma_perturb_list,
                 }
-                _, r_samples_angles, samples_angles = mcmc(
+                _, r_samples_angles, samples_angles = mcmc_sampling(
                     key_angles_pert,
                     proposals.proposal_orientations_perturb,
                     angles_iter[i],
@@ -364,7 +364,7 @@ def ab_initio_mcmc(
                     "ctf_params": ctf_params_iter[i],
                     "imgs": imgs_iter[i],
                 }
-                _, r_samples_shifts, samples_shifts = mcmc(
+                _, r_samples_shifts, samples_shifts = mcmc_sampling(
                     key_shifts,
                     proposals.proposal_shifts_local,
                     shifts_iter[i],
@@ -403,7 +403,7 @@ def ab_initio_mcmc(
             proposal_vol = proposals.proposal_vol_batch
 
         t0 = time.time()
-        v_hmc_mean, r_hmc, v_hmc_samples = mcmc(
+        v_hmc_mean, r_hmc, v_hmc_samples = mcmc_sampling(
             key_volume,
             proposal_vol,
             v,

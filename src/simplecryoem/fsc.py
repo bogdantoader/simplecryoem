@@ -1,13 +1,14 @@
 import numpy as np
 import jax
 import jax.numpy as jnp
-from simplecryoem.projection import rotate_z0
-from simplecryoem.interpolate import (
-    find_nearest_eight_grid_points_idx,
-    find_nearest_one_grid_point_idx,
-)
-from simplecryoem.emfiles import load_data
 import mrcfile
+
+from simplecryoem.emfiles import load_data
+from simplecryoem.forwardmodel.projection import rotate_z0
+from simplecryoem.forwardmodel.interpolation import (
+    _find_nearest_eight_grid_points_idx,
+    _find_nearest_one_grid_point_idx,
+)
 
 
 def calc_fsc(v1, v2, grid, dr=None):
@@ -202,7 +203,7 @@ def points_orientations_tri(angles, nx, number_of_batches=100):
     rc = rotate_list(x_grid, angles)
     print("Finding point indices")
     _, (_, xyz_idxs) = jax.vmap(
-        find_nearest_eight_grid_points_idx, in_axes=(1, None, None, None)
+        _find_nearest_eight_grid_points_idx, in_axes=(1, None, None, None)
     )(rc, x_grid, x_grid, x_grid)
 
     shape = np.array([nx, nx, nx]).astype(np.int64)
@@ -273,7 +274,7 @@ def points_orientations_tri_iter(angles, nx):
         rc = rotate_z0(x_grid, ang).T
 
         for c in rc:
-            _, (_, xyz_idx) = find_nearest_eight_grid_points_idx(
+            _, (_, xyz_idx) = _find_nearest_eight_grid_points_idx(
                 c, x_grid, x_grid, x_grid
             )
 
@@ -300,9 +301,9 @@ def points_orientations_nn(angles, nx):
     x_grid = jnp.array([1, nx])
 
     rc = rotate_list(x_grid, angles)
-    xyz_idxs = jax.vmap(find_nearest_one_grid_point_idx, in_axes=(1, None, None, None))(
-        rc, x_grid, x_grid, x_grid
-    )
+    xyz_idxs = jax.vmap(
+        _find_nearest_one_grid_point_idx, in_axes=(1, None, None, None)
+    )(rc, x_grid, x_grid, x_grid)
 
     shape = np.array([nx, nx, nx]).astype(np.int64)
     points_v = np.zeros(shape)
