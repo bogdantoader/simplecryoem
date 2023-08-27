@@ -1,10 +1,9 @@
 import jax
 from jax import random
 import jax.numpy as jnp
-from simplecryoem.utils import l2sq
 
 
-def mcmc(
+def mcmc_sampling(
     key,
     proposal_func,
     x0,
@@ -25,16 +24,15 @@ def mcmc(
     proposal_func :
         Function that gives a proposal sample and its
         Metropolis-Hastings ratio r.
-    x0:
+
+    x0 :
         Starting point.
 
     N_samples : int
         Number of MCMC samples
 
-    logPi :
-        Function that evaluates the log of the target
-        distribution Pi. It is only used for displaying progress
-        or debugging, the actual computation is done inside proposal_func.
+    proposal_params: dict
+        Dictionary containing the parameters of proposal_func.
 
     N_batch : int
         The number of independent variables that are being sampled
@@ -45,6 +43,8 @@ def mcmc(
         Save and return all the samples with index i such that
         mod(i, save_samples) = 0. If save_samples = -1, only return
         the last sample.
+
+    verbose : boolean
 
     iter_display : int
         Show the value of the distribution at the current sample
@@ -119,6 +119,10 @@ def mcmc(
 
 @jax.jit
 def accept_reject_scalar(unif_var, a, x0, x1, logPiX0, logPiX1):
+    """Reject function to accept/reject proposed samples.
+    This version of the function works with scalars.
+    For vectors, use `accept_reject_vmap`."""
+
     x = jax.lax.cond(
         unif_var <= a, true_fun=lambda _: x1, false_fun=lambda _: x0, operand=None
     )
@@ -134,50 +138,3 @@ def accept_reject_scalar(unif_var, a, x0, x1, logPiX0, logPiX1):
 
 
 accept_reject_vmap = jax.jit(jax.vmap(accept_reject_scalar, in_axes=(0, 0, 0, 0, 0, 0)))
-
-
-def proposal_hmc(key, x0, logPiX0, logPi, gradLogPi, dt_list, L=1, M=1):
-    """Hamiltonian Monte Carlo proposal function.
-    For simplicity, the mass matrix M is an array of
-    entry-wise scalings (i.e. a diagonal matrix).
-    This should be scaled roughly similarly to gradLogPi, e.g.
-    M = 1/max(sigma_noise)**2 * ones.
-    """
-
-    key, subkey = random.split(key)
-    dt = random.permutation(subkey, dt_list)[0]
-
-    logPiX0 = logPi(x0)
-
-    p0 = random.normal(key, x0.shape) * M
-    r0exponent = logPiX0 - jnp.sum(jnp.real(jnp.conj(p0) * p0)) / 2
-
-    # Doing this so that we don't compute gradLogPi(x1) twice.
-    gradLogPiX0 = gradLogPi(x0)
-
-    body_func = lambda i, xpg0: leapfrog_step(i, xpg0, dt, gradLogPi, M)
-
-    x1 = x0
-    p1 = p0
-    gradLogPiX1 = gradLogPiX0
-    for i in jnp.arange(0, L):
-        x1, p1, gradLogPiX1 = body_func(i, jnp.array([x1, p1, gradLogPiX1]))
-
-    logPiX1 = logPi(x1)
-    r1exponent = logPiX1 - jnp.sum(jnp.real(jnp.conj(p1) * p1)) / 2
-    r = jnp.exp(r1exponent - r0exponent)
-
-    return x1, r, logPiX1, logPiX0
-
-
-def leapfrog_step(i, xpg0, dt, gradLogPi, M):
-    x0, p0, gradLogPiX0 = xpg0
-
-    # note the + instead of in the p updates since we take U(x)=-log(pi(x))
-    p01 = p0 + dt / 2 * gradLogPiX0
-    x1 = x0 + dt * p01 / M
-
-    gradLogPiX1 = gradLogPi(x1)
-    p1 = p01 + dt / 2 * gradLogPiX1
-
-    return jnp.array([x1, p1, gradLogPiX1])

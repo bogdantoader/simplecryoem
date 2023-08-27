@@ -4,11 +4,22 @@ import jax.numpy as jnp
 from functools import partial
 
 from simplecryoem.jaxops import Slice, Loss, GradV
-from simplecryoem.utils import *
-from simplecryoem.mcmc import proposal_hmc
+from simplecryoem.utils import generate_uniform_orientations_jax, generate_perturbed_orientations
+from .hmc import proposal_hmc
 
 
 class CryoProposals:
+    """Class containing MCMC proposal functions that can be useful for
+    cryo-EM data processing.
+    
+    Instantiated with:
+    - a noise level sigma_noise
+    - a given set of HMC parameters (B, B_list, dt_list_hmc, L_hmc, M)
+    - Slice, Loss, GradV objects
+
+    Its methods represent MCMC proposal functions for volume, orientations and shifts.
+    """
+
     def __init__(
         self,
         sigma_noise,
@@ -35,6 +46,8 @@ class CryoProposals:
     def proposal_orientations_uniform(
         self, key, angles0, logPiX0, v, shifts, ctf_params, imgs
     ):
+        """Propose new angles sampled uniformly on SO(3)."""
+
         empty_params = {}
         return self._proposal_orientations(
             key,
@@ -52,6 +65,9 @@ class CryoProposals:
     def proposal_orientations_perturb(
         self, key, angles0, logPiX0, v, shifts, ctf_params, imgs, sigma_perturb
     ):
+        """Propose new angles sampled from a normal distribution 
+        around the current angles `angles0`."""
+
         key, subkey = random.split(key)
         sig_p = random.permutation(subkey, sigma_perturb)[0]
         orient_params = {"sig": sig_p}
@@ -80,6 +96,10 @@ class CryoProposals:
         generate_orientations_func,
         params_orientations,
     ):
+        """Generic orientations proposal function that is called by the
+        public orientations proposal functions above, together with a
+        function that generates new angles."""
+
         # logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs, sigma_noise_iter)
         logPi = lambda a: -self.loss.loss_batched0(
             v, a, shifts, ctf_params, imgs, self.sigma_noise
@@ -101,6 +121,9 @@ class CryoProposals:
 
     @partial(jax.jit, static_argnums=(0,))
     def proposal_shifts_local(self, key, shifts0, logPiX0, v, proj, ctf_params, imgs):
+        """Propose new shifts sampled from a normal distribution 
+        around the current shifts `shifts0`."""
+
         # logPi = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs, self.sigma_noise)
         logPi = lambda sh: -self.loss.loss_proj_batched(
             v, proj, sh, ctf_params, imgs, self.sigma_noise
@@ -129,6 +152,8 @@ class CryoProposals:
 
     @partial(jax.jit, static_argnums=(0,))
     def proposal_vol(self, key, v0, logPiX0, angles, shifts, ctf_params, imgs):
+        """Propose new volume using Hamiltonian Monte Carlo (HMC)."""
+
         logPi_vol = lambda v: -self.loss.loss_sum(
             v, angles, shifts, ctf_params, imgs, self.sigma_noise
         )
@@ -150,8 +175,8 @@ class CryoProposals:
         )
 
     def proposal_vol_batch(self, key, v0, logPiX0, angles, shifts, ctf_params, imgs):
-        """Similar to proposal_func_vol, but it loads the images to GPU in batches to
-        compute the gradient, so it is not jit-ed"""
+        """Similar to proposal_vol, but it loads the images to GPU in batches to
+        compute the gradient, so it is not jit-ed."""
 
         def logPi_vol(v):
             loss = 0
@@ -195,6 +220,8 @@ class CryoProposals:
     def proposal_mtm_orientations_shifts(
         self, key, as0, logPiX0, v, ctf_params, imgs, N_samples_shifts=100
     ):
+        """Propose both angles and shifts using Multiple-try Metropolis."""
+
         key, *keys = random.split(key, 4)
 
         angles0 = as0[:, :3]
