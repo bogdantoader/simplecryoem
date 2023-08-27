@@ -21,13 +21,14 @@ def proposal_hmc(key, x0, logPiX0, logPi, gradLogPi, dt_list, L=1, M=1):
     # Doing this so that we don't compute gradLogPi(x1) twice.
     gradLogPiX0 = gradLogPi(x0)
 
-    body_func = lambda i, xpg0: leapfrog_step(i, xpg0, dt, gradLogPi, M)
+    def apply_leapfrog_step(i, xpg0):
+        return leapfrog_step(i, xpg0, dt, gradLogPi, M)
 
     x1 = x0
     p1 = p0
     gradLogPiX1 = gradLogPiX0
     for i in jnp.arange(0, L):
-        x1, p1, gradLogPiX1 = body_func(i, jnp.array([x1, p1, gradLogPiX1]))
+        x1, p1, gradLogPiX1 = apply_leapfrog_step(i, jnp.array([x1, p1, gradLogPiX1]))
 
     logPiX1 = logPi(x1)
     r1exponent = logPiX1 - jnp.sum(jnp.real(jnp.conj(p1) * p1)) / 2
@@ -51,7 +52,7 @@ def leapfrog_step(i, xpg0, dt, gradLogPi, M):
 
     Returns:
     --------
-    xpg0 : jnp.array([x1, p1, grad(log(Pi(x1)))])
+    xpg1 : jnp.array([x1, p1, grad(log(Pi(x1)))])
 
     """
     x0, p0, gradLogPiX0 = xpg0

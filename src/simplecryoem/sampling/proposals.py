@@ -3,7 +3,8 @@ from jax import random
 import jax.numpy as jnp
 from functools import partial
 
-from simplecryoem.jaxops import Slice, Loss, GradV
+from simplecryoem.forwardmodel import Slice
+from simplecryoem.loss import Loss, GradV
 from simplecryoem.utils import (
     generate_uniform_orientations_jax,
     generate_perturbed_orientations,
@@ -16,7 +17,7 @@ class CryoProposals:
     cryo-EM data processing.
 
     Instantiated with:
-    - a noise level sigma_noise
+    - noise level sigma_noise
     - a given set of HMC parameters (B, B_list, dt_list_hmc, L_hmc, M)
     - Slice, Loss, GradV objects
 
@@ -103,10 +104,14 @@ class CryoProposals:
         public orientations proposal functions above, together with a
         function that generates new angles."""
 
-        # logPi = lambda a : -loss_func_batched0_iter(v, a, shifts, ctf_params, imgs, sigma_noise_iter)
-        logPi = lambda a: -self.loss.loss_batched0(
-            v, a, shifts, ctf_params, imgs, self.sigma_noise
-        )
+        # logPi = lambda a : -loss_func_batched0_iter(
+        #    v, a, shifts, ctf_params, imgs, sigma_noise_iter
+        # )
+
+        def logPi(a):
+            return -self.loss.loss_batched0(
+                v, a, shifts, ctf_params, imgs, self.sigma_noise
+            )
 
         angles1 = generate_orientations_func(key, angles0, **params_orientations)
 
@@ -127,10 +132,14 @@ class CryoProposals:
         """Propose new shifts sampled from a normal distribution
         around the current shifts `shifts0`."""
 
-        # logPi = lambda sh : -loss_proj_func_batched0_iter(v, proj, sh, ctf_params, imgs, self.sigma_noise)
-        logPi = lambda sh: -self.loss.loss_proj_batched(
-            v, proj, sh, ctf_params, imgs, self.sigma_noise
-        )
+        # logPi = lambda sh : -loss_proj_func_batched0_iter(
+        #    v, proj, sh, ctf_params, imgs, self.sigma_noise
+        # )
+
+        def logPi(sh):
+            return -self.loss.loss_proj_batched(
+                v, proj, sh, ctf_params, imgs, self.sigma_noise
+            )
 
         logPiX0 = jax.lax.cond(
             jnp.sum(logPiX0) == jnp.inf,
@@ -157,14 +166,17 @@ class CryoProposals:
     def proposal_vol(self, key, v0, logPiX0, angles, shifts, ctf_params, imgs):
         """Propose new volume using Hamiltonian Monte Carlo (HMC)."""
 
-        logPi_vol = lambda v: -self.loss.loss_sum(
-            v, angles, shifts, ctf_params, imgs, self.sigma_noise
-        )
-        gradLogPi_vol = lambda v: -jnp.conj(
-            self.gradv.grad_loss_volume_sum(
+        def logPi_vol(v):
+            return -self.loss.loss_sum(
                 v, angles, shifts, ctf_params, imgs, self.sigma_noise
             )
-        )
+
+        def gradLogPi_vol(v):
+            return -jnp.conj(
+                self.gradv.grad_loss_volume_sum(
+                    v, angles, shifts, ctf_params, imgs, self.sigma_noise
+                )
+            )
 
         return proposal_hmc(
             key,

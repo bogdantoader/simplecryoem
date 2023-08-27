@@ -119,7 +119,7 @@ def mcmc_sampling(
 
 @jax.jit
 def accept_reject_scalar(unif_var, a, x0, x1, logPiX0, logPiX1):
-    """Reject function to accept/reject proposed samples.
+    """Function to accept/reject proposed samples.
     This version of the function works with scalars.
     For vectors, use `accept_reject_vmap`."""
 
