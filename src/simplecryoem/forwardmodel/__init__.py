@@ -9,6 +9,7 @@ __all__ = [
     "interpolate",
     "project_spatial",
     "project",
+    "project_star_params",
     "apply_shifts_and_ctf",
     "rotate_and_interpolate",
     "Slice",
@@ -18,6 +19,7 @@ from .interpolation import interpolate
 from .projection import (
     project_spatial,
     project,
+    project_star_params,
     apply_shifts_and_ctf,
     rotate_and_interpolate,
 )

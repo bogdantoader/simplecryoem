@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from functools import partial
 
 from simplecryoem.forwardmodel import Slice
-from simplecryoem.loss import Loss, GradV
+from simplecryoem.optimization import Loss, GradV
 from simplecryoem.utils import (
     generate_uniform_orientations_jax,
     generate_perturbed_orientations,

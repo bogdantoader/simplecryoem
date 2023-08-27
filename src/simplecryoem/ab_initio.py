@@ -11,10 +11,10 @@ from simplecryoem.forwardmodel import (
     project,
     rotate_and_interpolate,
     apply_shifts_and_ctf,
+    Slice,
 )
 from simplecryoem.optimization import Loss, GradV, sgd, get_sgd_vol_ops
 from simplecryoem.sampling import mcmc_sampling, CryoProposals
-from simplecryoem.forwardmoel import Slice
 from simplecryoem.utils import (
     create_3d_mask,
     crop_fourier_volume,
