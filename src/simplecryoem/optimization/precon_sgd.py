@@ -23,13 +23,94 @@ def precon_sgd(
     iter_display=1,
     adaptive_threshold=False,
 ):
-    """Preconditioned SGD, where the preconditioner is estimated
-    and improved using minibatches and Hutchinson's diagonal estimator.
+    """Preconditioned SGD, where the diagonal of the Hessian of the
+    loss function is estimated and improved using minibatches and
+    Hutchinson's diagonal estimator. This estimate is then used
+    as a diagonal preconditioner.
 
-    The adaptive step size uses line search with preconditioned
-    Armijo condition. When the adaptive_step_size=False, the algorithm
-    is the same as OASIS with fixed learning rate
-    (see Jahani et al., 2021).
+    The adaptive step size uses line search with preconditioned Armijo condition.
+
+    When the adaptive_step_size=False, the algorithm is the same as OASIS
+    with fixed learning rate (see Jahani et al., 2021).
+
+    Parameters:
+    -----------
+    key: jax.random.PRNGKey
+
+    F : (x, idx) -> sum_i f_i(x), i=1,...N
+         A function that takes a volume x and an array of indices idx
+         and returns the sum of the loss functions at
+         volume x and images indexed by idx.
+
+    gradF : (x, idx) -> sum_i grad(f_i(x)), i=1,...N
+         A function that takes a volume x and an array of indices idx
+         and returns the sum of the gradients of the loss functions at
+         volume x and images indexed by idx.
+
+    hvpF: (v, x, idx) -> (sum_i Hessian(f_i(v)))^T x, i=1,...N
+         A function that takes a volume v, a vector (i.e. another volume) x
+         and an array of indices idx and returns
+         Hessian-vector product of the loss function over the minibatch idx
+         evaluated at v and applied to x.
+
+    w0 : nx x nx x nx
+         Starting volume
+
+    eta: float
+         (Initial) Step size.
+
+    D0 : nx x nx x nx
+         Initialization of the diagonal of the Hessian to be estimated
+         during the run.
+
+    beta2 : double
+         Weight used in the exponential average between D0 and the
+         current estimate of the Hessian diagonal.
+
+    alpha : double
+        Threshold the current estimate of the Hessian diagonal D from
+        below if its entries are very small so that the preconditioner
+        P = 1/D does not blow up.
+
+    N_epoch : int
+         Number of passes through the full dataset.
+
+    batch_size : int
+         Batch size. Set to None for deterministic gradient descent.
+
+    N : int
+         The total number of images/particles.
+
+    adaptive_step_size: boolean
+         Step size adaptation based on (precondition) Armijo condition.
+
+    c : double
+         Constant that determines the strength of the Armijo condition.
+
+    eps :
+        Stop when max(abs(gradient_epoch)) < eps.
+
+    iter_display : int
+        Print output every iter_display epochs. Default value 1.
+        Set higher when running many epochs for deterministic gradient descent.
+
+    adaptive_threshold : boolean
+        Adpative rule for adjusting the preconditioner threshold alpha.
+
+    Returns:
+    --------
+    w1: nx x nx x nx
+        Final volume reconstruction
+
+    loss_list : jnp.array(loss_list)
+        Loss function values at the end of each epoch.
+
+    iterates: N_epoch x nx x nx x nx
+        Iterates from all epochs.
+
+    step_sizes:
+        All step sizes from all iterations (not epochs).
+
     """
 
     n = jnp.array(w0.shape)
@@ -50,7 +131,6 @@ def precon_sgd(
     # (or even between iterations within an epoch)
     # depending on when the Hessian changes
     nsamp = 0
-    # D1sum = jnp.zeros(D0.shape)
     Davg = jnp.zeros(D0.shape)
 
     if adaptive_step_size:
@@ -83,41 +163,36 @@ def precon_sgd(
             else:
                 pbar = range(len(idx_batches_grad))
             for k in pbar:
+                # Draw rademacher vectors
                 h_steps = 1
 
                 z = random.rademacher(
                     zkeys[k - 1], jnp.flip(jnp.append(n, h_steps))
                 ).astype(w0.dtype)
 
-                # D1 = beta2 * D0 + (1-beta2) * (z * hvpF(w1, z, idx_batches_grad[k-1]))
-
-                # D1sum = D1sum + (z * hvpF(w1, z, idx_batches_grad[k-1]))
-
+                # Apply the Hutchinson step for each Rademacher vector
                 hvp_step = [zi * hvpF(w0, zi, idx_batches_grad[k - 1]) for zi in z]
                 hvp_step = jnp.mean(jnp.array(hvp_step), axis=0)
-                # D1sum += hvp_step
-                # nsamp += 1
-                # Davg = D1sum/nsamp
 
+                # Update the running average of the Hutchinson steps
                 nsamp0 = nsamp
                 nsamp = nsamp + 1
                 Davg0 = Davg
-
                 Davg = Davg0 * nsamp0 / nsamp + hvp_step / nsamp
 
                 # Exponential average between the 'guess' and the latest running avg.
                 D1 = beta2 * D0 + (1 - beta2) * Davg
 
+                # Thresholding
                 Dhat = jnp.maximum(jnp.abs(D1), alpha)
                 invDhat = 1 / Dhat
 
+                # And finally the adaptive step size rule
                 Fw0 = F(w0, idx_batches_grad[k - 1])
                 gradFw0 = gradF(w0, idx_batches_grad[k - 1])
 
                 if adaptive_step_size:
                     eta = eta * 1.2
-                    # eta = eta_max
-                    # print("hello")
 
                 w1 = w0 - eta * invDhat * jnp.conj(gradFw0)
                 Fw1 = F(w1, idx_batches_grad[k - 1])

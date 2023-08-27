@@ -2,8 +2,16 @@ import jax.numpy as jnp
 
 
 def conjugate_gradient(op, b, x0, iterations, eps=1e-16, verbose=False):
-    """Apply the conjugate gradient method where op(x) performs Ax for
-    Hermitian positive-definite matrix A."""
+    """Apply the conjugate gradient method to solve Ax=b, where:
+
+    op(x): Performs Ax for Hermitian positive-definite matrix A.
+    b:     The right-hand side of the linear system to solve.
+    x0:    Initialization.
+    iterations: Maximum number of iterations.
+    eps:   Stop if residual norm less than eps.
+    verbose: Print residual norm every 10 iterations.
+    """
+
     r = b - op(x0)
 
     x = x0
@@ -37,8 +45,8 @@ def conjugate_gradient(op, b, x0, iterations, eps=1e-16, verbose=False):
 def get_cg_vol_ops(
     grad_loss_volume_sum, angles, shifts, ctf_params, imgs_f, vol_shape, sigma=1
 ):
-    """Get the AA and Ab required to apply CG to find
-    the volume for known angles and shifts.
+    """Get the A^* A and Ab required to apply CG to solve A^* Ax = Ab
+    to find the volume for known angles and shifts.
 
     Parameters:
     -----------
@@ -61,6 +69,8 @@ def get_cg_vol_ops(
 
     vol_shape: [int, int, int]
         Shape of the volume.
+
+    sigma: Noise standard deviation.
 
     Returns:
     --------

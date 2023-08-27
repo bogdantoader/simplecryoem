@@ -19,10 +19,14 @@ def oasis_adaptive(
     N=1,
     iter_display=1,
 ):
-    """Original OASIS implementation with adaptive learning rate, deterministic
-    and stochastic.
-    As introduced in Jahani et al., 2021
-    https://arxiv.org/pdf/2109.05198.pdf
+    """Original OASIS implementation with adaptive learning rate,
+    deterministic and stochastic.
+
+    As introduced in Jahani et al., 2021 https://arxiv.org/pdf/2109.05198.pdf
+    See paper for parameter details.
+
+    Minor adaptation to leverage that the Hessian does not change
+    in our case so far.
     """
 
     n = jnp.array(w0.shape)
@@ -43,7 +47,6 @@ def oasis_adaptive(
     gradFw1 = gradF(w1, random.permutation(subkey1, N)[:batch_size])
 
     nsamp = 0
-    # D1sum = jnp.zeros(D0.shape)
     Davg = jnp.zeros(D0.shape)
 
     loss_list = []

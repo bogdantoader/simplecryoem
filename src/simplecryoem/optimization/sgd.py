@@ -7,8 +7,6 @@ from tqdm import tqdm
 from simplecryoem.loss import Loss, GradV
 
 
-# TODO:
-# Use jax.value_and_grad to speed things up (need to modify the jax operator classes)
 def sgd(
     key,
     grad_func,
@@ -27,32 +25,82 @@ def sgd(
     adaptive_threshold=False,
     alpha=1e-10,
 ):
-    """SGD
+    """Stochastic Gradient Descent
 
     Parameters:
+    -----------
+    key: jax.random.PRNGKey
+
     grad_func : (x, idx) -> sum_i grad(f_i(x)), i=1,...N
          A function that takes a volume x and an array of indices idx
          and returns the sum of the gradients of the loss functions at
          volume x and images indexed by idx.
 
-     N : int
-         The total number of images/samples.
+    loss_func: (x, idx) -> sum_i f_i(x), i=1,...N
+         A function that takes a volume x and an array of indices idx
+         and returns the sum of the loss functions at
+         volume x and images indexed by idx.
 
-     x0 : nx x nx x nx
+    N : int
+         The total number of images/particles.
+
+    x0 : nx x nx x nx
          Starting volume
 
-     eta: float
-         Learning rate
+    eta: float
+         (Initial) Step size.
 
-     N_epochs : int
+    N_epoch : int
          Number of passes through the full dataset.
 
-     batch_size : int
-         Batch size
+    batch_size : int
+         Batch size. Set to None for deterministic gradient descent.
 
-     P : nx x nx x nx
+    D0 : nx x nx x nx
+         Apply the diagonal preconditioner P = 1/max(abs(D0), alpha)
          Diagonal preconditioner (entry-wise multiplication of the gradient).
+         See alpha below.
 
+    adaptive_step_size: boolean
+         Step size adaptation based on (precondition) Armijo condition.
+
+    c : double
+         Constant that determines the strength of the Armijo condition.
+
+    eps :
+        Stop when max(abs(gradient_epoch)) < eps.
+
+    verbose :
+        Not actually used.
+
+    iter_display : int
+        Print output every iter_display epochs. Default value 1.
+        Set higher when running many epochs for deterministic gradient descent.
+
+    adaptive_threshold : boolean
+        Adpative rule for adjusting the preconditioner threshold alpha.
+
+    alpha : double
+        Threshold D0 from below if its entries are very small so that the
+        preconditioner P = 1/D0 does not blow up.
+
+    Returns:
+    --------
+    x: nx x nx x nx
+        Final volume reconstruction
+
+    loss_list : jnp.array(loss_list)
+        Loss function values at the end of each epoch.
+
+    grad_list : jnp.array(grad_list)
+        Mean values of the loss function gradients at the end of each epoch.
+        (See the code for the exact details)
+
+    iterates: N_epoch x nx x nx x nx
+        Iterates from all epochs.
+
+    step_sizes:
+        All step sizes from all iterations (not epochs).
     """
 
     if batch_size is None or batch_size == N:
@@ -92,7 +140,7 @@ def sgd(
             else:
                 pbar = idx_batches
 
-            # Trying this: reset the step size at each epoch in case it goes
+            # Reset the step size at each epoch in case it goes
             # very bad (i.e. very small) during the previous epoch.
             if adaptive_step_size:
                 eta = eta_max
@@ -104,30 +152,17 @@ def sgd(
                 fx = loss_func(x, idx)
 
                 if adaptive_step_size:
-                    eta = eta * 2  # 1.2
-                    # eta = eta_max
+                    eta = eta * 2
 
                 x1 = x - eta * P * jnp.conj(gradx)
-                # x1 = x1 * mask # TEMPORARY
-                # x1 = x1.at[jnp.abs(x1) > 1e4].set(0)
-
                 fx1 = loss_func(x1, idx)
 
                 if adaptive_step_size:
                     while fx1 > fx - c * eta * jnp.real(
                         jnp.sum(jnp.conj(gradx) * P * gradx)
                     ):
-                        # print("AAA")
-                        # print(fx1)
-                        # print(fx - 1/2*eta*jnp.real(jnp.sum(jnp.conj(gradx)*gradx)))
-
                         eta = eta / 2
-                        # print(f"Halving step size. New eta = {eta}")
-
                         x1 = x - eta * P * jnp.conj(gradx)
-                        # x1 = x1 * mask # TEMPORARY
-                        # x1 = x1.at[jnp.abs(x1) > 1e4].set(0)
-
                         fx1 = loss_func(x1, idx)
 
                 step_sizes.append(eta)
@@ -161,7 +196,6 @@ def sgd(
             if idx_epoch % iter_display == 0:
                 print(f"  |Grad| = {grad_epoch :.3e}")
                 print(f"  Loss = {loss_epoch :.8e}")
-
                 print(f"  eta = {eta}")
                 print(f"  alpha = {alpha}")
 
@@ -182,9 +216,32 @@ def sgd(
 def get_sgd_vol_ops(
     gradv: GradV, loss: Loss, angles, shifts, ctf_params, imgs, sigma=1
 ):
-    """Return the loss function, its gradient function and a its hessian-vector
+    """Return the loss function, its gradient function and its hessian-vector
     product function in a way that allows subsampling of the gradient
-    (and Hessian) for SGD or higher order stochastic methods."""
+    (and Hessian) for SGD or higher order stochastic methods.
+
+    Parameters:
+    -----------
+    gradv: GradV object
+    loss: Loss object
+    angles: N x 3 array of Euler angles
+    shifts: N x 2 array of shifts
+    ctf_params: array of CTF parameters
+    imgs: array of images
+    sigma: noise standard deviation
+
+    Returns:
+    --------
+    grad_func: function computing the gradient of the loss function
+        over a minibatch of images, given
+        (v, idx): volume and array of image indices
+    loss_func: the loss function at volume v over a minibatch given by idx
+    hvp_func: Hessian-vector product function
+        Hessian of the loss function at volume v and minibatch idx
+        applied to vector x
+    loss_px_punc: Pixel-wise loss function at volume v and minibatch idx
+
+    """
 
     @jax.jit
     def hvp_loss_func(v, x, angles, shifts, ctf_params, imgs, sigma_noise):
@@ -196,19 +253,24 @@ def get_sgd_vol_ops(
             (x,),
         )[1]
 
-    loss_func = lambda v, idx: loss.loss_sum(
-        v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma
-    )
+    def loss_func(v, idx):
+        return loss.loss_sum(
+            v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma
+        )
 
-    grad_func = lambda v, idx: gradv.grad_loss_volume_sum(
-        v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma
-    )
-    hvp_func = lambda v, x, idx: hvp_loss_func(
-        v, x, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma
-    )
+    def grad_func(v, idx):
+        return gradv.grad_loss_volume_sum(
+            v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma
+        )
 
-    loss_px_func = lambda v, idx: loss.loss_px_sum(
-        v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma
-    )
+    def hvp_func(v, x, idx):
+        return hvp_loss_func(
+            v, x, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma
+        )
+
+    def loss_px_func(v, idx):
+        return loss.loss_px_sum(
+            v, angles[idx], shifts[idx], ctf_params[idx], imgs[idx], sigma
+        )
 
     return grad_func, loss_func, hvp_func, loss_px_func
