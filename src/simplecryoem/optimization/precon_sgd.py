@@ -4,6 +4,7 @@ import numpy as np
 from tqdm import tqdm
 
 
+# TODO: need a better and less confusing name for this
 def precon_sgd(
     key,
     F,
