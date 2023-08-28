@@ -1,9 +1,8 @@
 .ipynb_checkpoints/
 .virtual_documents
-*__pycache__*
+__pycache__
 *swp
 .DS_Store
-*.mrc
 data/*
-nb/logs/*
+notebooks/logs/*
 src/simplecryoem.egg-info

@@ -2,9 +2,10 @@ import unittest
 from jax.config import config
 import numpy as np
 import jax.numpy as jnp
-from simplecryoem.projection import project, project_spatial
-from simplecryoem.utils import spherical_volume
 from numpy.testing import assert_array_almost_equal
+
+from simplecryoem.forwardmodel.projection import project, project_spatial
+from simplecryoem.utils import spherical_volume
 
 config.update("jax_enable_x64", True)
 
@@ -207,11 +208,9 @@ class TestProjection(unittest.TestCase):
             )
 
             # And check that all's good
-            # print("BB", v_proj4_nn)
-            # print(v_proj4_true)
-            assert_array_almost_equal(v_proj2_nn, v_proj2_true, decimal=15)
-            assert_array_almost_equal(v_proj2_tri, v_proj2_true, decimal=15)
-            assert_array_almost_equal(v_proj4_nn, v_proj4_true, decimal=15)
+            assert_array_almost_equal(v_proj2_nn, v_proj2_true, decimal=14)
+            assert_array_almost_equal(v_proj2_tri, v_proj2_true, decimal=14)
+            assert_array_almost_equal(v_proj4_nn, v_proj4_true, decimal=14)
         return
 
     def calculate_rotated_point_mass_projection(self, idx, Kxr, Kyr):

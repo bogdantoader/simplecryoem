@@ -1,16 +1,17 @@
 import unittest
 import numpy as np
+from numpy.testing import assert_array_equal, assert_equal
 import jax.numpy as jnp
 from jax.config import config
-from simplecryoem.interpolate import (
-    find_nearest_one_grid_point_idx,
+
+from simplecryoem.forwardmodel.interpolation import (
     interpolate_diff_grids,
-    tri_interp_point,
-    find_nearest_eight_grid_points_idx,
-    find_adjacent_grid_points_idx,
-    find_nearest_grid_point_idx,
+    _find_nearest_one_grid_point_idx,
+    _tri_interp_point,
+    _find_nearest_eight_grid_points_idx,
+    _find_adjacent_grid_points_idx,
+    _find_nearest_grid_point_idx,
 )
-from numpy.testing import assert_array_equal, assert_equal
 
 config.update("jax_enable_x64", True)
 
@@ -47,7 +48,7 @@ class TestInterpolate(unittest.TestCase):
         # x and y indices swapped
 
         for p, pt_grid_idx in zip(pts, pts_grid_idxs):
-            idx_found = find_nearest_one_grid_point_idx(p, x_grid, y_grid, z_grid)
+            idx_found = _find_nearest_one_grid_point_idx(p, x_grid, y_grid, z_grid)
             assert_array_equal(idx_found, pt_grid_idx)
 
         return
@@ -64,7 +65,7 @@ class TestInterpolate(unittest.TestCase):
         y_grid = jnp.array([y_freq[1], len(y_freq)])
         z_grid = jnp.array([z_freq[1], len(z_freq)])
 
-        found_idx = find_nearest_one_grid_point_idx(coord, x_grid, y_grid, z_grid)
+        found_idx = _find_nearest_one_grid_point_idx(coord, x_grid, y_grid, z_grid)
         assert_array_equal(found_idx, target_idx)
         return
 
@@ -117,7 +118,7 @@ class TestInterpolate(unittest.TestCase):
 
         for coord, val in coords_vals:
             self.assertEqual(
-                tri_interp_point(jnp.array(coord), vol, (xyz, xyz_idx)), val
+                _tri_interp_point(jnp.array(coord), vol, (xyz, xyz_idx)), val
             )
 
         return
@@ -217,63 +218,63 @@ class TestInterpolate(unittest.TestCase):
         # z_freq = x_freq
 
         coords = jnp.array([1.5, 1.5, 1.5])
-        coords, (xyz, xyz_idx) = find_nearest_eight_grid_points_idx(
+        coords, (xyz, xyz_idx) = _find_nearest_eight_grid_points_idx(
             coords, x_grid, y_grid, z_grid
         )
         assert_array_equal(xyz, jnp.array([[1, 2], [1, 2], [1, 2]]))
         assert_array_equal(xyz_idx, jnp.array([[1, 2], [1, 2], [1, 2]]))
 
         coords = jnp.array([1.5, 1.5, 2.5])
-        coords, (xyz, xyz_idx) = find_nearest_eight_grid_points_idx(
+        coords, (xyz, xyz_idx) = _find_nearest_eight_grid_points_idx(
             coords, x_grid, y_grid, z_grid
         )
         assert_array_equal(xyz, jnp.array([[1, 2], [1, 2], [2, 3]]))
         assert_array_equal(xyz_idx, jnp.array([[1, 2], [1, 2], [2, 3]]))
 
         coords = jnp.array([1.5, 1.5, 3.5])
-        coords, (xyz, xyz_idx) = find_nearest_eight_grid_points_idx(
+        coords, (xyz, xyz_idx) = _find_nearest_eight_grid_points_idx(
             coords, x_grid, y_grid, z_grid
         )
         assert_array_equal(xyz, jnp.array([[1, 2], [1, 2], [3, 4]]))
         assert_array_equal(xyz_idx, jnp.array([[1, 2], [1, 2], [3, 4]]))
 
         coords = jnp.array([1.5, 1.5, 4.5])
-        coords, (xyz, xyz_idx) = find_nearest_eight_grid_points_idx(
+        coords, (xyz, xyz_idx) = _find_nearest_eight_grid_points_idx(
             coords, x_grid, y_grid, z_grid
         )
         assert_array_equal(xyz, jnp.array([[1, 2], [1, 2], [4, 5]]))
         assert_array_equal(xyz_idx, jnp.array([[1, 2], [1, 2], [4, 5]]))
 
         coords = jnp.array([1.5, -0.9, 0.2])
-        coords, (xyz, xyz_idx) = find_nearest_eight_grid_points_idx(
+        coords, (xyz, xyz_idx) = _find_nearest_eight_grid_points_idx(
             coords, x_grid, y_grid, z_grid
         )
         assert_array_equal(xyz, jnp.array([[1, 2], [6, 7], [0, 1]]))
         assert_array_equal(xyz_idx, jnp.array([[1, 2], [6, 0], [0, 1]]))
 
         coords = jnp.array([1.5, -1.9, 0.2])
-        coords, (xyz, xyz_idx) = find_nearest_eight_grid_points_idx(
+        coords, (xyz, xyz_idx) = _find_nearest_eight_grid_points_idx(
             coords, x_grid, y_grid, z_grid
         )
         assert_array_equal(xyz, jnp.array([[1, 2], [5, 6], [0, 1]]))
         assert_array_equal(xyz_idx, jnp.array([[1, 2], [5, 6], [0, 1]]))
 
         coords = jnp.array([1.5, -2.9, 0.2])
-        coords, (xyz, xyz_idx) = find_nearest_eight_grid_points_idx(
+        coords, (xyz, xyz_idx) = _find_nearest_eight_grid_points_idx(
             coords, x_grid, y_grid, z_grid
         )
         assert_array_equal(xyz, jnp.array([[1, 2], [4, 5], [0, 1]]))
         assert_array_equal(xyz_idx, jnp.array([[1, 2], [4, 5], [0, 1]]))
 
         coords = jnp.array([2, -0.6, 0.2])
-        coords, (xyz, xyz_idx) = find_nearest_eight_grid_points_idx(
+        coords, (xyz, xyz_idx) = _find_nearest_eight_grid_points_idx(
             coords, x_grid, y_grid, z_grid
         )
         assert_array_equal(xyz, jnp.array([[2, 3], [6, 7], [0, 1]]))
         assert_array_equal(xyz_idx, jnp.array([[2, 3], [6, 0], [0, 1]]))
 
         coords = jnp.array([5.7, 8.2, -12.3])
-        coords, (xyz, xyz_idx) = find_nearest_eight_grid_points_idx(
+        coords, (xyz, xyz_idx) = _find_nearest_eight_grid_points_idx(
             coords, x_grid, y_grid, z_grid
         )
         assert_array_equal(xyz, jnp.array([[5, 6], [1, 2], [1, 2]]))
@@ -290,7 +291,7 @@ class TestInterpolate(unittest.TestCase):
 
         for test_pt, adj_idx, _ in pts_adjacent_nearest:
             assert_equal(
-                find_adjacent_grid_points_idx(test_pt, grid[1], len(grid)),
+                _find_adjacent_grid_points_idx(test_pt, grid[1], len(grid)),
                 (jnp.array(adj_idx[0]), jnp.array(adj_idx[1])),
             )
 
@@ -302,7 +303,7 @@ class TestInterpolate(unittest.TestCase):
 
         for test_pt, adj_idx, _ in pts_adjacent_nearest:
             assert_equal(
-                find_adjacent_grid_points_idx(test_pt, grid[1], len(grid)),
+                _find_adjacent_grid_points_idx(test_pt, grid[1], len(grid)),
                 (jnp.array(adj_idx[0]), jnp.array(adj_idx[1])),
             )
         return
@@ -316,7 +317,7 @@ class TestInterpolate(unittest.TestCase):
 
         for test_pt, _, nearest_idx in pts_adjacent_nearest:
             assert_equal(
-                find_nearest_grid_point_idx(test_pt, grid[1], len(grid)),
+                _find_nearest_grid_point_idx(test_pt, grid[1], len(grid)),
                 jnp.array(nearest_idx),
             )
 
@@ -328,7 +329,7 @@ class TestInterpolate(unittest.TestCase):
 
         for test_pt, _, nearest_idx in pts_adjacent_nearest:
             assert_equal(
-                find_nearest_grid_point_idx(test_pt, grid[1], len(grid)),
+                _find_nearest_grid_point_idx(test_pt, grid[1], len(grid)),
                 jnp.array(nearest_idx),
             )
         return

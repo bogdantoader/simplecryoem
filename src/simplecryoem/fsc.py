@@ -1,19 +1,21 @@
 import numpy as np
 import jax
 import jax.numpy as jnp
-from simplecryoem.projection import rotate_z0
-from simplecryoem.interpolate import (
-    find_nearest_eight_grid_points_idx,
-    find_nearest_one_grid_point_idx,
-)
-from simplecryoem.emfiles import load_data
 import mrcfile
+
+from simplecryoem.emfiles import load_data
+from simplecryoem.forwardmodel.projection import rotate_z0
+from simplecryoem.forwardmodel.interpolation import (
+    _find_nearest_eight_grid_points_idx,
+    _find_nearest_one_grid_point_idx,
+)
 
 
 def calc_fsc(v1, v2, grid, dr=None):
     """Calculate the fourier shell correlation between the Fourier
     volumes v1 and v2 on the Fourier grid given by grid and shell
     width given by dr.
+    Return the resolution and the FSC at that resolution.
 
     Parameters:
     ----------
@@ -24,6 +26,7 @@ def calc_fsc(v1, v2, grid, dr=None):
         dx is the spacing and N is the number of points of the grid.
     dr: double
         The width of each Fourier shell.
+
     Returns:
     -------
     res: double array
@@ -32,8 +35,7 @@ def calc_fsc(v1, v2, grid, dr=None):
         The cross-correlation between the volumes at each shell.
     shell_points: int array
         The number of points in each shell.
-
-    Return the resolution and the FSC at that resolution."""
+    """
 
     # Calculate the radius in the Fourier domain.
     x_freq = jnp.fft.fftfreq(int(grid[1]), 1 / (grid[0] * grid[1]))
@@ -82,8 +84,9 @@ def calc_fsc(v1, v2, grid, dr=None):
 
 
 def average_shells(v, grid, dr=None):
-    """Calculate the average of the values in each shell, where the shells
-    are computed in the same way as for the FSC function above.
+    """Calculate the average of the values in each 3D shell,
+    where the shells are computed in the same way as in the
+    calc_fsc function.
 
     Parameters:
     ----------
@@ -94,16 +97,18 @@ def average_shells(v, grid, dr=None):
         dx is the spacing and N is the number of points of the grid.
     dr: double
         The width of each Fourier shell.
+
     Returns:
     -------
     res: double array
         The resolutions defining each shell, the first being 0.
     shell_means: double array
         The cross-correlation between the volumes at each shell.
-    shell_points: int array
+    shell_n_pts : int array
         The number of points in each shell.
-
-    Return the resolution and the FSC at that resolution."""
+    maxs, medians, mins : int arrays
+        The max, median and min value in each shell.
+    """
 
     # Calculate the radius in the Fourier domain.
     x_freq = jnp.fft.fftfreq(int(grid[1]), 1 / (grid[0] * grid[1]))
@@ -133,7 +138,7 @@ def average_shells(v, grid, dr=None):
     sums = jnp.array([jnp.sum(si) for si in s])
     maxs = jnp.array([jnp.max(si) for si in s])
     medians = jnp.array([jnp.median(si) for si in s])
-    mins = jnp.array([jnp.min(si) for si in s])
+    # mins = jnp.array([jnp.min(si) for si in s])
 
     shell_n_pts = jnp.array([len(si) for si in s])
     shell_means = sums / shell_n_pts
@@ -144,7 +149,8 @@ def average_shells(v, grid, dr=None):
 
 
 def average_shells_2D(img, grid, dr=None):
-    "The same as the above function but only for an image"
+    """The same as the average_shells function but on 2D shells
+    (for images)."""
 
     # Calculate the radius in the Fourier domain.
     x_freq = jnp.fft.fftfreq(int(grid[1]), 1 / (grid[0] * grid[1]))
@@ -194,6 +200,7 @@ def points_orientations_tri(angles, nx, number_of_batches=100):
 
     We assume the volume has equal size and grid spacing in all dimensions.
     """
+
     # We set the grid spacing to one as the exact number (determined by
     # pixel size) is irrelevant.
     x_grid = jnp.array([1, nx])
@@ -202,7 +209,7 @@ def points_orientations_tri(angles, nx, number_of_batches=100):
     rc = rotate_list(x_grid, angles)
     print("Finding point indices")
     _, (_, xyz_idxs) = jax.vmap(
-        find_nearest_eight_grid_points_idx, in_axes=(1, None, None, None)
+        _find_nearest_eight_grid_points_idx, in_axes=(1, None, None, None)
     )(rc, x_grid, x_grid, x_grid)
 
     shape = np.array([nx, nx, nx]).astype(np.int64)
@@ -225,23 +232,23 @@ def points_orientations_tri(angles, nx, number_of_batches=100):
         rr = jnp.sum(jax.vmap(po_func, in_axes=0)(xyz_idx_batch), axis=0)
 
         # The same as the line above, without jax magic for debugging
-        # rr = jnp.sum(
-        #    jnp.array([points_orientations_to_vol_tri_one(xyz_idx) for xyz_idx in xyz_idx_batch]),
-        # axis=0)
+        # rr = jnp.sum(jnp.array(
+        #    [_points_orientations_to_vol_tri_one(xyz_idx) for xyz_idx in xyz_idx_batch]
+        # ), axis=0)
 
         points_v += rr
 
     return jnp.array(points_v)
 
 
-# Closure to return the below function without jit issues if
-# nx was an argument
 def get_points_orientations_to_vol_tri_one(nx):
-    po_func = lambda xyz_idx: points_orientations_to_vol_tri_one(xyz_idx, nx)
-    return jax.jit(po_func)
+    """Closure to return the _points_orientations_to_vol_tri_one function
+    without jit issues if nx was an argument."""
+
+    return jax.jit(lambda xyz_idx: _points_orientations_to_vol_tri_one(xyz_idx, nx))
 
 
-def points_orientations_to_vol_tri_one(xyz_idx, nx):
+def _points_orientations_to_vol_tri_one(xyz_idx, nx):
     # Note that x and y indices are swapped in vol,
     # similar to the tri_interp_point funtion.
     # i.e. to obtain vol(x, y, z), call vol[y_idx, x_idx, z_idx]
@@ -273,7 +280,7 @@ def points_orientations_tri_iter(angles, nx):
         rc = rotate_z0(x_grid, ang).T
 
         for c in rc:
-            _, (_, xyz_idx) = find_nearest_eight_grid_points_idx(
+            _, (_, xyz_idx) = _find_nearest_eight_grid_points_idx(
                 c, x_grid, x_grid, x_grid
             )
 
@@ -300,9 +307,9 @@ def points_orientations_nn(angles, nx):
     x_grid = jnp.array([1, nx])
 
     rc = rotate_list(x_grid, angles)
-    xyz_idxs = jax.vmap(find_nearest_one_grid_point_idx, in_axes=(1, None, None, None))(
-        rc, x_grid, x_grid, x_grid
-    )
+    xyz_idxs = jax.vmap(
+        _find_nearest_one_grid_point_idx, in_axes=(1, None, None, None)
+    )(rc, x_grid, x_grid, x_grid)
 
     shape = np.array([nx, nx, nx]).astype(np.int64)
     points_v = np.zeros(shape)

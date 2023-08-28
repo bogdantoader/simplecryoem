@@ -2,7 +2,8 @@ import unittest
 import numpy as np
 import jax.numpy as jnp
 from jax.config import config
-from simplecryoem.algorithm import conjugate_gradient
+
+from simplecryoem.optimization import conjugate_gradient
 
 config.update("jax_enable_x64", True)
 

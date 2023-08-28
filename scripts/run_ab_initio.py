@@ -1,16 +1,13 @@
 import argparse
 import numpy as np
 import jax.numpy as jnp
+from jax import random
 import mrcfile
-from simplecryoem.utils import *
-from simplecryoem.projection import *
-from simplecryoem.interpolate import *
-from simplecryoem.jaxops import *
-from simplecryoem.noise import noise
-from simplecryoem.fsc import *
-from simplecryoem.algorithm import *
-from simplecryoem.ab_initio import ab_initio_mcmc
+
+from simplecryoem.emfiles import load_data
+from simplecryoem.utils import rescale_larger_grid
 from simplecryoem.preprocess import preprocess
+from simplecryoem.ab_initio import ab_initio_mcmc
 
 
 def parse_args(parser):
@@ -136,19 +133,14 @@ def main(args):
         args.data_dir, args.star_file, load_imgs=True, fourier=False
     )
 
-    print(f"min(shifts) = {jnp.min(shifts0)}")
-    print(f"max(shifts) = {jnp.max(shifts0)}")
-
     # Only keep the first N images
     if args.N_imgs:
         assert (
             args.N_imgs <= imgs0.shape[0]
         ), "N cannot be smaller than the number of particles."
         N = args.N_imgs
-        shuffle = True
     else:
         N = imgs0.shape[0]
-        shuffle = False
 
     # Estimate the noise
     if args.noise_free:
@@ -157,7 +149,7 @@ def main(args):
         if args.N_px_noise:
             N_px_noise = args.N_px_noise
         else:
-            N_px_noise = nx
+            N_px_noise = args.nx_crop
 
         if args.N_imgs_noise:
             N_imgs_noise = args.N_imgs_noise
@@ -167,10 +159,8 @@ def main(args):
     processed_data = preprocess(
         imgs0,
         params0,
-        args.out_dir,
         nx_crop=args.nx_crop,
-        N=N,
-        shuffle=shuffle,
+        idx=None,
         N_px_noise=N_px_noise,
         N_imgs_noise=N_imgs_noise,
     )
@@ -221,9 +211,6 @@ def main(args):
     key = random.PRNGKey(int(jnp.floor(np.random.rand() * 1000)))
     v_rec, angles_rec, shifts_rec = ab_initio_mcmc(
         key,
-        project,
-        rotate_and_interpolate,
-        apply_shifts_and_ctf,
         imgs_batch,
         sigma_noise,
         ctf_params_batch,

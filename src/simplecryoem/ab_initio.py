@@ -7,8 +7,14 @@ import numpy as np
 from matplotlib import pyplot as plt
 import mrcfile
 
-from simplecryoem.algorithm import get_sgd_vol_ops, sgd
-from simplecryoem.mcmc import mcmc
+from simplecryoem.forwardmodel import (
+    project,
+    rotate_and_interpolate,
+    apply_shifts_and_ctf,
+    Slice,
+)
+from simplecryoem.optimization import Loss, GradV, sgd, get_sgd_vol_ops
+from simplecryoem.sampling import mcmc_sampling, CryoProposals
 from simplecryoem.utils import (
     create_3d_mask,
     crop_fourier_volume,
@@ -18,15 +24,10 @@ from simplecryoem.utils import (
     generate_uniform_orientations_jax_batch,
     plot_angles,
 )
-from simplecryoem.jaxops import Slice, Loss, GradV
-from simplecryoem.proposals import CryoProposals
 
 
 def ab_initio_mcmc(
     key,
-    project_func,
-    rotate_and_interpolate_func,
-    apply_shifts_and_ctf_func,
     imgs,
     sigma_noise,
     ctf_params,
@@ -64,16 +65,116 @@ def ab_initio_mcmc(
 
     Parameters:
     ----------
+    key: jax.random.PRNGKey
+
     imgs : N1 x N2 x nx*nx array
         The 2d images, vectorised and batched.
+
+    sigma_noise : double
+        Noise standard deviation.
+
+    ctf_params : N1 x N2 x 9 array
+        Batched CTF parameters.
 
     x_grid : [dx, nx]
         The Fourier grid of the images.
 
-    alpha : regularisation parameter
+    vol0 : nx x nx x nx array
+        Volume initialization
+
+    angles0 : N1 x N2 x 3
+        Angles initialization.
+
+    shifts0 : N1 x N2 x 2
+        Shifts initialization.
+
+    N_iter : int
+        Number of total iterations, defaults to 100.
+
+    learning_rate : double
+        SGD step size, defaults to 1
+
+    sgd_batch_size : int
+        Batch size for SGD. If not given, taken to be N2.
+
+    N_samples_vol : int
+        Number of HMC samples for the volume at each iteration.
+        Defaults to 100.
+
+    N_samples_angles_global : int
+        Number of global (uniform) orientations samples
+        at each iteration. Defaults to 1000.
+
+    N_samples_angles_local=100,
+        Number of local (Gaussian) orientations samples
+        at each iteration. Defaults to 100.
+
+    N_samples_shifts_global=100,
+        Number of global (uniform) shifts samples
+        at each iteration. Defaults to 100.
+
+    N_samples_shifts_local=1000,
+        Number of local (Gaussian) shifts samples
+        at each iteration. Defaults to 1000.
+
+    dt_list_hmc : list[double]
+        List of step sizes for the integration that the HMC
+        sampler randomly chooses from at each iteration.
+
+    sigma_perturb_list : list[double]
+        List of Gaussian standard deviations that the
+        local orientation sampler chooses from randomly
+        at each iteration.
+
+    L_hmc : int
+        Number of integration steps in the HMC sampling.
+        Defaults to 10.
+
+    radius0 : double
+        Starting Fourier radius for frequency marching.
+        Defaults to 0.1.
+    dr : double
+        The amount by which the Fourier radius is increased
+        in frequency marching.
+
+    alpha : double
+        Regularisation parameter
+
+    eps_vol : double
+        SGD accuracy for volume reconstruction.
+        Defaults to 1e-16.
+    B, B_list : double
+        Used for the shift proposals.
+
+    minibatch_factor : int
+        Increase the minibatch size by minibatch_factor.
+        Not sure it is used.
+
+    freq_marching_step_iters : int
+        The amount by which to increase the Fourier radius
+        in the frequency marching.
+        Defaults to 8.
+
+    interp_method : string
+        Interpolation method: "tri" or "nn".
+        Defaults to "tri".
+
+    opt_vol_first : boolean
+        Run SGD on volume before starting estimating angles and shifts.
+        Defaults to True.
+
+    verbose : boolean
+
+    diagnostics : boolean
+
+    save_to_file : boolean
+
+    out_dir : string
+        Path of the directory where the output is saved.
 
     Returns:
-
+    --------
+    v, angles, shifts
     """
 
     assert imgs.ndim == 3
@@ -113,7 +214,7 @@ def ab_initio_mcmc(
         slice_full = Slice(x_grid)
         loss_full = Loss(slice_full, alpha=alpha)
         gradv_full = GradV(loss_full)
-        v, angles, shifts = initialize_ab_initio_vol(
+        v, angles, shifts = _initialize_ab_initio_vol(
             subkey,
             imgs,
             ctf_params,
@@ -198,9 +299,9 @@ def ab_initio_mcmc(
             slice_iter = Slice(
                 x_grid_iter,
                 mask3d,
-                project_func,
-                rotate_and_interpolate_func,
-                apply_shifts_and_ctf_func,
+                project,
+                rotate_and_interpolate,
+                apply_shifts_and_ctf,
                 interp_method,
             )
             loss_iter = Loss(slice_iter, alpha=alpha)
@@ -260,7 +361,7 @@ def ab_initio_mcmc(
                             "N_samples_shifts": N_samples_shifts_global,
                         }
                         as0 = jnp.concatenate([angles_iter[i], shifts_iter[i]], axis=1)
-                        _, r_samples_as, samples_as = mcmc(
+                        _, r_samples_as, samples_as = mcmc_sampling(
                             key_angles_unif,
                             proposals.proposal_mtm_orientations_shifts,
                             as0,
@@ -282,7 +383,7 @@ def ab_initio_mcmc(
                             "imgs": imgs_iter[i],
                             "shifts": shifts_iter[i],
                         }
-                        _, r_samples_as, samples_angles = mcmc(
+                        _, r_samples_as, samples_angles = mcmc_sampling(
                             key_angles_unif,
                             proposals.proposal_orientations_uniform,
                             angles_iter[i],
@@ -324,7 +425,7 @@ def ab_initio_mcmc(
                     "imgs": imgs_iter[i],
                     "sigma_perturb": sigma_perturb_list,
                 }
-                _, r_samples_angles, samples_angles = mcmc(
+                _, r_samples_angles, samples_angles = mcmc_sampling(
                     key_angles_pert,
                     proposals.proposal_orientations_perturb,
                     angles_iter[i],
@@ -364,7 +465,7 @@ def ab_initio_mcmc(
                     "ctf_params": ctf_params_iter[i],
                     "imgs": imgs_iter[i],
                 }
-                _, r_samples_shifts, samples_shifts = mcmc(
+                _, r_samples_shifts, samples_shifts = mcmc_sampling(
                     key_shifts,
                     proposals.proposal_shifts_local,
                     shifts_iter[i],
@@ -375,7 +476,7 @@ def ab_initio_mcmc(
                     verbose=True,
                     iter_display=10,
                 )
-                shifts_new.append(samples_shifts[N_samples_shifts - 2])
+                shifts_new.append(samples_shifts[N_samples_shifts_local - 2])
             shifts_iter = jnp.array(shifts_new)
 
             if verbose:
@@ -403,7 +504,7 @@ def ab_initio_mcmc(
             proposal_vol = proposals.proposal_vol_batch
 
         t0 = time.time()
-        v_hmc_mean, r_hmc, v_hmc_samples = mcmc(
+        v_hmc_mean, r_hmc, v_hmc_samples = mcmc_sampling(
             key_volume,
             proposal_vol,
             v,
@@ -474,7 +575,7 @@ def ab_initio_mcmc(
     return v, angles, shifts
 
 
-def initialize_ab_initio_vol(
+def _initialize_ab_initio_vol(
     key,
     imgs,
     ctf_params,

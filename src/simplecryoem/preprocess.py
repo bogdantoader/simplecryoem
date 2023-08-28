@@ -121,8 +121,10 @@ def preprocess(imgs0, params0, nx_crop=None, idx=None, N_px_noise=0, N_imgs_nois
             N_imgs_noise = N
 
         print(
-            (f"Estimating the noise using the {N_px_noise} x {N_px_noise}",
-             f"corners of the first {N_imgs_noise} images."),
+            (
+                f"Estimating the noise using the {N_px_noise} x {N_px_noise}",
+                f"corners of the first {N_imgs_noise} images.",
+            ),
             flush=True,
         )
         t0 = time.time()
