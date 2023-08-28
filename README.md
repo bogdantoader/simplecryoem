@@ -1,5 +1,9 @@
 # Basic implementation of cryo-EM reconstruction
 
+## Reconstruction demo
+
+For an introduction to doing reconstruction using `simplecryoem`, see the [Reconstruction_demo](notebooks/Reconstruction_demo.ipynb) notebook.
+
 ## Installation -- for development
 
 1. Clone the *simplecryoem* repository
