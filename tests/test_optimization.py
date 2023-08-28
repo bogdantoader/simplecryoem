@@ -8,7 +8,7 @@ from simplecryoem.optimization import conjugate_gradient
 config.update("jax_enable_x64", True)
 
 
-class TestAlgorithm(unittest.TestCase):
+class TestOptimization(unittest.TestCase):
     def test_conjugate_gradient(self):
         N = 100
         iterations = 1000

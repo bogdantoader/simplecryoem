@@ -16,7 +16,7 @@ from simplecryoem.forwardmodel.interpolation import (
 config.update("jax_enable_x64", True)
 
 
-class TestInterpolate(unittest.TestCase):
+class TestInterpolation(unittest.TestCase):
     def test_find_nearest_one_grid_point_idx(self):
         # Tested here for both even and odd number of grid points.
         x_freq = jnp.fft.fftfreq(10, 2)
