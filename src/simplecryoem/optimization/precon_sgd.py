@@ -13,7 +13,7 @@ def precon_sgd(
     w0,
     eta,
     D0,
-    beta2,
+    beta,
     alpha,
     N_epoch=20,
     batch_size=None,
@@ -63,7 +63,7 @@ def precon_sgd(
          Initialization of the diagonal of the Hessian to be estimated
          during the run.
 
-    beta2 : double
+    beta : double
          Weight used in the exponential average between D0 and the
          current estimate of the Hessian diagonal.
 
@@ -136,7 +136,7 @@ def precon_sgd(
     if adaptive_step_size:
         eta_max = eta
 
-    # beta0 = beta2
+    # beta0 = beta
     loss_list = []
     step_sizes = []
     iterates = [w0]
@@ -148,9 +148,9 @@ def precon_sgd(
             key, subkey1, subkey2 = random.split(key, 3)
 
             # if idx_epoch == 1:
-            #    beta2 = 1
+            #    beta = 1
             # else:
-            #    beta2 = beta0
+            #    beta = beta0
 
             idx_batches_grad = np.array_split(random.permutation(subkey1, N), N_batch)
 
@@ -181,7 +181,7 @@ def precon_sgd(
                 Davg = Davg0 * nsamp0 / nsamp + hvp_step / nsamp
 
                 # Exponential average between the 'guess' and the latest running avg.
-                D1 = beta2 * D0 + (1 - beta2) * Davg
+                D1 = beta * D0 + (1 - beta) * Davg
 
                 # Thresholding
                 Dhat = jnp.maximum(jnp.abs(D1), alpha)
