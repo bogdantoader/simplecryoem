@@ -54,7 +54,7 @@ def precon_sgd(
          evaluated at v and applied to x.
 
     w0 : nx x nx x nx
-         Starting volume
+         Initial volume
 
     eta: float
          (Initial) Step size.
@@ -113,14 +113,12 @@ def precon_sgd(
 
     """
 
-    n = jnp.array(w0.shape)
+    w_shape = jnp.array(w0.shape)
 
     if batch_size is None or batch_size == N:
         N_batch = 1
     else:
         N_batch = N / batch_size
-
-    key, subkey = random.split(key)
 
     # Since we only work with the diagonal of the Hessian, we
     # can simply write it as a matrix of whatever shape the input
@@ -130,13 +128,12 @@ def precon_sgd(
     # This can be placed before the epoch loop starts or before each epoch
     # (or even between iterations within an epoch)
     # depending on when the Hessian changes
-    nsamp = 0
+    n_samp = 0
     Davg = jnp.zeros(D0.shape)
 
     if adaptive_step_size:
         eta_max = eta
 
-    # beta0 = beta
     loss_list = []
     step_sizes = []
     iterates = [w0]
@@ -145,42 +142,37 @@ def precon_sgd(
             if idx_epoch % iter_display == 0:
                 print(f"Epoch {idx_epoch}/{N_epoch}")
 
-            key, subkey1, subkey2 = random.split(key, 3)
+            key, subkey = random.split(key, 2)
 
-            # if idx_epoch == 1:
-            #    beta = 1
-            # else:
-            #    beta = beta0
+            idx_batches = np.array_split(random.permutation(subkey, N), N_batch)
 
-            idx_batches_grad = np.array_split(random.permutation(subkey1, N), N_batch)
-
-            zkeys = random.split(key, len(idx_batches_grad))
+            key, *zkeys = random.split(key, 1 + len(idx_batches))
 
             if adaptive_step_size:
                 eta = eta_max
             if idx_epoch % iter_display == 0:
-                pbar = tqdm(range(len(idx_batches_grad)))
+                pbar = tqdm(range(len(idx_batches)))
             else:
-                pbar = range(len(idx_batches_grad))
+                pbar = range(len(idx_batches))
             for k in pbar:
-                # Draw rademacher vectors
+                # Draw h_steps Rademacher vectors
                 h_steps = 1
 
                 z = random.rademacher(
-                    zkeys[k - 1], jnp.flip(jnp.append(n, h_steps))
-                ).astype(w0.dtype)
+                    zkeys[k], jnp.insert(w_shape, 0, h_steps), dtype=w0.dtype
+                )
 
                 # Apply the Hutchinson step for each Rademacher vector
-                hvp_step = [zi * hvpF(w0, zi, idx_batches_grad[k - 1]) for zi in z]
+                hvp_step = [zi * hvpF(w0, zi, idx_batches[k]) for zi in z]
                 hvp_step = jnp.mean(jnp.array(hvp_step), axis=0)
 
                 # Update the running average of the Hutchinson steps
-                nsamp0 = nsamp
-                nsamp = nsamp + 1
+                n_samp0 = n_samp
+                n_samp = n_samp + 1
                 Davg0 = Davg
-                Davg = Davg0 * nsamp0 / nsamp + hvp_step / nsamp
+                Davg = Davg0 * n_samp0 / n_samp + hvp_step / n_samp
 
-                # Exponential average between the 'guess' and the latest running avg.
+                # Exponential average between D0 and the latest running avg.
                 D1 = beta * D0 + (1 - beta) * Davg
 
                 # Thresholding
@@ -188,14 +180,14 @@ def precon_sgd(
                 invDhat = 1 / Dhat
 
                 # And finally the adaptive step size rule
-                Fw0 = F(w0, idx_batches_grad[k - 1])
-                gradFw0 = gradF(w0, idx_batches_grad[k - 1])
+                Fw0 = F(w0, idx_batches[k])
+                gradFw0 = gradF(w0, idx_batches[k])
 
                 if adaptive_step_size:
                     eta = eta * 1.2
 
                 w1 = w0 - eta * invDhat * jnp.conj(gradFw0)
-                Fw1 = F(w1, idx_batches_grad[k - 1])
+                Fw1 = F(w1, idx_batches[k])
 
                 if adaptive_step_size:
                     while Fw1 > Fw0 - c * eta * jnp.real(
@@ -203,7 +195,7 @@ def precon_sgd(
                     ):
                         eta = eta / 2
                         w1 = w0 - eta * invDhat * jnp.conj(gradFw0)
-                        Fw1 = F(w1, idx_batches_grad[k - 1])
+                        Fw1 = F(w1, idx_batches[k])
 
                 w0 = w1
                 D0 = D1
@@ -215,7 +207,7 @@ def precon_sgd(
 
             loss_epoch = []
             for k in pbar:
-                loss_iter = F(w1, idx_batches_grad[k - 1])
+                loss_iter = F(w1, idx_batches[k])
                 loss_epoch.append(loss_iter)
             loss_epoch = jnp.mean(jnp.array(loss_epoch))
 
