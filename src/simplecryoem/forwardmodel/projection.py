@@ -1,4 +1,5 @@
 import numpy as np
+import jax
 import jax.numpy as jnp
 from jax.config import config
 from pyem.vop import grid_correct
@@ -134,19 +135,27 @@ def rotate_and_interpolate(
 def apply_shifts_and_ctf(proj, shifts, ctf_params, grid_proj):
     """Apply the shifts and CTF to an image in the Fourier domain.
 
-    To apply no CTF, make ctf_params None."""
+    To apply no CTF, make ctf_params jnp.array([jnp.nan]) or np.array([None])."""
 
     shift = get_shift_term(grid_proj, grid_proj, shifts)
     proj *= shift
 
-    if ctf_params is not None:
+    def compute_ctf():
         x_freq = jnp.fft.fftfreq(int(grid_proj[1]), 1 / (grid_proj[0] * grid_proj[1]))
         X, Y = jnp.meshgrid(x_freq, x_freq)
         r = jnp.sqrt(X**2 + Y**2)
         theta = jnp.arctan2(Y, X)
 
-        ctf = eval_ctf(r, theta, ctf_params)
-        proj *= ctf.ravel()
+        return eval_ctf(r, theta, ctf_params).astype(jnp.complex128).ravel()
+
+    ctf = jax.lax.cond(
+        jnp.isnan(ctf_params[0]),
+        true_fun = lambda _: jnp.ones_like(proj),
+        false_fun = lambda _: compute_ctf(),
+        operand = None
+    )
+
+    proj *= ctf
 
     # return proj, proj_coords
     return proj
