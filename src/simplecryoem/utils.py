@@ -165,11 +165,20 @@ def get_sinc(x_grid):
     return jnp.array(res)
 
 
-def create_3d_mask(x_grid, centre, radius):
+def create_3d_mask(x_grid, centre = None, radius = None):
     """Create an nx x nx x nx 3D mask to apply to a volume.
 
     It works in the Fourier domain with the standard ordering,
     but obviously it can be applied in the spatial domain too."""
+
+    if centre is None:
+        centre = (0, 0, 0)
+    
+    if radius is None:
+        if x_grid[1] % 2 == 0:
+            radius = (x_grid[1] / 2 - 1) * x_grid[0]
+        else:
+            radius = (x_grid[1] - 1) / 2 * x_grid[0]
 
     x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1 / (x_grid[1] * x_grid[0]))
     y_freq = x_freq
@@ -185,12 +194,21 @@ def create_3d_mask(x_grid, centre, radius):
     return np.array(mask)
 
 
-def create_2d_mask(x_grid, centre, radius):
+def create_2d_mask(x_grid, centre = None, radius = None):
     """Create an nx x nx 2D mask to apply to an image.
 
     Works in the Fourier domain with the standard ordering,
     but obviously it can be applied in the spatial domain too.
     Always centered at zero."""
+
+    if centre is None:
+        centre = (0, 0)
+    
+    if radius is None:
+        if x_grid[1] % 2 == 0:
+            radius = (x_grid[1] / 2 - 1) * x_grid[0]
+        else:
+            radius = (x_grid[1] - 1) / 2 * x_grid[0]
 
     x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1 / (x_grid[1] * x_grid[0]))
     y_freq = x_freq
