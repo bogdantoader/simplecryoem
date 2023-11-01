@@ -169,11 +169,17 @@ def create_3d_mask(x_grid, centre = None, radius = None):
     """Create an nx x nx x nx 3D mask to apply to a volume.
 
     It works in the Fourier domain with the standard ordering,
-    but obviously it can be applied in the spatial domain too."""
+    but obviously it can be applied in the spatial domain too.
+
+    If centre is None, it is set to (0,0,0).
+
+    If radius is None, it is set to the maximum radius that fits
+    inside the grid.
+    """
 
     if centre is None:
         centre = (0, 0, 0)
-    
+
     if radius is None:
         if x_grid[1] % 2 == 0:
             radius = (x_grid[1] / 2 - 1) * x_grid[0]
@@ -203,7 +209,7 @@ def create_2d_mask(x_grid, centre = None, radius = None):
 
     if centre is None:
         centre = (0, 0)
-    
+
     if radius is None:
         if x_grid[1] % 2 == 0:
             radius = (x_grid[1] / 2 - 1) * x_grid[0]
