@@ -50,6 +50,8 @@ Clone the *pyem* repository in a separate directory:
 ```
 git clone https://github.com/asarnow/pyem.git
 cd pyem
+conda install numpy scipy matplotlib seaborn numba pandas natsort
+conda install -c conda-forge pyfftw healpy pathos
 pip install --no-dependencies -e .
 ```
 
