@@ -18,7 +18,7 @@ config.update("jax_enable_x64", True)
 
 
 def project_spatial(
-    v, angles, pixel_size, shifts=[0, 0], method="tri", ctf_params=None, pfac=1
+    v, angles, pixel_size, shifts=[0, 0], method="tri", ctf_params=jnp.array([jnp.nan]), pfac=1
 ):
     """Takes a centred object in the spatial domain and returns the centred
     projection in the spatial domain.

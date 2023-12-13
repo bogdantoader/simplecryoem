@@ -339,10 +339,10 @@ class TestProjection(unittest.TestCase):
 
     def do_nn_and_tri_projection(self, v, x_grid, angles):
         vp_nn = project(
-            jnp.fft.ifftshift(v), angles, [0, 0], None, x_grid, x_grid, "nn"
+            jnp.fft.ifftshift(v), angles, [0, 0], jnp.array([jnp.nan]), x_grid, x_grid, "nn"
         )
         vp_tri = project(
-            jnp.fft.ifftshift(v), angles, [0, 0], None, x_grid, x_grid, "tri"
+            jnp.fft.ifftshift(v), angles, [0, 0], jnp.array([jnp.nan]), x_grid, x_grid, "tri"
         )
 
         vp_nn = vp_nn.reshape(v.shape[0], v.shape[1])
