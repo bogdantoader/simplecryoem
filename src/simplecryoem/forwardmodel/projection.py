@@ -150,9 +150,9 @@ def apply_shifts_and_ctf(proj, shifts, ctf_params, grid_proj):
 
     ctf = jax.lax.cond(
         jnp.isnan(ctf_params[0]),
-        true_fun = lambda _: jnp.ones_like(proj),
-        false_fun = lambda _: compute_ctf(),
-        operand = None
+        true_fun=lambda _: jnp.ones_like(proj),
+        false_fun=lambda _: compute_ctf(),
+        operand=None
     )
 
     proj *= ctf
