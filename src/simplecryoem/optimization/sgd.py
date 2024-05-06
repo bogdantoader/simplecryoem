@@ -22,7 +22,6 @@ def sgd(
     eps=1e-15,
     verbose=False,
     iter_display=1,
-    adaptive_threshold=False,
     alpha=1e-10,
 ):
     """Stochastic Gradient Descent
@@ -77,9 +76,6 @@ def sgd(
         Print output every iter_display epochs. Default value 1.
         Set higher when running many epochs for deterministic gradient descent.
 
-    adaptive_threshold : boolean
-        Adpative rule for adjusting the preconditioner threshold alpha.
-
     alpha : double
         Threshold D0 from below if its entries are very small so that the
         preconditioner P = 1/D0 does not blow up.
@@ -131,7 +127,8 @@ def sgd(
                 print(f"Epoch {idx_epoch+1}/{N_epoch} ", end="")
 
             key, subkey = random.split(key)
-            idx_batches = np.array_split(random.permutation(subkey, N), N_batch)
+            idx_batches = np.array_split(
+                random.permutation(subkey, N), N_batch)
 
             grad_epoch = []
 
@@ -175,9 +172,9 @@ def sgd(
 
                 if idx_epoch % iter_display == 0:
                     pbar.set_postfix(
-                        grad=f"{gradmax :.3e}",
-                        loss=f"{loss_iter :.3e}",
-                        eta=f"{eta :.3e}",
+                        grad=f"{gradmax:.3e}",
+                        loss=f"{loss_iter:.3e}",
+                        eta=f"{eta:.3e}",
                     )
 
             grad_epoch = jnp.mean(jnp.array(grad_epoch))
@@ -194,18 +191,13 @@ def sgd(
             iterates.append(x)
 
             if idx_epoch % iter_display == 0:
-                print(f"  |Grad| = {grad_epoch :.3e}")
-                print(f"  Loss = {loss_epoch :.8e}")
+                print(f"  |Grad| = {grad_epoch:.3e}")
+                print(f"  Loss = {loss_epoch:.8e}")
                 print(f"  eta = {eta}")
                 print(f"  alpha = {alpha}")
 
             if grad_epoch < eps:
                 break
-
-            if adaptive_threshold:
-                alpha = alpha / 2
-                D0hat = jnp.maximum(jnp.abs(D0), alpha)
-                P = 1 / D0hat
 
         except KeyboardInterrupt:
             break

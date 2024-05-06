@@ -4,7 +4,6 @@ import numpy as np
 from tqdm import tqdm
 
 
-# TODO: need a better and less confusing name for this
 def precon_sgd(
     key,
     F,
@@ -21,7 +20,6 @@ def precon_sgd(
     adaptive_step_size=False,
     c=0.5,
     iter_display=1,
-    adaptive_threshold=False,
 ):
     """Preconditioned SGD, where the diagonal of the Hessian of the
     loss function is estimated and improved using minibatches and
@@ -94,9 +92,6 @@ def precon_sgd(
         Print output every iter_display epochs. Default value 1.
         Set higher when running many epochs for deterministic gradient descent.
 
-    adaptive_threshold : boolean
-        Adpative rule for adjusting the preconditioner threshold alpha.
-
     Returns:
     --------
     w1: nx x nx x nx
@@ -144,7 +139,8 @@ def precon_sgd(
 
             key, subkey = random.split(key, 2)
 
-            idx_batches = np.array_split(random.permutation(subkey, N), N_batch)
+            idx_batches = np.array_split(
+                random.permutation(subkey, N), N_batch)
 
             key, *zkeys = random.split(key, 1 + len(idx_batches))
 
@@ -203,7 +199,8 @@ def precon_sgd(
                 step_sizes.append(eta)
 
                 if idx_epoch % iter_display == 0:
-                    pbar.set_postfix(loss=f"{loss_iter : .3e}", eta=f"{eta :.3e}")
+                    pbar.set_postfix(
+                        loss=f"{loss_iter: .3e}", eta=f"{eta:.3e}")
 
             loss_epoch = []
             for k in pbar:
@@ -215,12 +212,10 @@ def precon_sgd(
             iterates.append(w1)
 
             if idx_epoch % iter_display == 0:
-                print(f"  Loss = {loss_epoch : .8e}")
+                print(f"  Loss = {loss_epoch: .8e}")
                 print(f"  eta = {eta}")
                 print(f"  alpha= {alpha}")
 
-            if adaptive_threshold:
-                alpha = alpha / 2
         except KeyboardInterrupt:
             break
 
