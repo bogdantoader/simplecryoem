@@ -2,8 +2,8 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 from jax.config import config
-from pyem.vop import grid_correct
-from pyem import star
+from simplecryoem.external.pyem.vop import grid_correct
+from simplecryoem.external.pyem import star
 
 from simplecryoem.ctf import eval_ctf
 from . import interpolate

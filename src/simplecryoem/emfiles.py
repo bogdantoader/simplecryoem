@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from pyem import star
+from simplecryoem.external.pyem import star
 from simplecryoem.ctf import get_ctf_params_from_df_row
 import mrcfile
 

@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from pyem import star
+from simplecryoem.external.pyem import star
 
 
 def eval_ctf(s, a, params):
