@@ -1,9 +1,9 @@
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jax.config import config
-from simplecryoem.external.pyem.vop import grid_correct
-from simplecryoem.external.pyem import star
+from jax import config
+from pyem.vop import grid_correct
+from pyem import star
 
 from simplecryoem.ctf import eval_ctf
 from . import interpolate
@@ -59,7 +59,8 @@ def project_spatial(
 
     V, grid_vol, grid_proj = volume_fourier(v, pixel_size, pfac)
 
-    V_slice = project(V, angles, shifts, ctf_params, grid_vol, grid_proj, method)
+    V_slice = project(V, angles, shifts, ctf_params,
+                      grid_vol, grid_proj, method)
 
     # Make it 2D
     V_slice = V_slice.reshape(int(grid_proj[1]), int(grid_proj[1]))
@@ -141,7 +142,8 @@ def apply_shifts_and_ctf(proj, shifts, ctf_params, grid_proj):
     proj *= shift
 
     def compute_ctf():
-        x_freq = jnp.fft.fftfreq(int(grid_proj[1]), 1 / (grid_proj[0] * grid_proj[1]))
+        x_freq = jnp.fft.fftfreq(
+            int(grid_proj[1]), 1 / (grid_proj[0] * grid_proj[1]))
         X, Y = jnp.meshgrid(x_freq, x_freq)
         r = jnp.sqrt(X**2 + Y**2)
         theta = jnp.arctan2(Y, X)
@@ -186,10 +188,12 @@ def rotate_z0(grid_proj, angles):
     # an XLA 'too slow' bug when calling with jit.
 
     # Generate the x and y grids.
-    x_freq = jnp.fft.fftfreq(int(grid_proj[1]), 1 / (grid_proj[0] * grid_proj[1]))
+    x_freq = jnp.fft.fftfreq(
+        int(grid_proj[1]), 1 / (grid_proj[0] * grid_proj[1]))
 
     X, Y = jnp.meshgrid(x_freq, x_freq)
-    coords = jnp.array([X.ravel(), Y.ravel(), jnp.zeros(len(x_freq) * len(x_freq))])
+    coords = jnp.array(
+        [X.ravel(), Y.ravel(), jnp.zeros(len(x_freq) * len(x_freq))])
 
     angles = -jnp.array(angles)
 
@@ -203,7 +207,8 @@ def rotate_full_grid(grid_proj, angles):
     """The same as rotate_z0, but rotate the full grid instead of
     only the z0 plane."""
 
-    x_freq = jnp.fft.fftfreq(int(grid_proj[1]), 1 / (grid_proj[0] * grid_proj[1]))
+    x_freq = jnp.fft.fftfreq(
+        int(grid_proj[1]), 1 / (grid_proj[0] * grid_proj[1]))
 
     X, Y, Z = jnp.meshgrid(x_freq, x_freq, x_freq)
     coords = jnp.array([X.ravel(), Y.ravel(), Z.ravel()])
@@ -257,7 +262,8 @@ def project_star_params(vol, p, pfac=1):
     )  # third angle is
     # rotation around the first z axis
 
-    shifts = jnp.array([p[star.Relion.ORIGINX], p[star.Relion.ORIGINY]]) * pixel_size
+    shifts = jnp.array(
+        [p[star.Relion.ORIGINX], p[star.Relion.ORIGINY]]) * pixel_size
 
     #    ctf_params = {'def1'  : p[star.Relion.DEFOCUSU],
     #                  'def2'  : p[star.Relion.DEFOCUSV],

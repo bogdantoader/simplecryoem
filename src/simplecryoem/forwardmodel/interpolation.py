@@ -1,6 +1,6 @@
 import jax.numpy as jnp
 import jax
-from jax.config import config
+from jax import config
 import warnings
 
 config.update("jax_enable_x64", True)
@@ -79,7 +79,8 @@ def _get_interpolate_nn_func(x_grid, y_grid, z_grid, vol):
 
     def interpolate_nn_func(coords):
         return vol[
-            tuple(_find_nearest_one_grid_point_idx(coords, x_grid, y_grid, z_grid))
+            tuple(_find_nearest_one_grid_point_idx(
+                coords, x_grid, y_grid, z_grid))
         ]
 
     return interpolate_nn_func
@@ -305,9 +306,12 @@ def _find_nearest_eight_grid_points_idx(coords, x_grid, y_grid, z_grid, eps=1e-1
     # For eps < 1e-13, we start to see artefacts, so be careful.
 
     cx, cy, cz = coords
-    x0_idx, x1_idx = _find_adjacent_grid_points_idx(cx, x_grid[0], x_grid[1], eps)
-    y0_idx, y1_idx = _find_adjacent_grid_points_idx(cy, y_grid[0], y_grid[1], eps)
-    z0_idx, z1_idx = _find_adjacent_grid_points_idx(cz, z_grid[0], y_grid[1], eps)
+    x0_idx, x1_idx = _find_adjacent_grid_points_idx(
+        cx, x_grid[0], x_grid[1], eps)
+    y0_idx, y1_idx = _find_adjacent_grid_points_idx(
+        cy, y_grid[0], y_grid[1], eps)
+    z0_idx, z1_idx = _find_adjacent_grid_points_idx(
+        cz, z_grid[0], y_grid[1], eps)
 
     x0 = _get_fourier_grid_point(x0_idx, x_grid[0], x_grid[1])
     x1 = _get_fourier_grid_point(x1_idx, x_grid[0], x_grid[1])
@@ -443,7 +447,8 @@ def _find_nearest_grid_point_idx(p, grid_spacing, grid_length, eps=1e-13):
 
     # Avoiding if-else above due to jax. Replacing the above with cond
     # statements makes the code twice as slow.
-    extended_grid = jnp.array([grid - increment, grid, grid + increment]).flatten()
+    extended_grid = jnp.array(
+        [grid - increment, grid, grid + increment]).flatten()
 
     # Find the index of the closest grid point.
     dists = abs(extended_grid - p)
@@ -498,7 +503,8 @@ def _find_nearest_grid_point_idx(p, grid_spacing, grid_length, eps=1e-13):
             # end of the array, then the 'left' index is the second one.
             true_fun=lambda _: closest_idx2,
             false_fun=lambda _: jax.lax.cond(
-                (closest_idx2 == 0) / 2 + (closest_idx1 == grid_length - 1) / 2 >= 1,
+                (closest_idx2 == 0) / 2 + \
+                (closest_idx1 == grid_length - 1) / 2 >= 1,
                 # Same situation as above, but swapped indices.
                 true_fun=lambda _: closest_idx1,
                 false_fun=lambda _:
