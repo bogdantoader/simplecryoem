@@ -69,25 +69,10 @@ def eval_ctf(s, a, params):
     return ctf
 
 
-def get_ctf_params_from_df_row(p, df_optics, pixel_size):
+def get_ctf_params_from_df_row(p, pixel_size):
     """Extract the CTF parameters from a row in the particles dataframe
     and the optics_df as arrays with elements in the same order as the 
     arguments of eval_ctf."""
-
-    if star.Relion.VOLTAGE in p:
-        voltage = p[star.Relion.VOLTAGE]
-    if star.Relion.VOLTAGE in df_optics:
-        voltage = df_optics[star.Relion.VOLTAGE].loc[p[star.Relion.OPTICSGROUP]]
-
-    if star.Relion.AC in p:
-        ac = p[star.Relion.AC]
-    if star.Relion.AC in df_optics:
-        ac = df_optics[star.Relion.AC].loc[p[star.Relion.OPTICSGROUP]]
-
-    if star.Relion.CS in p:
-        cs = p[star.Relion.CS]
-    if star.Relion.CS in df_optics:
-        cs = df_optics[star.Relion.CS].loc[p[star.Relion.OPTICSGROUP]]
 
     ctf_params = jnp.array(
         [
@@ -95,9 +80,9 @@ def get_ctf_params_from_df_row(p, df_optics, pixel_size):
             p[star.Relion.DEFOCUSV],
             p[star.Relion.DEFOCUSANGLE],
             p[star.Relion.PHASESHIFT],
-            voltage,
-            ac,
-            cs,
+            p[star.Relion.VOLTAGE],
+            p[star.Relion.AC],
+            p[star.Relion.CS],
             0,
             2 * pixel_size,
         ]

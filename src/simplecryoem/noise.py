@@ -74,7 +74,8 @@ def estimate_noise_radial(imgs, nx_empty=48, nx_final=32):
     """Estimate the noise and average it radially."""
 
     print("Estimating pixel-wise noise...", end="", flush=True)
-    sigma_noise = estimate_noise(imgs, nx_empty, nx_final).reshape([nx_final, nx_final])
+    sigma_noise = estimate_noise(
+        imgs, nx_empty, nx_final).reshape([nx_final, nx_final])
     print("done.")
 
     x_grid = [1, sigma_noise.shape[0]]

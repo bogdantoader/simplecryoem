@@ -2,7 +2,7 @@ import time
 import numpy as np
 import pandas as pd
 import mrcfile
-import starfile
+import sys
 from pyem import star
 from simplecryoem.ctf import get_ctf_params_from_df_row
 
@@ -38,29 +38,14 @@ def load_data(data_dir, star_file, load_imgs=False, fourier=True):
 
     """
 
-    # df = star.parse_star(data_dir + star_file, keep_index=False)
+    df = parse_star(data_dir + star_file, keep_index=False)
 
-    star_data = starfile.read(data_dir + star_file)
-    if type(star_data) is dict:
-        df_particles = star_data['particles']
-        df_optics = star_data['optics']
-        df_optics.set_index(star.Relion.OPTICSGROUP, inplace=True)
-    else:
-        df_particles = star_data
-        df_optics = None
-
-    print(f"load_data: number of partcles: {len(df_particles)}")
-
-    df_particles[IMAGE_INDEX] = pd.to_numeric(
-        df_particles[star.Relion.IMAGE_NAME].str.split("@").str[0]
-    ) - 1
-    df_particles[IMAGE_PATH] = df_particles[star.Relion.IMAGE_NAME].str.split(
-        "@").str[1]
+    print(df.keys())
+    print(f"load_data: number of partcles: {len(df)}")
 
     t0 = time.time()
     pixel_size, angles, shifts, ctf_params, imgs = get_data_from_df(
-        df_particles, df_optics, data_dir, load_imgs
-    )
+        df, data_dir, load_imgs)
     t1 = time.time()
     print(f"load_data: data loaded, time: {t1-t0: .2f} sec.")
 
@@ -79,7 +64,7 @@ def load_data(data_dir, star_file, load_imgs=False, fourier=True):
     return params, imgs
 
 
-def get_data_from_df(df, df_optics, data_dir, load_imgs=False):
+def get_data_from_df(df, data_dir, load_imgs=False):
     """Given a data frame as returned by star.parse_star, extract the useful
     information.
 
@@ -105,7 +90,7 @@ def get_data_from_df(df, df_optics, data_dir, load_imgs=False):
         Arrays containing the images if load_imgs=True and empty array otherwise.
     """
 
-    gb = df.groupby(IMAGE_PATH)
+    gb = df.groupby(star.UCSF.IMAGE_ORIGINAL_PATH)
 
     imgs = []
     pixel_size = []
@@ -113,7 +98,7 @@ def get_data_from_df(df, df_optics, data_dir, load_imgs=False):
     shifts = []
     ctf_params = []
 
-    particle_paths = df[IMAGE_PATH].unique()
+    particle_paths = df[star.UCSF.IMAGE_ORIGINAL_PATH].unique()
 
     for path in particle_paths:
         if load_imgs:
@@ -129,30 +114,24 @@ def get_data_from_df(df, df_optics, data_dir, load_imgs=False):
             angtilt = p.get(star.Relion.ANGLETILT)
             angpsi = p.get(star.Relion.ANGLEPSI)
 
-            px = get_pixel_size(p, df_optics)
+            px = star.calculate_apix(p)
 
-            if star.Relion.ORIGINX in p:
-                shx = p[star.Relion.ORIGINX] * px
-            elif star.Relion.ORIGINXANGST in p:
-                shx = p[star.Relion.ORIGINXANGST]
-            else:
-                shx = None
+            shx = p.get(star.Relion.ORIGINX)
+            shy = p.get(star.Relion.ORIGINY)
 
-            if star.Relion.ORIGINY in p:
-                shy = p[star.Relion.ORIGINY] * px
-            elif star.Relion.ORIGINYANGST in p:
-                shy = p[star.Relion.ORIGINYANGST]
-            else:
-                shy = None
+            if shx is not None:
+                shx = shx * px
+            if shy is not None:
+                shy = shy * px
 
             angs = np.array([angpsi, angtilt, angrot])
             if angrot is not None:
                 angs = np.deg2rad(angs)
             sh = np.array([shx, shy])
 
-            ctf_p = get_ctf_params_from_df_row(p, df_optics, px)
+            ctf_p = get_ctf_params_from_df_row(p, px)
 
-            img_index = p[IMAGE_INDEX]
+            img_index = p[star.UCSF.IMAGE_ORIGINAL_INDEX]
             if load_imgs:
                 img = group_data[img_index]
                 imgs.append(img)
@@ -171,11 +150,31 @@ def get_data_from_df(df, df_optics, data_dir, load_imgs=False):
     return pixel_size, angles, shifts, ctf_params, imgs
 
 
-def get_pixel_size(df_row, optics_df):
-    if star.Relion.IMAGEPIXELSIZE in optics_df:
-        return optics_df[star.Relion.IMAGEPIXELSIZE].loc[df_row[star.Relion.OPTICSGROUP]]
-    if star.Relion.IMAGEPIXELSIZE in df_row:
-        return df_row[star.Relion.IMAGEPIXELSIZE]
-    if star.Relion.MICROGRAPHPIXELSIZE in df_row:
-        return df_row[star.Relion.MICROGRAPHPIXELSIZE]
-    return 10000.0 * df[star.Relion.DETECTORPIXELSIZE] / df[star.Relion.MAGNIFICATION]
+def parse_star(star_path, keep_index=False, augment=True, nrows=sys.maxsize):
+    """Function from pyem, modify to add the 'suffixes' option in the pandas.merge function.
+    Without it, the resulting merged dataframe will rename the common columns."""
+
+    tables = star.star_table_offsets(star_path)
+    dfs = {t: star.parse_star_table(star_path, offset=tables[t][0], nrows=min(tables[t][3], nrows), keep_index=keep_index)
+           for t in tables}
+    if star.Relion.OPTICDATA in dfs:
+        if star.Relion.PARTICLEDATA in dfs:
+            data_table = star.Relion.PARTICLEDATA
+        elif star.Relion.MICROGRAPHDATA in dfs:
+            data_table = star.Relion.MICROGRAPHDATA
+        elif star.Relion.IMAGEDATA in dfs:
+            data_table = star.Relion.IMAGEDATA
+        else:
+            data_table = None
+        if data_table is not None:
+            df = pd.merge(dfs[star.Relion.OPTICDATA],
+                          dfs[data_table], on=star.Relion.OPTICSGROUP,
+                          suffixes=('_optics', None))
+        else:
+            df = dfs[star.Relion.OPTICDATA]
+    else:
+        df = dfs[next(iter(dfs))]
+    df = star.check_defaults(df, inplace=True)
+    if augment:
+        star.augment_star_ucsf(df, inplace=True)
+    return df
