@@ -70,6 +70,9 @@ def project_spatial(
 
     return v_proj
 
+# TODO: New parameters order: vol, grid_vol, grid_proj, angles, shifts, ctf_params.
+# Then I can give default values for shifts and CTF params.
+
 
 def project(
     vol, angles, shifts, ctf_params, grid_vol, grid_proj, interpolation_method="tri"
@@ -118,7 +121,7 @@ def project(
     )
 
     # Apply the shift and the CTF.
-    proj = apply_shifts_and_ctf(proj, shifts, ctf_params, grid_proj)
+    proj = apply_shifts_and_ctf(proj, grid_proj, shifts, ctf_params)
 
     return proj
 
@@ -133,7 +136,7 @@ def rotate_and_interpolate(
     return interpolate(proj_coords, grid_vol, vol, interpolation_method)
 
 
-def apply_shifts_and_ctf(proj, shifts, ctf_params, grid_proj):
+def apply_shifts_and_ctf(proj, grid_proj, shifts=jnp.array([0.0, 0.0]), ctf_params=jnp.array([jnp.nan])):
     """Apply the shifts and CTF to an image in the Fourier domain.
 
     To apply no CTF, make ctf_params jnp.array([jnp.nan]) or np.array([None])."""

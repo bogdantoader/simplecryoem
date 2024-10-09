@@ -109,7 +109,7 @@ class Slice:
         """Jit-compiled version of the apply_shifts_and_ctf function."""
 
         return self.apply_shifts_and_ctf_func(
-            projection, shifts, ctf_params, self.x_grid
+            projection, self.x_grid, shifts, ctf_params,
         )
 
     @partial(jax.jit, static_argnums=(0,))
