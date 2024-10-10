@@ -6,17 +6,24 @@ from pyem import star
 def eval_ctf(s, a, params):
     """JAX version of the CTF function from pyEM.
 
-    :param s, a: r, theta polar coordinates in frequency space
-    :param def1: 1st prinicipal underfocus distance (Å).
-    :param def2: 2nd principal underfocus distance (Å).
-    :param angast: Angle of astigmatism (deg) from x-axis to azimuth.
-    :param phase: Phase shift (deg).
-    :param kv:  Microscope acceleration potential (kV).
-    :param ac:  Amplitude contrast in [0, 1.0].
-    :param cs:  Spherical aberration (mm).
-    :param bf:  B-factor, divided by 4 in exponential, lowpass positive.
-    :param lp:  Hard low-pass filter (Å), should usually be Nyquist.
+    Parameters 
+    ----------
+    s, a : jnp.array
+        r, theta polar coordinates in frequency space
+
+    params: jnp.array
+        Array with the following elements:
+        def1: 1st principal underfocus distance (Å), rlnDefocusU
+        def2: 2nd principal underfocus distance (Å), rlnDefocusV
+        angast: Angle of astigmatism (deg) from x-axis to azimuth, rlnDefocusAngle
+        phase: Phase shift (deg), rlnPhaseShift
+        kv:  Microscope acceleration potential (kV), rlnVoltage
+        ac:  Amplitude contrast in [0, 1.0], rlnAmplitudeContrast
+        cs:  Spherical aberration (mm), rlnSphericalAberration
+        bf:  B-factor, divided by 4 in exponential, lowpass positive
+        lp:  Hard low-pass filter (Å), should usually be Nyquist (2 x pixel_size)
     """
+
     def1 = params[0]
     def2 = params[1]
     angast = params[2]
