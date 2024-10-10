@@ -1,5 +1,5 @@
 import unittest
-from jax.config import config
+from jax import config
 import numpy as np
 import jax.numpy as jnp
 from numpy.testing import assert_array_almost_equal

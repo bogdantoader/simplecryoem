@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_equal, assert_equal
 import jax.numpy as jnp
-from jax.config import config
+from jax import config
 
 from simplecryoem.forwardmodel.interpolation import (
     interpolate_diff_grids,

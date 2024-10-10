@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import jax.numpy as jnp
-from jax.config import config
+from jax import config
 
 from simplecryoem.optimization import conjugate_gradient
 
