@@ -40,7 +40,6 @@ def load_data(data_dir, star_file, load_imgs=False, fourier=True):
 
     df = parse_star(data_dir + star_file, keep_index=False)
 
-    print(df.keys())
     print(f"load_data: number of partcles: {len(df)}")
 
     t0 = time.time()
