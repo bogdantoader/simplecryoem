@@ -121,7 +121,8 @@ def plot_angles(angs):
 
     # Get point coordinates
     coords = jnp.array(
-        [get_rotation_matrix(a[0], a[1], a[2]) @ jnp.array([0, 0, 1.1]) for a in angs]
+        [get_rotation_matrix(a[0], a[1], a[2]) @
+         jnp.array([0, 0, 1.1]) for a in angs]
     )
     xx, yy, zz = jnp.hsplit(coords, 3)
 
@@ -135,7 +136,8 @@ def plot_angles(angs):
 def get_preconditioner(x_grid):
     """A basic preconditioner based on the squared Fourier radius."""
 
-    x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1 / (x_grid[1] * x_grid[0]))
+    x_freq = np.fft.fftfreq(x_grid[1].astype(
+        np.int64), 1 / (x_grid[1] * x_grid[0]))
     y_freq = x_freq
     z_freq = x_freq
 
@@ -147,7 +149,8 @@ def get_preconditioner(x_grid):
 def get_sinc(x_grid):
     """3D sinc function in the Fourier domain."""
 
-    x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1 / (x_grid[1] * x_grid[0]))
+    x_freq = np.fft.fftfreq(x_grid[1].astype(
+        np.int64), 1 / (x_grid[1] * x_grid[0]))
     y_freq = x_freq
     z_freq = x_freq
 
@@ -165,7 +168,7 @@ def get_sinc(x_grid):
     return jnp.array(res)
 
 
-def create_3d_mask(x_grid, centre = None, radius = None):
+def create_3d_mask(x_grid, centre=None, radius=None):
     """Create an nx x nx x nx 3D mask to apply to a volume.
 
     It works in the Fourier domain with the standard ordering,
@@ -186,7 +189,8 @@ def create_3d_mask(x_grid, centre = None, radius = None):
         else:
             radius = (x_grid[1] - 1) / 2 * x_grid[0]
 
-    x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1 / (x_grid[1] * x_grid[0]))
+    x_freq = np.fft.fftfreq(x_grid[1].astype(
+        np.int64), 1 / (x_grid[1] * x_grid[0]))
     y_freq = x_freq
     z_freq = x_freq
 
@@ -200,7 +204,7 @@ def create_3d_mask(x_grid, centre = None, radius = None):
     return np.array(mask)
 
 
-def create_2d_mask(x_grid, centre = None, radius = None):
+def create_2d_mask(x_grid, centre=None, radius=None):
     """Create an nx x nx 2D mask to apply to an image.
 
     Works in the Fourier domain with the standard ordering,
@@ -216,7 +220,8 @@ def create_2d_mask(x_grid, centre = None, radius = None):
         else:
             radius = (x_grid[1] - 1) / 2 * x_grid[0]
 
-    x_freq = np.fft.fftfreq(x_grid[1].astype(np.int64), 1 / (x_grid[1] * x_grid[0]))
+    x_freq = np.fft.fftfreq(x_grid[1].astype(
+        np.int64), 1 / (x_grid[1] * x_grid[0]))
     y_freq = x_freq
 
     X, Y = np.meshgrid(x_freq, y_freq)
@@ -308,8 +313,6 @@ def mip_z(img):
     return
 
 
-# TODO: tests for the three functions below,
-# and change the names of these functions, they're not great
 def rescale_smaller_grid(v, x_grid, y_grid, z_grid, radius):
     """Rescale the Fourier volume v defined on x_grid, y_grid, z_grid
     to a new grid of radius r.
@@ -370,7 +373,6 @@ def rescale_larger_grid(v, x_grid, nx_new):
     return v_new, x_grid_new
 
 
-# TODO : write tests for this function and make with work with odd dimensions too.
 def crop_fourier_images(imgs, x_grid, nx_new):
     """Given an N x nx0 x nx0 array of N images of dimension nx0 x nx0 in the
     frequency space with the standard ordering, crop the high-frequency entries
@@ -437,9 +439,9 @@ def crop_fourier_volume(vol, x_grid, nx_new):
 
     vol_cropped = np.fft.ifftshift(
         vol[
-            int(mid - nx_new / 2) : int(mid + nx_new / 2),
-            int(mid - nx_new / 2) : int(mid + nx_new / 2),
-            int(mid - nx_new / 2) : int(mid + nx_new / 2),
+            int(mid - nx_new / 2): int(mid + nx_new / 2),
+            int(mid - nx_new / 2): int(mid + nx_new / 2),
+            int(mid - nx_new / 2): int(mid + nx_new / 2),
         ]
     )
 
@@ -570,7 +572,8 @@ def err_orientations(angles1, angles2):
     a1_i and a2_i from the N x 3 arrays angles1 and angles2."""
 
     # Making get_rotation_matrix function vmap friendly
-    get_rot_mats = jax.vmap(lambda a: get_rotation_matrix(a[0], a[1], a[2]), in_axes=0)
+    get_rot_mats = jax.vmap(
+        lambda a: get_rotation_matrix(a[0], a[1], a[2]), in_axes=0)
 
     # Get the matrix for each orientation
     M1 = get_rot_mats(angles1)
