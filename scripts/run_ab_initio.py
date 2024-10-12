@@ -11,7 +11,8 @@ from simplecryoem.ab_initio import ab_initio_mcmc
 
 
 def parse_args(parser):
-    parser.add_argument("data_dir", help="Location of the star and mrcs files.")
+    parser.add_argument(
+        "data_dir", help="Location of the star and mrcs files.")
     parser.add_argument(
         "star_file", help="Name of the star file, relative to data_dir."
     )
@@ -19,7 +20,8 @@ def parse_args(parser):
         "out_dir",
         help="Directory to save the output at each iteration (vol, angles, shifts).",
     )
-    parser.add_argument("-N", "--N_imgs", type=int, help="Only keep N particle images.")
+    parser.add_argument("-N", "--N_imgs", type=int,
+                        help="Only keep N particle images.")
     parser.add_argument(
         "-nx", "--nx_crop", type=int, help="Crop the images to nx x nx pixels."
     )
@@ -167,13 +169,9 @@ def main(args):
 
     imgs_f = processed_data["imgs_f"]
     pixel_size = processed_data["pixel_size"]
-    angles = processed_data["angles"]
-    shifts = processed_data["shifts"]
     ctf_params = processed_data["ctf_params"]
-    idxrand = processed_data["idxrand"]
     nx = processed_data["nx"]
     x_grid = processed_data["x_grid"]
-    mask = processed_data["mask"]
     sigma_noise = processed_data["sigma_noise"]
     N = imgs_f.shape[0]
 
@@ -183,8 +181,6 @@ def main(args):
 
     # Split in batches, note that imgs_batch stays on the CPU (i.e. np not jnp)
     imgs_batch = np.array(np.array_split(imgs_f, args.N_batch))
-    angles_batch = jnp.array(np.array_split(angles, args.N_batch))
-    shifts_batch = jnp.array(np.array_split(shifts, args.N_batch))
     ctf_params_batch = jnp.array(np.array_split(ctf_params, args.N_batch))
 
     if args.radius0:
@@ -195,7 +191,6 @@ def main(args):
     # List of step sizes for HMC. TODO: tune this automatically.
     dt_list_hmc = jnp.array([0.1, 0.5, 1, 5, 10])
 
-    pixel_size_crop = pixel_size[0] * nx0 / nx
     B = pixel_size[0] * nx0 / 8
     B_list = jnp.array([B / 4, B / 8, B / 16, B / 32])
     sigma_perturb_list = jnp.array([1, 0.1, 0.01, 0.001])
@@ -225,6 +220,7 @@ def main(args):
         args.N_samples_angles_global,
         args.N_samples_angles_local,
         args.N_samples_shifts,
+        args.N_samples_angles_local,
         dt_list_hmc,
         sigma_perturb_list,
         args.L_hmc,

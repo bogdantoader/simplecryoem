@@ -65,7 +65,8 @@ class Loss:
             * (
                 self.alpha * l2sq(v)
                 + self.err_func(
-                    self.slice.slice(v, angles, shifts, ctf_params), img, 1 / sigma**2
+                    self.slice.slice(v, angles, shifts,
+                                     ctf_params), img, 1 / sigma**2
                 )
             )
         )
@@ -77,7 +78,8 @@ class Loss:
             1
             / 2
             * self.err_func(
-                self.slice.slice(v, angles, shifts, ctf_params), img, 1 / sigma**2
+                self.slice.slice(v, angles, shifts,
+                                 ctf_params), img, 1 / sigma**2
             )
         )
 
@@ -103,7 +105,7 @@ class Loss:
 
     @partial(jax.jit, static_argnums=(0,))
     def loss_proj(self, v, projection, shifts, ctf_params, img, sigma):
-        """Loss when the rotation is already done.
+        """Loss when the rotation is already applied.
         L2 squared error with L2 regularization, where alpha is the
         regularization parameter and sigma is the pixel-wise standard
         deviation of the noise."""

@@ -36,8 +36,10 @@ def mcmc_sampling(
 
     N_batch : int
         The number of independent variables that are being sampled
-        in parallel (e.g. for volume it would be one, for orientations
-        it would be more).
+        in parallel, which determines whether the accept_reject function
+        is applied over the whole vector or independently for each variable
+        being sampled. In particular, for volume sampling,set N_batch=1
+        and for orientations/shifts sampling, set N_batch = N_images.
 
     save_samples: int
         Save and return all the samples with index i such that
@@ -59,7 +61,8 @@ def mcmc_sampling(
         Array containing all the Metropolis Hastings ratios.
 
     samples :
-        The array of saved samples. Empty if save_samples = -1.
+        The array of saved samples. If save_samples = -1,
+        it only contains the last sample.
     """
 
     key, *keys = random.split(key, 2 * N_samples + 1)
@@ -86,10 +89,12 @@ def mcmc_sampling(
 
         if N_batch > 1:
             unif_var = random.uniform(keys[2 * i + 1], (N_batch,))
-            x1, logPiX1 = accept_reject_vmap(unif_var, a, x0, x1, logPiX0, logPiX1)
+            x1, logPiX1 = accept_reject_vmap(
+                unif_var, a, x0, x1, logPiX0, logPiX1)
         else:
             unif_var = random.uniform(keys[2 * i + 1])
-            x1, logPiX1 = accept_reject_scalar(unif_var, a, x0, x1, logPiX0, logPiX1)
+            x1, logPiX1 = accept_reject_scalar(
+                unif_var, a, x0, x1, logPiX0, logPiX1)
 
         x_mean = (x_mean * (i - 1) + x1) / i
 
@@ -137,4 +142,5 @@ def accept_reject_scalar(unif_var, a, x0, x1, logPiX0, logPiX1):
     return x, logPiX
 
 
-accept_reject_vmap = jax.jit(jax.vmap(accept_reject_scalar, in_axes=(0, 0, 0, 0, 0, 0)))
+accept_reject_vmap = jax.jit(
+    jax.vmap(accept_reject_scalar, in_axes=(0, 0, 0, 0, 0, 0)))

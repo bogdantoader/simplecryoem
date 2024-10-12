@@ -104,16 +104,13 @@ class CryoProposals:
         public orientations proposal functions above, together with a
         function that generates new angles."""
 
-        # logPi = lambda a : -loss_func_batched0_iter(
-        #    v, a, shifts, ctf_params, imgs, sigma_noise_iter
-        # )
-
         def logPi(a):
             return -self.loss.loss_batched0(
                 v, a, shifts, ctf_params, imgs, self.sigma_noise
             )
 
-        angles1 = generate_orientations_func(key, angles0, **params_orientations)
+        angles1 = generate_orientations_func(
+            key, angles0, **params_orientations)
 
         logPiX0 = jax.lax.cond(
             jnp.sum(logPiX0) == jnp.inf,
@@ -132,12 +129,8 @@ class CryoProposals:
         """Propose new shifts sampled from a normal distribution
         around the current shifts `shifts0`."""
 
-        # logPi = lambda sh : -loss_proj_func_batched0_iter(
-        #    v, proj, sh, ctf_params, imgs, self.sigma_noise
-        # )
-
         def logPi(sh):
-            return -self.loss.loss_proj_batched(
+            return -self.loss.loss_proj_batched0(
                 v, proj, sh, ctf_params, imgs, self.sigma_noise
             )
 
@@ -147,9 +140,6 @@ class CryoProposals:
             false_fun=lambda _: logPiX0,
             operand=None,
         )
-
-        # if jnp.sum(logPiX0) == jnp.inf:
-        #    logPiX0 = logPi(shifts0)
 
         key, subkey = random.split(key)
         B0 = random.permutation(subkey, self.B_list)[0]
@@ -247,18 +237,21 @@ class CryoProposals:
 
         N = angles0.shape[0]
         shifts1_states = (
-            random.uniform(keys[2], (N, N_samples_shifts, 2)) * 2 * self.B - self.B
+            random.uniform(keys[2], (N, N_samples_shifts, 2)
+                           ) * 2 * self.B - self.B
         )
 
         # weights has shape [N, N_samples_shifts], w(y_i) = logPi(y_i)
         weights = -jax.vmap(
-            self.loss.loss_proj_batched0, in_axes=(None, None, 1, None, None, None)
+            self.loss.loss_proj_batched0, in_axes=(
+                None, None, 1, None, None, None)
         )(v, proj, shifts1_states, ctf_params, imgs, self.sigma_noise).transpose()
 
         # Select the proposed state with probability proportional
         # to weights, batch mode (all images in parallel).
         keys = random.split(key, N)
-        sh1idx = jax.vmap(jax.random.categorical, in_axes=(0, 0))(keys, weights)
+        sh1idx = jax.vmap(jax.random.categorical,
+                          in_axes=(0, 0))(keys, weights)
         shifts1 = jax.vmap(
             lambda s1_states_i, sh1idx_i: s1_states_i[sh1idx_i], in_axes=(0, 0)
         )(shifts1_states, sh1idx)
@@ -275,7 +268,8 @@ class CryoProposals:
             in_axes=(0, 0, 0),
         )(weights, sh1idx, weights0)
 
-        r = jax.vmap(self._ratio_sum_exp, in_axes=(0, 0))(weights, weights_reference)
+        r = jax.vmap(self._ratio_sum_exp, in_axes=(0, 0))(
+            weights, weights_reference)
         as1 = jnp.concatenate([angles1, shifts1], axis=1)
 
         return as1, r, weights1, weights0

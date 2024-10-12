@@ -192,7 +192,8 @@ def ab_initio_mcmc(
         dr = r[1, 1, 1]
     if verbose:
         max_radius = x_grid[0] * x_grid[1] / 2
-        n_steps = (jnp.floor((max_radius - radius0) / dr) + 1).astype(jnp.int64)
+        n_steps = (jnp.floor((max_radius - radius0) / dr) +
+                   1).astype(jnp.int64)
 
         print(f"Fourier radius: {max_radius}")
         print(f"Minibatch factor: {minibatch_factor}")
@@ -209,7 +210,7 @@ def ab_initio_mcmc(
 
     key, subkey = random.split(key)
     if vol0 is None and opt_vol_first:
-        N_vol_iter = 3000
+        N_vol_iter = 501
 
         slice_full = Slice(x_grid)
         loss_full = Loss(slice_full, alpha=alpha)
@@ -219,6 +220,7 @@ def ab_initio_mcmc(
             imgs,
             ctf_params,
             gradv_full,
+            loss_full,
             N_vol_iter,
             eps_vol,
             sigma_noise,
@@ -233,7 +235,8 @@ def ab_initio_mcmc(
             plt.colorbar()
             plt.show()
     elif vol0 is None:
-        v = jnp.array(np.random.randn(nx, nx, nx) + np.random.randn(nx, nx, nx) * 1j)
+        v = jnp.array(np.random.randn(nx, nx, nx) +
+                      np.random.randn(nx, nx, nx) * 1j)
     else:
         v = vol0
 
@@ -254,314 +257,337 @@ def ab_initio_mcmc(
 
     nx_iter = 0
     recompile = True
-    for idx_iter in range(N_iter):
-        if (
-            nx_iter == nx
-            and jnp.mod(idx_iter, freq_marching_step_iters - 1) == 0
-            and N_samples_vol < 100
-        ):
-            N_samples_vol = 500
 
-        if verbose:
-            print(f"Iter {idx_iter}")
+    try:
+        for idx_iter in range(N_iter):
+            if (
+                nx_iter == nx
+                and jnp.mod(idx_iter, freq_marching_step_iters - 1) == 0
+                and N_samples_vol < 100
+            ):
+                N_samples_vol = 500
 
-        if recompile:
-            # The nx of the volume at the current iteration
-            mask3d = create_3d_mask(x_grid, (0, 0, 0), radius)
-            nx_iter = jnp.sum(mask3d[0, 0, :]).astype(jnp.int64)
+            if verbose:
+                print(f"Iter {idx_iter}")
 
-            # Ensure that we work with even images so that all the masking stuff works
-            if jnp.mod(nx_iter, 2) == 1:
-                nx_iter += 1
+            if recompile:
+                # The nx of the volume at the current iteration
+                mask3d = create_3d_mask(x_grid, (0, 0, 0), radius)
+                nx_iter = jnp.sum(mask3d[0, 0, :]).astype(jnp.int64)
 
-            # At the first iteration, we reduce the size (from v0) while
-            # afterwards, we increase it (frequency marching).
-            if idx_iter == 0:
-                v, _ = crop_fourier_volume(v, x_grid, nx_iter)
+                # Ensure that we work with even images so that all the masking stuff works
+                if jnp.mod(nx_iter, 2) == 1:
+                    nx_iter += 1
+                print(f"nx_iter = {nx_iter}")
+
+                # At the first iteration, we reduce the size (from v0) while
+                # afterwards, we increase it (frequency marching).
+                if idx_iter == 0:
+                    v, _ = crop_fourier_volume(v, x_grid, nx_iter)
+                else:
+                    v, _ = rescale_larger_grid(v, x_grid_iter, nx_iter)
+
+                # Crop the images to the right size
+                imgs_iter_full, x_grid_iter = crop_fourier_images_batch(
+                    imgs, x_grid, nx_iter
+                )
+                imgs_iter_full = imgs_iter_full.reshape(
+                    [N1, N2, nx_iter * nx_iter])
+                sigma_noise_iter, _ = crop_fourier_images(
+                    sigma_noise, x_grid, nx_iter)
+                sigma_noise_iter = sigma_noise_iter.reshape(-1)
+                mask3d = create_3d_mask(x_grid_iter, (0, 0, 0), radius)
+                mask2d = mask3d[0].reshape(1, -1)
+                imgs_iter_full = imgs_iter_full * mask2d
+                M_iter = (
+                    1 / jnp.max(sigma_noise) ** 2 *
+                    jnp.ones([nx_iter, nx_iter, nx_iter])
+                )
+
+                # Get the operators for the dimensions at this iteration.
+                slice_iter = Slice(
+                    x_grid_iter,
+                    mask3d,
+                    project,
+                    rotate_and_interpolate,
+                    apply_shifts_and_ctf,
+                    interp_method,
+                )
+                loss_iter = Loss(slice_iter, alpha=alpha)
+                gradv_iter = GradV(loss_iter)
+
+                proposals = CryoProposals(
+                    sigma_noise_iter,
+                    B,
+                    B_list,
+                    dt_list_hmc,
+                    L_hmc,
+                    M_iter,
+                    slice_iter,
+                    loss_iter,
+                    gradv_iter,
+                )
+
+            if minibatch_factor is not None and N1 == 1:
+                minibatch = True
+                minibatch_size = nx_iter * minibatch_factor
+                key, subkey = random.split(key)
+                idx_img = random.permutation(subkey, N2)[:minibatch_size]
+
+                print(f"Minibatch size = {minibatch_size}")
             else:
-                v, _ = rescale_larger_grid(v, x_grid_iter, nx_iter)
+                minibatch = False
+                idx_img = np.arange(N2)
 
-            # Crop the images to the right size
-            imgs_iter_full, x_grid_iter = crop_fourier_images_batch(
-                imgs, x_grid, nx_iter
-            )
-            imgs_iter_full = imgs_iter_full.reshape([N1, N2, nx_iter * nx_iter])
-            sigma_noise_iter, _ = crop_fourier_images(sigma_noise, x_grid, nx_iter)
-            sigma_noise_iter = sigma_noise_iter.reshape(-1)
-            mask3d = create_3d_mask(x_grid_iter, (0, 0, 0), radius)
-            mask2d = mask3d[0].reshape(1, -1)
-            imgs_iter_full = imgs_iter_full * mask2d
-            M_iter = (
-                1 / jnp.max(sigma_noise) ** 2 * jnp.ones([nx_iter, nx_iter, nx_iter])
+            imgs_iter = imgs_iter_full[:, idx_img]
+            angles_iter = angles[:, idx_img]
+            shifts_iter = shifts[:, idx_img]
+            ctf_params_iter = ctf_params[:, idx_img]
+
+            key, key_volume, key_angles_unif, key_angles_pert, key_shifts = random.split(
+                key, 5
             )
 
-            # Get the operators for the dimensions at this iteration.
-            slice_iter = Slice(
-                x_grid_iter,
-                mask3d,
-                project,
-                rotate_and_interpolate,
-                apply_shifts_and_ctf,
-                interp_method,
-            )
-            loss_iter = Loss(slice_iter, alpha=alpha)
-            gradv_iter = GradV(loss_iter)
+            # Sample the orientations
+            if angles0 is None:
+                # First, sample orientations and shifts uniformly and at the same time using
+                # multiple-try Monte Carlo
 
-            proposals = CryoProposals(
-                sigma_noise_iter,
-                B,
-                B_list,
-                dt_list_hmc,
-                L_hmc,
-                M_iter,
-                slice_iter,
-                loss_iter,
-                gradv_iter,
-            )
+                t0 = time.time()
+                # or jnp.mod(idx_iter, 8) == 4:
 
-        if minibatch_factor is not None and N1 == 1:
-            minibatch = True
-            minibatch_size = nx_iter * minibatch_factor
-            key, subkey = random.split(key)
-            idx_img = random.permutation(subkey, N2)[:minibatch_size]
+                if idx_iter < 8 * freq_marching_step_iters:
+                    print("Sampling global orientations and shifts")
 
-            print(f"Minibatch size = {minibatch_size}")
-        else:
-            idx_iter = np.arange(N2)
+                    angles_new = []
+                    shifts_new = []
+                    for i in jnp.arange(N1):
+                        if verbose and N1 > 1:
+                            print("batch ", i)
 
-        imgs_iter = imgs_iter_full[:, idx_img]
-        angles_iter = angles[:, idx_img]
-        shifts_iter = shifts[:, idx_img]
-        ctf_params_iter = ctf_params[:, idx_img]
+                        if shifts0 is None:
+                            params_mtm = {
+                                "v": v,
+                                "ctf_params": ctf_params_iter[i],
+                                "imgs": imgs_iter[i],
+                                "N_samples_shifts": N_samples_shifts_global,
+                            }
+                            as0 = jnp.concatenate(
+                                [angles_iter[i], shifts_iter[i]], axis=1)
+                            _, r_samples_as, samples_as = mcmc_sampling(
+                                key_angles_unif,
+                                proposals.proposal_mtm_orientations_shifts,
+                                as0,
+                                N_samples_angles_global,
+                                params_mtm,
+                                imgs_iter.shape[1],
+                                1,
+                                verbose=True,
+                                iter_display=100,
+                            )
+                            as1 = samples_as[N_samples_angles_global - 2]
 
-        key, key_volume, key_angles_unif, key_angles_pert, key_shifts = random.split(
-            key, 5
-        )
+                            angles_new.append(as1[:, :3])
+                            shifts_new.append(as1[:, 3:])
+                        else:
+                            params_orientations = {
+                                "v": v,
+                                "ctf_params": ctf_params_iter[i],
+                                "imgs": imgs_iter[i],
+                                "shifts": shifts_iter[i],
+                            }
+                            _, r_samples_as, samples_angles = mcmc_sampling(
+                                key_angles_unif,
+                                proposals.proposal_orientations_uniform,
+                                angles_iter[i],
+                                N_samples_angles_global,
+                                params_orientations,
+                                imgs_iter.shape[1],
+                                1,
+                                verbose=True,
+                                iter_display=100,
+                            )
 
-        # Sample the orientations
-        if angles0 is None:
-            # First, sample orientations and shifts uniformly and at the same time using
-            # multiple-try Monte Carlo
+                            angles_new.append(
+                                samples_angles[N_samples_angles_global - 2])
 
-            t0 = time.time()
-            if idx_iter < 8 * freq_marching_step_iters:  # or jnp.mod(idx_iter, 8) == 4:
-                print("Sampling global orientations and shifts")
+                    angles_iter = jnp.array(angles_new)
+                    if shifts0 is None:
+                        shifts_iter = jnp.array(shifts_new)
 
+                    if verbose:
+                        print(
+                            "  Time global orientations and shifts sampling =",
+                            time.time() - t0,
+                        )
+                        print(
+                            "  mean(a_angles_shifts) =", jnp.mean(r_samples_as), flush=True
+                        )
+
+                # And now sample local perturbations of the orientations.
+                print("Sampling local orientations")
+
+                t0 = time.time()
                 angles_new = []
+                for i in jnp.arange(N1):
+                    if verbose and N1 > 1:
+                        print(f"batch {i}")
+                    params_orientations = {
+                        "v": v,
+                        "shifts": shifts_iter[i],
+                        "ctf_params": ctf_params_iter[i],
+                        "imgs": imgs_iter[i],
+                        "sigma_perturb": sigma_perturb_list,
+                    }
+                    _, r_samples_angles, samples_angles = mcmc_sampling(
+                        key_angles_pert,
+                        proposals.proposal_orientations_perturb,
+                        angles_iter[i],
+                        N_samples_angles_local,
+                        params_orientations,
+                        imgs_iter.shape[1],
+                        1,
+                        verbose=True,
+                        iter_display=100,
+                    )
+                    angles_new.append(
+                        samples_angles[N_samples_angles_local - 2])
+                angles_iter = jnp.array(angles_new)
+
+                if verbose:
+                    print("  Time local orientations sampling =", time.time() - t0)
+                    print("  mean(a_angles) =", jnp.mean(
+                        r_samples_angles), flush=True)
+
+            # Sample the shifts locally
+            if shifts0 is None:
+                print("Sampling local shifts")
+                proj = jnp.array(
+                    [
+                        slice_iter.rotate_and_interpolate_vmap(
+                            v, angles_iter[i])
+                        for i in jnp.arange(angles_iter.shape[0])
+                    ]
+                )
+
+                t0 = time.time()
                 shifts_new = []
                 for i in jnp.arange(N1):
                     if verbose and N1 > 1:
-                        print("batch ", i)
+                        print(f"batch {i}")
 
-                    if shifts0 is None:
-                        params_mtm = {
-                            "v": v,
-                            "ctf_params": ctf_params_iter[i],
-                            "imgs": imgs_iter[i],
-                            "N_samples_shifts": N_samples_shifts_global,
-                        }
-                        as0 = jnp.concatenate([angles_iter[i], shifts_iter[i]], axis=1)
-                        _, r_samples_as, samples_as = mcmc_sampling(
-                            key_angles_unif,
-                            proposals.proposal_mtm_orientations_shifts,
-                            as0,
-                            N_samples_angles_global,
-                            params_mtm,
-                            imgs_iter.shape[1],
-                            1,
-                            verbose=True,
-                            iter_display=50,
-                        )
-                        as1 = samples_as[N_samples_angles_global - 2]
+                    params_shifts = {
+                        "v": v,
+                        "proj": proj[i],
+                        "ctf_params": ctf_params_iter[i],
+                        "imgs": imgs_iter[i],
+                    }
 
-                        angles_new.append(as1[:, :3])
-                        shifts_new.append(as1[:, 3:])
-                    else:
-                        params_orientations = {
-                            "v": v,
-                            "ctf_params": ctf_params_iter[i],
-                            "imgs": imgs_iter[i],
-                            "shifts": shifts_iter[i],
-                        }
-                        _, r_samples_as, samples_angles = mcmc_sampling(
-                            key_angles_unif,
-                            proposals.proposal_orientations_uniform,
-                            angles_iter[i],
-                            N_samples_angles_global,
-                            params_orientations,
-                            imgs_iter.shape[1],
-                            1,
-                            verbose=True,
-                            iter_display=50,
-                        )
-
-                        angles_new.append(samples_angles[N_samples_angles_global - 2])
-
-                angles_iter = jnp.array(angles_new)
-                if shifts0 is None:
-                    shifts_iter = jnp.array(shifts_new)
+                    _, r_samples_shifts, samples_shifts = mcmc_sampling(
+                        key_shifts,
+                        proposals.proposal_shifts_local,
+                        shifts_iter[i],
+                        N_samples_shifts_local,
+                        params_shifts,
+                        imgs_iter.shape[1],
+                        1,
+                        verbose=True,
+                        iter_display=100,
+                    )
+                    shifts_new.append(
+                        samples_shifts[N_samples_shifts_local - 2])
+                shifts_iter = jnp.array(shifts_new)
 
                 if verbose:
-                    print(
-                        "  Time global orientations and shifts sampling =",
-                        time.time() - t0,
-                    )
-                    print(
-                        "  mean(a_angles_shifts) =", jnp.mean(r_samples_as), flush=True
-                    )
+                    print("  Time shifts sampling =", time.time() - t0)
+                    print("  mean(a_shifts) =", jnp.mean(
+                        r_samples_shifts), flush=True)
 
-            # And now sample local perturbations of the orientations.
-            print("Sampling local orientations")
+            # Sample the volume
+            print("Sampling the volume")
+
+            if N1 == 1:
+                params_vol = {
+                    "angles": angles_iter[0],
+                    "shifts": shifts_iter[0],
+                    "ctf_params": ctf_params_iter[0],
+                    "imgs": imgs_iter[0],
+                }
+                proposal_vol = proposals.proposal_vol
+            else:
+                params_vol = {
+                    "angles": angles_iter,
+                    "shifts": shifts_iter,
+                    "ctf_params": ctf_params_iter,
+                    "imgs": imgs_iter,
+                }
+                proposal_vol = proposals.proposal_vol_batch
 
             t0 = time.time()
-            angles_new = []
-            for i in jnp.arange(N1):
-                if verbose and N1 > 1:
-                    print(f"batch {i}")
-                params_orientations = {
-                    "v": v,
-                    "shifts": shifts_iter[i],
-                    "ctf_params": ctf_params_iter[i],
-                    "imgs": imgs_iter[i],
-                    "sigma_perturb": sigma_perturb_list,
-                }
-                _, r_samples_angles, samples_angles = mcmc_sampling(
-                    key_angles_pert,
-                    proposals.proposal_orientations_perturb,
-                    angles_iter[i],
-                    N_samples_angles_local,
-                    params_orientations,
-                    imgs_iter.shape[1],
-                    1,
-                    verbose=True,
-                    iter_display=10,
-                )
-                angles_new.append(samples_angles[N_samples_angles_local - 2])
-            angles_iter = jnp.array(angles_new)
-
-            if verbose:
-                print("  Time local orientations sampling =", time.time() - t0)
-                print("  mean(a_angles) =", jnp.mean(r_samples_angles), flush=True)
-
-        # Sample the shifts locally
-        if shifts0 is None:
-            print("Sampling local shifts")
-            proj = jnp.array(
-                [
-                    slice_iter.rotate_and_interpolate_vmap(v, angles_iter[i])
-                    for i in jnp.arange(angles_iter.shape[0])
-                ]
+            v_hmc_mean, r_hmc, v_hmc_samples = mcmc_sampling(
+                key_volume,
+                proposal_vol,
+                v,
+                N_samples_vol,
+                params_vol,
+                save_samples=-1,
+                iter_display=100,
             )
+            v = v_hmc_samples[0]
+            v = jnp.array(v * mask3d)
 
-            t0 = time.time()
-            shifts_new = []
-            for i in jnp.arange(N1):
-                if verbose and N1 > 1:
-                    print(f"batch {i}")
-
-                params_shifts = {
-                    "v": v,
-                    "proj": proj[i],
-                    "ctf_params": ctf_params_iter[i],
-                    "imgs": imgs_iter[i],
-                }
-                _, r_samples_shifts, samples_shifts = mcmc_sampling(
-                    key_shifts,
-                    proposals.proposal_shifts_local,
-                    shifts_iter[i],
-                    N_samples_shifts_local,
-                    params_shifts,
-                    imgs_iter.shape[1],
-                    1,
-                    verbose=True,
-                    iter_display=10,
-                )
-                shifts_new.append(samples_shifts[N_samples_shifts_local - 2])
-            shifts_iter = jnp.array(shifts_new)
+            # Update the full arrays of angles, shifts etc with
+            # the values computed at the current iteration.
+            if minibatch:
+                angles = angles.at[:, idx_img].set(angles_iter)
+                shifts = shifts.at[:, idx_img].set(shifts_iter)
 
             if verbose:
-                print("  Time shifts sampling =", time.time() - t0)
-                print("  mean(a_shifts) =", jnp.mean(r_samples_shifts), flush=True)
+                print("  Time volume sampling =", time.time() - t0)
+                print("  mean(a_vol) =", jnp.mean(r_hmc), flush=True)
 
-        # Sample the volume
-        print("Sampling the volume")
+            if jnp.mod(idx_iter, freq_marching_step_iters) == 0 and verbose:
+                print(datetime.datetime.now())
+                print("  nx =", nx_iter, flush=True)
 
-        if N1 == 1:
-            params_vol = {
-                "angles": angles_iter[0],
-                "shifts": shifts_iter[0],
-                "ctf_params": ctf_params_iter[0],
-                "imgs": imgs_iter[0],
-            }
-            proposal_vol = proposals.proposal_vol
-        else:
-            params_vol = {
-                "angles": angles_iter,
-                "shifts": shifts_iter,
-                "ctf_params": ctf_params_iter,
-                "imgs": imgs_iter,
-            }
-            proposal_vol = proposals.proposal_vol_batch
+                if diagnostics:
+                    plt.imshow(jnp.abs(jnp.fft.fftshift(
+                        v[:, :, 0] * mask3d[:, :, 0])))
+                    plt.colorbar()
+                    plt.show()
 
-        t0 = time.time()
-        v_hmc_mean, r_hmc, v_hmc_samples = mcmc_sampling(
-            key_volume,
-            proposal_vol,
-            v,
-            N_samples_vol,
-            params_vol,
-            save_samples=-1,
-            iter_display=10,
-        )
-        v = v_hmc_samples[0]
-        v = jnp.array(v * mask3d)
+                    plot_angles(angles_iter[0, :500])
+                    plt.show()
 
-        # Update the full arrays of angles, shifts etc with
-        # the values computed at the current iteration.
-        if minibatch:
-            angles = angles.at[:, idx_img].set(angles_iter)
-            shifts = shifts.at[:, idx_img].set(shifts_iter)
+            if jnp.mod(idx_iter, 1) == 0 and save_to_file:
+                with mrcfile.new(
+                    out_dir + "/rec_iter_" + str(idx_iter) + ".mrc", overwrite=True
+                ) as mrc:
+                    vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
+                    mrc.set_data(vr.astype(np.float32))
 
-        if verbose:
-            print("  Time volume sampling =", time.time() - t0)
-            print("  mean(a_vol) =", jnp.mean(r_hmc), flush=True)
+                file = open(out_dir + "/rec_iter_" +
+                            str(idx_iter) + "_angles", "wb")
+                pickle.dump(angles, file)
+                file.close()
 
-        if jnp.mod(idx_iter, freq_marching_step_iters) == 0 and verbose:
-            print(datetime.datetime.now())
-            print("  nx =", nx_iter, flush=True)
+                file3 = open(out_dir + "/rec_iter_" +
+                             str(idx_iter) + "_shifts", "wb")
+                pickle.dump(shifts, file3)
+                file3.close()
 
-            if diagnostics:
-                plt.imshow(jnp.abs(jnp.fft.fftshift(v[:, :, 0] * mask3d[:, :, 0])))
-                plt.colorbar()
-                plt.show()
+            # Increase radius
+            if jnp.mod(idx_iter, freq_marching_step_iters) == 0:
+                radius += dr
+                recompile = True
 
-                plot_angles(angles_iter[0, :500])
-                plt.show()
+                if nx_iter == nx:
+                    break
+            else:
+                recompile = False
 
-        if jnp.mod(idx_iter, 1) == 0 and save_to_file:
-            with mrcfile.new(
-                out_dir + "/rec_iter_" + str(idx_iter) + ".mrc", overwrite=True
-            ) as mrc:
-                vr = jnp.real(jnp.fft.fftshift(jnp.fft.ifftn(v)))
-                mrc.set_data(vr.astype(np.float32))
-
-            file = open(out_dir + "/rec_iter_" + str(idx_iter) + "_angles", "wb")
-            pickle.dump(angles, file)
-            file.close()
-
-            file3 = open(out_dir + "/rec_iter_" + str(idx_iter) + "_shifts", "wb")
-            pickle.dump(shifts, file3)
-            file3.close()
-
-        # Increase radius
-        if jnp.mod(idx_iter, freq_marching_step_iters) == 0:
-            radius += dr
-            recompile = True
-
-            if nx_iter == nx:
-                break
-        else:
-            recompile = False
+    except KeyboardInterrupt:
+        pass
 
     # At the end, take the mean
     v = v_hmc_mean
@@ -580,6 +606,7 @@ def _initialize_ab_initio_vol(
     imgs,
     ctf_params,
     gradv_obj,
+    loss_obj,
     N_vol_iter,
     eps_vol,
     sigma_noise=1,
@@ -597,24 +624,28 @@ def _initialize_ab_initio_vol(
     N2 = imgs.shape[1]
     nx = jnp.sqrt(imgs.shape[2]).astype(jnp.int64)
 
-    v0 = jnp.array(np.random.randn(nx, nx, nx) + np.random.randn(nx, nx, nx) * 1j)
-    angles = generate_uniform_orientations_jax_batch(key, N1, N2)
+    v0 = jnp.array(np.random.randn(nx, nx, nx) +
+                   np.random.randn(nx, nx, nx) * 1j)
+    angles = generate_uniform_orientations_jax_batch(key1, N1, N2)
     if shifts is None:
         shifts = jnp.zeros([N1, N2, 2])
 
-    sgd_grad_func = get_sgd_vol_ops(
-        gradv_obj, angles[0], shifts[0], ctf_params[0], imgs[0], sigma_noise
+    sgd_grad_func, loss_func, _, _ = get_sgd_vol_ops(
+        gradv_obj, loss_obj, angles[0], shifts[0], ctf_params[0], imgs[0], sigma_noise
     )
-    v = sgd(
+    v, _, _, _, _ = sgd(
+        key2,
         sgd_grad_func,
+        loss_func,
         N2,
         v0,
         learning_rate,
         N_vol_iter,
         batch_size,
         None,
-        eps_vol,
+        eps=eps_vol,
         verbose=verbose,
+        iter_display=100
     )
 
     return v, angles, shifts
