@@ -46,7 +46,7 @@ conda env create -f environment.yml
 conda activate jax_minimal 
 ```
 
-3. Install [pyem](https://github.com/asarnow/pyem/wiki/Install-pyem-with-Miniconda)
+3. Install [pyem](https://github.com/asarnow/pyem/)
 
 Clone the *pyem* repository in a separate directory:
 
