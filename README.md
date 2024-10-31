@@ -39,23 +39,18 @@ git clone git@github.com:bogdantoader/simplecryoem.git
 cd simplecryoem
 ```
 
-2. Create the conda environment and activate it
+2. Create a conda environment and activate it
 
 ```
-conda env create -f environment.yml
-conda activate jax_minimal 
+conda create -n simplecryoem=3.11
+conda activate simplecryoem 
 ```
 
-3. Install [pyem](https://github.com/asarnow/pyem/)
-
-Clone the *pyem* repository in a separate directory:
+3. Install the dependencies
 
 ```
-git clone https://github.com/asarnow/pyem.git
-cd pyem
-conda install numpy scipy matplotlib seaborn numba pandas natsort
-conda install -c conda-forge pyfftw healpy pathos
-pip install --no-dependencies -e .
+conda install numpy scipy matplotlib seaborn numba pandas natsort ipython jupyter
+conda install -c conda-forge pyfftw healpy pathos pyem
 ```
 
 4. Install *simplecryoem* in [development mode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
@@ -81,7 +76,7 @@ If you found this code useful in academic work, please cite: ([arXiv link](https
 @article{toader2023efficient,
     title = {Efficient high-resolution refinement in cryo-EM with stochastic gradient descent},
     author = {Toader, Bogdan and Brubaker, Marcus A. and Lederman, Roy R.},
-    journal = {arXiv:2311.16100v1},
-    year = {2023},
+    journal = {arXiv:2311.16100},
+    year = {2024},
 }
 ```
