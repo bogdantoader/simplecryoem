@@ -39,16 +39,11 @@ git clone git@github.com:bogdantoader/simplecryoem.git
 cd simplecryoem
 ```
 
-2. Create a conda environment and activate it
+2. Create a conda environment and install the dependencies
 
 ```
 conda create -n simplecryoem python=3.11
 conda activate simplecryoem 
-```
-
-3. Install the dependencies
-
-```
 conda install numpy scipy matplotlib seaborn numba pandas natsort ipython jupyterlab tqdm
 pip install starfile mrcfile
 pip install pyfftw healpy pathos
@@ -57,7 +52,13 @@ pip install -U "jax[cuda12]"
 pip install jaxopt
 ```
 
-4. Install *simplecryoem* in [development mode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
+Alternatively, there is an `environment.yml` file that can be used to create a working conda environment:
+
+```
+conda env create -f environment.yml
+```
+
+3. Install *simplecryoem* in [development mode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
 
 Back in the simplecryoem directory, run:
 
@@ -65,7 +66,7 @@ Back in the simplecryoem directory, run:
 pip install --editable .
 ```
 
-5.  Check tests pass.
+4.  Check tests pass.
 
 ```
 python3 -m unittest -v tests/test*
