@@ -17,9 +17,9 @@ The relevont code is in the following notebooks in the `notebooks/preconditioned
 
 2. [2_Preconditioned_SGD_nn.ipynb](notebooks/preconditioned_sgd/2_Preconditioned_SGD_nn.ipynb): Generates some figures of the (diagonal) Hessian of the loss function when nearest-neighbor interpolation is used in the projection operator, for illustration purposes.
 
-3. [3_Preconditioned_SGD_condition_number.ipynb](notebooks/preconditioned_sgd/3_Preconditioned_SGD_condition_number.ipynb): Compute the condition number of the Hessian with increasing resolution (i.e. radius in Fourier space), for both the experimental dataset and when simulating uniform orientations. 
+3. [3_Preconditioned_SGD_condition_number.ipynb](notebooks/preconditioned_sgd/3_Preconditioned_SGD_condition_number.ipynb): Compute the condition number of the Hessian with increasing resolution (i.e. radius in Fourier space), for both the experimental dataset and when simulating uniform particle orientations. 
 
-4. [4_Preconditioned_SGD_plots.ipynb](notebooks/preconditioned_sgd/4_Preconditioned_SGD_plots.ipynb): Generate the plots in the paper using the outputs from the other notebooks.
+4. [4_Preconditioned_SGD_plots.ipynb](notebooks/preconditioned_sgd/4_Preconditioned_SGD_plots.ipynb): Generate the figures in the paper using the outputs from the other notebooks.
 
 These experiments require downloading the particle images in the Electron Microscopy Public Image Archive (EMPIAR) entry [EMPIAR-10076](https://www.ebi.ac.uk/empiar/EMPIAR-10076/) and inverting their contrast. The file with pose and CTF parameters is provided in [notebooks/preconditioned_sgd/data/my_particles_8.star](notebooks/preconditioned_sgd/data/my_particles_8.star).
 
