@@ -252,4 +252,3 @@ dependencies:
       - tzdata==2023.3
       - wcwidth==0.2.5
       - zipp==3.20.2
-prefix: /lmb/home/btoader/.conda/envs/mybase/envs/simplecryoem
