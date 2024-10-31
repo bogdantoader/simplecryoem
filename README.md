@@ -49,8 +49,8 @@ conda activate simplecryoem
 3. Install the dependencies
 
 ```
-conda install numpy scipy matplotlib seaborn numba pandas natsort ipython jupyter
-conda install -c conda-forge pyfftw healpy pathos pyem
+conda install numpy scipy matplotlib seaborn numba pandas natsort ipython jupyterlab
+conda install -c conda-forge starfile mrcfile pyfftw healpy pathos pyem
 ```
 
 4. Install *simplecryoem* in [development mode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
