@@ -49,7 +49,7 @@ conda activate simplecryoem
 3. Install the dependencies
 
 ```
-conda install numpy scipy matplotlib seaborn numba pandas natsort ipython jupyterlab
+conda install numpy scipy matplotlib seaborn numba pandas natsort ipython jupyterlab tqdm
 pip install starfile mrcfile
 pip install pyfftw healpy pathos pyem
 pip install -U "jax[cuda12]"
