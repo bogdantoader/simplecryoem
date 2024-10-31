@@ -42,7 +42,7 @@ cd simplecryoem
 2. Create a conda environment and activate it
 
 ```
-conda create -n simplecryoem=3.11
+conda create -n simplecryoem python=3.11
 conda activate simplecryoem 
 ```
 
