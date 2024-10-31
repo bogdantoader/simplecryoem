@@ -51,7 +51,8 @@ conda activate simplecryoem
 ```
 conda install numpy scipy matplotlib seaborn numba pandas natsort ipython jupyterlab tqdm
 pip install starfile mrcfile
-pip install pyfftw healpy pathos pyem
+pip install pyfftw healpy pathos
+conda install -c conda-forge pyem
 pip install -U "jax[cuda12]"
 pip install jaxopt
 ```
