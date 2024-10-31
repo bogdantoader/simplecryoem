@@ -13,13 +13,13 @@ This repository contains code to reproduce the numerical experiments in the arti
 
 The relevont code is in the following notebooks in the `notebooks/preconditioned_sgd` directory:
 
-1. [1_Preconditioned_SGD.ipynb](notebooks/preconditioned_sgd/1_Preconditioned_SGD.ipynb):
+1. [1_Preconditioned_SGD.ipynb](notebooks/preconditioned_sgd/1_Preconditioned_SGD.ipynb): The main experiments on SGD/preconditioned SGD/estimated preconditioned SGD using trilinear interpolation in the projection operator. 
 
-2. [2_Preconditioned_SGD_nn.ipynb](notebooks/preconditioned_sgd/2_Preconditioned_SGD_nn.ipynb):
+2. [2_Preconditioned_SGD_nn.ipynb](notebooks/preconditioned_sgd/2_Preconditioned_SGD_nn.ipynb): Generates some figures of the (diagonal) Hessian of the loss function when nearest-neighbor interpolation is used in the projection operator, for illustration purposes.
 
-3. [3_Preconditioned_SGD_condition_number.ipynb](notebooks/preconditioned_sgd/3_Preconditioned_SGD_condition_number.ipynb):
+3. [3_Preconditioned_SGD_condition_number.ipynb](notebooks/preconditioned_sgd/3_Preconditioned_SGD_condition_number.ipynb): Compute the condition number of the Hessian with increasing resolution (i.e. radius in Fourier space), for both the experimental dataset and when simulating uniform orientations. 
 
-4. [4_Preconditioned_SGD_plots.ipynb](notebooks/preconditioned_sgd/4_Preconditioned_SGD_plots.ipynb):
+4. [4_Preconditioned_SGD_plots.ipynb](notebooks/preconditioned_sgd/4_Preconditioned_SGD_plots.ipynb): Generate the plots in the paper using the outputs from the other notebooks.
 
 These experiments require downloading the particle images in the Electron Microscopy Public Image Archive (EMPIAR) entry [EMPIAR-10076](https://www.ebi.ac.uk/empiar/EMPIAR-10076/) and inverting their contrast. The file with pose and CTF parameters is provided in [notebooks/preconditioned_sgd/data/my_particles_8.star](notebooks/preconditioned_sgd/data/my_particles_8.star).
 
@@ -43,9 +43,10 @@ The main functionality:
 The `notebooks` directory contains useful examples:
 
 * `Reconstruction_demo.ipynb` : Quick demo of how volume reconstruction works. 
+* `Sammpling_demo.ipynb` : Demonstration of the pose and volume sampling functionality in the package. Very experimental.
 * `basic_functionality` :  Notebooks illustrating random bits of functionality in the package.
 * `comparisons` : Notebooks to compare outputs from `simplecryoem` with other packages/softare.
-* `preconditioned_sgd` : My experiments on preconditioned SGD for cryo-EM.
+* `preconditioned_sgd` : Code to reproduce the numerical experiments on preconditioned SGD for cryo-EM (see above).
 * `sanity_checks` : Very simple examples of projections and reconstruction that serve as sanity checks. Some are implemented as tests too.
 
 The `scripts` directory currently only contains one script for ab-initio reconstruction. It has not been used recently, and may require updating.
