@@ -50,7 +50,10 @@ conda activate simplecryoem
 
 ```
 conda install numpy scipy matplotlib seaborn numba pandas natsort ipython jupyterlab
-conda install -c conda-forge starfile mrcfile pyfftw healpy pathos pyem
+pip install starfile mrcfile
+pip install pyfftw healpy pathos pyem
+pip install -U "jax[cuda12]"
+pip install jaxopt
 ```
 
 4. Install *simplecryoem* in [development mode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
