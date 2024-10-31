@@ -42,8 +42,8 @@ The main functionality:
 
 The `notebooks` directory contains useful examples:
 
-* `Reconstruction_demo.ipynb` : Quick demo of how volume reconstruction works. 
-* `Sammpling_demo.ipynb` : Demonstration of the pose and volume sampling functionality in the package. Very experimental.
+* `Reconstruction_demo.ipynb` : Quick demo of how volume reconstruction works in `simplecryoem`. 
+* `Sammpling_demo.ipynb` : Demonstration of the pose and volume sampling functionality in the package. Experimental.
 * `basic_functionality` :  Notebooks illustrating random bits of functionality in the package.
 * `comparisons` : Notebooks to compare outputs from `simplecryoem` with other packages/softare.
 * `preconditioned_sgd` : Code to reproduce the numerical experiments on preconditioned SGD for cryo-EM (see above).
@@ -54,7 +54,7 @@ The `scripts` directory currently only contains one script for ab-initio reconst
 
 ## Installation
 
-1. Clone the *simplecryoem* repository
+1. Clone the `simplecryoem` repository
 
 ```
 git clone git@github.com:bogdantoader/simplecryoem.git
@@ -80,7 +80,7 @@ Alternatively, there is an `environment.yml` file that can be used to create a w
 conda env create -f environment.yml
 ```
 
-3. Install *simplecryoem* in [development mode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
+3. Install `simplecryoem` in [development mode](https://setuptools.pypa.io/en/latest/userguide/development_mode.html)
 
 Back in the simplecryoem directory, run:
 
