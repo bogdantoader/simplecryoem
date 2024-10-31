@@ -1,8 +1,28 @@
 # simplecryoem
 
-Basic implementation of cryo-EM projection operators and reconstruction algorithms in JAX from scratch, developed mainly for the implementation of ideas in [Toader, Brubaker & Lederman, *Efficient high-resolution refinement in cryo-EM with stochastic gradient descent*](https://arxiv.org/abs/2311.16100v1).
+DIY implementation of cryo-EM projection operators and reconstruction algorithms in JAX. Currently the main purpose of this code is to demonstrate and reproduce the numerical experiments in [Toader, Brubaker & Lederman, *Efficient high-resolution refinement in cryo-EM with stochastic gradient descent*](https://arxiv.org/abs/2311.16100), but it is also intended to be a useful tool for understanding the basics of cryo-EM projection and reconstruction, as well as a platform for exploring new ideas (see the [repository structure](#structure-of-the-repository) below).
 
-To reproduce the numerical experiments in the article, see the [1_Preconditioned_SGD.ipynb](notebooks/preconditioned_sgd/1_Preconditioned_SGD.ipynb) notebook, as well as the rest of the `notebooks/preconditioned_sgd` directory.
+
+## Reproducing the preconditioned SGD results 
+
+This repository contains code to reproduce the numerical experiments in the article:
+
+> **Efficient high-resolution refinement in cryo-EM with stochastic gradient descent**
+> *Bogdan Toader, Marcus A. Brubaker, Roy R. Lederman*
+
+The relevont code is in the following notebooks in the `notebooks/preconditioned_sgd` directory:
+
+1. [1_Preconditioned_SGD.ipynb](notebooks/preconditioned_sgd/1_Preconditioned_SGD.ipynb):
+
+2. [2_Preconditioned_SGD_nn.ipynb](notebooks/preconditioned_sgd/2_Preconditioned_SGD_nn.ipynb):
+
+3. [3_Preconditioned_SGD_condition_number.ipynb](notebooks/preconditioned_sgd/3_Preconditioned_SGD_condition_number.ipynb):
+
+4. [4_Preconditioned_SGD_plots.ipynb](notebooks/preconditioned_sgd/4_Preconditioned_SGD_plots.ipynb):
+
+These experiments require the particle images in the Electron Microscopy Public Image Archive (EMPIAR) entry [EMPIAR-10076](https://www.ebi.ac.uk/empiar/EMPIAR-10076/) and inverting their contrast. The file with pose and CTF parameters is provided in [notebooks/data/my_particles_8.star](notebooks/data/my_particles_8.star).
+
+The generated outputs and figures used in the numerical experiments section of the paper can also be downloaded from Zenodo: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14017757.svg)](https://doi.org/10.5281/zenodo.14017757)
 
 
 ## Reconstruction demo
