@@ -97,13 +97,17 @@ python3 -m unittest -v tests/test*
 
 ## Citation
 
-If you found this code useful in academic work, please cite: ([arXiv link](https://arxiv.org/abs/2311.16100))
+If you found this code useful in academic work, please cite: ([journal link](https://doi.org/10.1107/S205979832500511X), [arXiv](https://arxiv.org/abs/2311.16100))
 
 ```bibtex
-@article{toader2024efficient,
+@article{toader2025efficient,
     title = {Efficient high-resolution refinement in cryo-EM with stochastic gradient descent},
     author = {Toader, Bogdan and Brubaker, Marcus A. and Lederman, Roy R.},
-    journal = {arXiv:2311.16100},
-    year = {2024},
+    journal = {Acta Crystallographica Section D},
+    year = {2025},
+    volume = {81},
+    number = {7},
+    doi = {10.1107/S205979832500511X},
+    url = {https://doi.org/10.1107/S205979832500511X},
 }
 ```
