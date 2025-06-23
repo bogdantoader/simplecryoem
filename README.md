@@ -1,6 +1,6 @@
 # simplecryoem
 
-DIY implementation of cryo-EM projection operators and reconstruction algorithms in JAX. Currently the main purpose of this code is to demonstrate and reproduce the numerical experiments in [Toader, Brubaker & Lederman, *Efficient high-resolution refinement in cryo-EM with stochastic gradient descent*](https://arxiv.org/abs/2311.16100), but it is also intended to be a useful tool for understanding the basics of cryo-EM projection and reconstruction, as well as a platform for exploring new ideas (see the [repository structure](#structure-of-the-repository) below).
+DIY implementation of cryo-EM projection operators and reconstruction algorithms in JAX. Currently the main purpose of this code is to demonstrate and reproduce the numerical experiments in [Toader, Brubaker & Lederman, *Efficient high-resolution refinement in cryo-EM with stochastic gradient descent*](https://doi.org/10.1107/S205979832500511X), but it is also intended to be a useful tool for understanding the basics of cryo-EM projection and reconstruction, as well as a platform for exploring new ideas (see the [repository structure](#structure-of-the-repository) below).
 
 
 ## Reproducing the preconditioned SGD results 
